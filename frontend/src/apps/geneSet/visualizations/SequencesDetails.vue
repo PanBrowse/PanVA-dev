@@ -267,12 +267,12 @@ export default {
         console.log(
           'range',
 
-          this.xScale.invert(selection[0]),
-          this.xScale.invert(selection[1])
+          this.xScale.invert(selection[0] - (this.margin.left *3)),
+          this.xScale.invert(selection[1] - (this.margin.left *3))
         )
         this.xScale.domain([
-          this.xScale.invert(selection[0]),
-          this.xScale.invert(selection[1]),
+          this.xScale.invert(selection[0] - (this.margin.left *3)),
+          this.xScale.invert(selection[1] - (this.margin.left *3)),
         ])
 
         this.svg().select('.brush').call(this.brush.move, null) // This remove the grey brush area as soon as the selection has been done
@@ -417,6 +417,38 @@ export default {
     },
     idled() {
       this.idleTimeout = null
+    },
+    updateZoom( zoomEvent ) {
+      console.log('zoom factor', zoomEvent)
+
+      // If no zoom, back to initial coordinate. Otherwise, update X axis domain
+      if (!zoomEvent) {
+        if (!this.idleTimeout)
+          return (this.idleTimeout = setTimeout(this.idled, 350)) // This allows to wait a little bit
+        this.xScale.domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
+      } else {
+        const regionLength = Math.abs( this.xScale.domain()[1] - this.xScale.domain()[0])
+        this.xScale.domain([
+          this.xScale.domain()[0] - (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
+          this.xScale.domain()[1] +  (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001)
+        ])
+
+        this.svg()
+          .select('.x-axis')
+          .transition()
+          .duration(1000)
+          .call(
+            d3.axisTop(this.xScale)
+
+          )
+          .call((g) => g.select('.domain').remove())
+          .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
+          .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
+
+        this.svg().selectAll('circle.density').remove()
+        this.svg().selectAll('text.density-value-focus').remove()
+        this.draw()
+      }
     },
     drawBars() {
       let vis = this
@@ -1415,6 +1447,11 @@ export default {
 
     this.brush = brush
 
+    var zoom = d3
+      .zoom()
+      .on("zoom", this.updateZoom)
+     d3.select(document.getElementById('contentChr')).call(zoom)
+    // this.call(zoom)
     // Add brushing
     this.svg().append('g').attr('class', 'brush').call(brush)
 
