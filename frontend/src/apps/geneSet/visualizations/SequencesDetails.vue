@@ -34,6 +34,7 @@ import { asterisk, cross, plus } from '@/helpers/customSymbols'
 import { useGeneSetStore } from '@/stores/geneSet'
 import { useGlobalStore } from '@/stores/global'
 import type { SequenceMetrics } from '@/types'
+import { Gene } from '../interfaces/interfaces'
 
 export default {
   name: 'SequencesDetails',
@@ -42,11 +43,11 @@ export default {
     name: String,
     data: Array,
     dataGenes: Array,
-    dataMin: Number,
-    dataMax: Number,
+    dataMin: {type: Number, required: true},
+    dataMax: {type: Number, required: true},
     nrColumns: Number,
-    maxGC: Number,
-    minGC: Number,
+    maxGC: {type: Number, required: true},
+    minGC: {type: Number, required: true},
   },
   components: {
     ACard: Card,
@@ -74,7 +75,7 @@ export default {
     numberOfCols: 2,
     barHeight: 6,
     sortedSequenceIds: [],
-    idleTimeout: null,
+    idleTimeout: {type: [null, Number]},
   }),
   computed: {
     ...mapState(useGeneSetStore, [
@@ -97,6 +98,7 @@ export default {
       'showLinks',
     ]),
     cardName() {
+      if(this.name === undefined) {return "Undefined"}
       return this.name.split('_')[0]
     },
     containerWidth() {
@@ -183,17 +185,17 @@ export default {
     colorScale() {
       return d3
         .scaleOrdinal()
-        .domain(this.homologyGroups)
+        .domain(this.homologyGroups.map(toString))
         .range(d3.schemeCategory10)
     },
     colorScaleGC() {
       return d3
         .scaleSequential()
-        .domain([this.minGC, this.maxGC])
+        .domain([this.minGC ?? 0, this.maxGC ?? 1 ])
         .interpolator(d3.interpolateGreys)
     },
     colorScaleGenome() {
-      return d3.scaleOrdinal().domain([1, 5]).range(d3.schemeCategory10)
+      return d3.scaleOrdinal().domain(['1','2','3','4','5']).range(d3.schemeCategory10)
       // .interpolator(d3.interpolateViridis)
     },
     shapeGenerator() {
@@ -219,13 +221,15 @@ export default {
   methods: {
     ...mapActions(useGeneSetStore, ['deleteChromosome']),
     observeWidth() {
+      const htmlElement:HTMLElement | null = document.getElementById('content')
+      if (htmlElement === null) {return}
       let vis = this
       const resizeObserver = new ResizeObserver(function () {
         vis.svgWidth =
-          document.getElementById('content').offsetWidth *
+          htmlElement.offsetWidth *
           vis.svgWidthScaleFactor
       })
-      resizeObserver.observe(document.getElementById('content'))
+      resizeObserver.observe(htmlElement)
     },
     svg() {
       return d3.select(`#container_${this.name}`)
@@ -255,14 +259,14 @@ export default {
         .attr('x', 0)
         .attr('y', 0)
     },
-    updateChart({ selection }) {
+    updateChart({ selection }): NodeJS.Timeout | undefined {
       console.log('brush selection', selection)
 
       // If no selection, back to initial coordinate. Otherwise, update X axis domain
       if (!selection) {
         if (!this.idleTimeout)
           return (this.idleTimeout = setTimeout(this.idled, 350)) // This allows to wait a little bit
-        this.xScale.domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
+        this.xScale.domain([this.dataMin  > 0 ? 0 : this.dataMin, this.dataMax ??  100])
       } else {
         console.log(
           'range',
@@ -698,95 +702,6 @@ export default {
           (exit) => exit.remove()
         )
 
-      // this.svg()
-      //   .selectAll('path.genome')
-      //   .data(this.data, (d) => d.sequence_id)
-      //   .join(
-      //     (enter) =>
-      //       enter
-      //         .append('path')
-      //         .attr(
-      //           'd',
-      //           d3
-      //             .symbol()
-
-      //             .type(function (d) {
-      //               console.log('d shape', d.genome_number)
-      //               if (d.genome_number === 1) {
-      //                 return cross
-      //               }
-      //               if (d.genome_number === 2) {
-      //                 // return d3.symbolsFill[6]
-      //                 return d3.symbolWye
-      //               }
-      //               if (d.genome_number === 3) {
-      //                 return d3.symbolsStroke[2]
-      //               }
-      //               if (d.genome_number === 4) {
-      //                 return d3.symbolsFill[3]
-      //               }
-      //               if (d.genome_number === 5) {
-      //                 return d3.symbolsFill[4]
-      //               } else {
-      //                 return d3.symbolsFill[5]
-      //               }
-      //             })
-      //             .size(this.barHeight * 3)
-      //         )
-
-      //         .attr('transform', function (d, i) {
-      //           if (d.genome_number === 1) {
-      //             return `translate(${vis.margin.left},${
-      //               vis.margin.top +
-      //               vis.barHeight +
-      //               vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i] *
-      //                 (vis.barHeight + 10)
-      //             }
-      //               )rotate(-45)`
-      //           } else {
-      //             return `translate(${vis.margin.left},${
-      //               vis.margin.top +
-      //               vis.barHeight +
-      //               vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i] *
-      //                 (vis.barHeight + 10)
-      //             }
-      //               )`
-      //           }
-      //         })
-      //         .attr('class', 'genome')
-      //         .attr('style', function (d) {
-      //           if ((d.genome_number === 1) | (d.genome_number === 3)) {
-      //             return 'stroke: red'
-      //           }
-      //         })
-
-      //         .attr('z-index', 100),
-
-      //     (update) =>
-      //       update
-      //         .transition()
-      //         .duration(this.transitionTime)
-      //         .attr('transform', function (d, i) {
-      //           if (d.genome_number === 1) {
-      //             return `translate(${vis.margin.left},${
-      //               vis.margin.top +
-      //               vis.barHeight +
-      //               vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i] *
-      //                 (vis.barHeight + 10)
-      //             }
-      //               )rotate(-45)`
-      //           } else {
-      //             return `translate(${vis.margin.left},${
-      //               vis.margin.top +
-      //               vis.barHeight +
-      //               vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i] *
-      //                 (vis.barHeight + 10)
-      //             }
-      //               )`
-      //           }
-      //         }),
-      //     (exit) => exit.remove()
-      //   )
     },
     addValues() {
       this.svg()
@@ -850,386 +765,258 @@ export default {
     drawGenes() {
       let vis = this
       console.log('this.dataGenes', this.dataGenes)
+      const genes = this.dataGenes
+      if (genes === undefined) { return }
 
-      if (this.dataGenes !== undefined) {
         /// connection lines
+      if (this.showLinks) {
+        this.svg().selectAll('path.connection').remove()
+        this.homologyGroups.forEach((homology) => {
+          const path_focus = genes.filter(
+            (d) => d.homology_id == homology //this.homologyFocus
+          )
 
-        if (this.showLinks) {
-          this.svg().selectAll('path.connection').remove()
-          this.homologyGroups.forEach((homology) => {
-            const path_focus = this.dataGenes.filter(
-              (d) => d.homology_id == homology //this.homologyFocus
+          // console.log('path focus', path_focus)
+          const newPathFocus = path_focus.map((v) => ({
+            ...v,
+            sequence_id: `${v.genome_number}_${v.sequence_number}`,
+          }))
+('newPathFocus', newPathFocus)
+          console.log(Object.keys(this.sequenceIdLookup[this.chromosomeNr]))
+
+          let sortOrder = Object.keys(
+            this.sequenceIdLookup[this.chromosomeNr]
+          )
+
+          let sortedPath = [...newPathFocus].sort(function (a, b) {
+            return (
+              sortOrder.indexOf(a.sequence_id) -
+              sortOrder.indexOf(b.sequence_id)
             )
+          })
 
-            // console.log('path focus', path_focus)
-            const newPathFocus = path_focus.map((v) => ({
-              ...v,
-              sequence_id: `${v.genome_number}_${v.sequence_number}`,
-            }))
+          // Add the line
 
-            // path_focus.forEach((d) => {
-            //   const key = `${d.genome_number}_${d.sequence_number}`
-            //   path_focus['sequence_id'] = key
-            // })
-            console.log('newPathFocus', newPathFocus)
-            console.log(Object.keys(this.sequenceIdLookup[this.chromosomeNr]))
-
-            let sortOrder = Object.keys(
-              this.sequenceIdLookup[this.chromosomeNr]
+          this.svg()
+            .append('path')
+            .datum(sortedPath)
+            .attr('class', 'connection')
+            .attr('fill', 'none')
+            .attr(
+              'stroke',
+              vis.colorGenomes ? 'black' : vis.colorScale(homology)
             )
+            .attr('stroke-width', 1.5)
+            .attr(
+              'd',
+              d3
+                .line()
+                .x(function (d) {
+                  const key = `${d.genome_number}_${d.sequence_number}`
+                  let anchorStart = vis.anchorLookup[key]
+                  return (
+                    vis.margin.left * 3 +
+                    vis.xScale(d.mRNA_start_position - anchorStart)
+                  )
+                })
+                .y(function (d, i) {
+                  return (
+                    vis.margin.top * 2 +
+                    vis.barHeight / 2 +
+                    // vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                    vis.sequenceIdLookup[vis.chromosomeNr][d.sequence_id] *
+                      (vis.barHeight + 10)
+                    // i * (vis.barHeight + 10)
+                  )
+                })
+            )
+        })
+      } else {
+        this.svg().selectAll('path.connection').remove()
+      }
 
-            let sortedPath = [...newPathFocus].sort(function (a, b) {
-              return (
-                sortOrder.indexOf(a.sequence_id) -
-                sortOrder.indexOf(b.sequence_id)
-              )
-            })
-
-            // console.log('sortedPath', sortedPath)
-
-            // Add the line
-
-            this.svg()
+      this.svg()
+        .selectAll('path.gene')
+        .data(genes, (d) => d.mRNA_id)
+        .join(
+          (enter) =>
+            enter
               .append('path')
-              .datum(sortedPath)
-              .attr('class', 'connection')
-              .attr('fill', 'none')
-              .attr(
-                'stroke',
-                vis.colorGenomes ? 'black' : vis.colorScale(homology)
-              )
-              .attr('stroke-width', 1.5)
               .attr(
                 'd',
                 d3
-                  .line()
-                  .x(function (d) {
-                    const key = `${d.genome_number}_${d.sequence_number}`
-                    let anchorStart = vis.anchorLookup[key]
-                    return (
+                  .symbol()
+                  .size(this.barHeight * 4)
+                  .type(d3.symbolTriangle)
+                  .type((d) => vis.shapeGenerator[d.homology_id])
+                // .type(d3.symbolTriangle)
+              )
+              .attr('transform', function (d, i) {
+                const key = `${d.genome_number}_${d.sequence_number}`
+                let rotation
+
+                if (vis.anchor) {
+                  let anchorStart = vis.anchorLookup[key]
+                  // console.log('anchorStart', anchorStart)
+
+                  if (d.strand === '+') {
+                    rotation = `translate(${
                       vis.margin.left * 3 +
                       vis.xScale(d.mRNA_start_position - anchorStart)
-                    )
-                  })
-                  .y(function (d, i) {
-                    return (
+                    },${
                       vis.margin.top * 2 +
                       vis.barHeight / 2 +
-                      // vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                      vis.sequenceIdLookup[vis.chromosomeNr][d.sequence_id] *
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
                         (vis.barHeight + 10)
-                      // i * (vis.barHeight + 10)
-                    )
-                  })
+                    }
+                  )`
+                  } else {
+                    return `translate(${
+                      vis.margin.left * 3 +
+                      vis.xScale(d.mRNA_start_position - anchorStart)
+                    },${
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
+                    }
+                  )`
+                  }
+
+                  return rotation
+                } else {
+                  if (d.strand === '+') {
+                    rotation = `translate(${
+                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
+                    },${
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
+                    }
+                  )`
+                  } else {
+                    return `translate(${
+                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
+                    },${
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
+                    }
+                  )`
+                  }
+
+                  return rotation
+                }
+              })
+              // .attr('transform', function (d, i) {
+              //   const key = `${d.genome_number}_${d.sequence_number}`
+              .attr('class', 'gene')
+              .attr('hg', (d) => d.homology_id)
+              .attr('z-index', 100)
+              .attr('stroke', (d) =>
+                vis.colorGenes
+                  ? vis.upstreamHomologies.includes(d.homology_id)
+                    ? vis.colorScale(d.homology_id)
+                    : ''
+                  : ''
               )
-          })
-        } else {
-          this.svg().selectAll('path.connection').remove()
-        }
+              .attr('stroke-width', (d) =>
+                vis.upstreamHomologies.includes(d.homology_id) ? '3px' : ''
+              )
+              .attr('fill', (d) =>
+                vis.colorGenes ? vis.colorScale(d.homology_id) : 'black'
+              )
+              .attr('opacity', 0.8),
 
-        // const path_focus = this.dataGenes.filter(
-        //   (d) => d.homology_id == 232274335 //this.homologyFocus
-        // )
-
-        // // // console.log('path focus', path_focus)
-        // // const newPathFocus = path_focus.map((v) => ({
-        // //   ...v,
-        // //   sequence_id: `${v.genome_number}_${v.sequence_number}`,
-        // // }))
-
-        // // // path_focus.forEach((d) => {
-        // // //   const key = `${d.genome_number}_${d.sequence_number}`
-        // // //   path_focus['sequence_id'] = key
-        // // // })
-        // // console.log('newPathFocus', newPathFocus)
-        // // console.log(Object.keys(this.sequenceIdLookup[this.chromosomeNr]))
-
-        // // let sortOrder = Object.keys(this.sequenceIdLookup[this.chromosomeNr])
-
-        // // let sortedPath = [...newPathFocus].sort(function (a, b) {
-        // //   return (
-        // //     sortOrder.indexOf(a.sequence_id) - sortOrder.indexOf(b.sequence_id)
-        // //   )
-        // // })
-
-        // // // console.log('sortedPath', sortedPath)
-
-        // // // Add the line
-        // // this.svg().select('path.connection').remove()
-        // // this.svg()
-        // //   .append('path')
-        // //   .datum(sortedPath)
-        // //   .attr('class', 'connection')
-        // //   .attr('fill', 'none')
-        // //   .attr('stroke', vis.colorScale(232274335))
-        // //   .attr('stroke-width', 1.5)
-        // //   .attr(
-        // //     'd',
-        // //     d3
-        // //       .line()
-        // //       .x(function (d) {
-        // //         const key = `${d.genome_number}_${d.sequence_number}`
-        // //         let anchorStart = vis.anchorLookup[key]
-        // //         return (
-        // //           vis.margin.left * 3 +
-        // //           vis.xScale(d.mRNA_start_position - anchorStart)
-        // //         )
-        // //       })
-        // //       .y(function (d, i) {
-        // //         return (
-        // //           vis.margin.top * 2 +
-        // //           vis.barHeight / 2 +
-        // //           // vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-        // //           vis.sequenceIdLookup[vis.chromosomeNr][d.sequence_id] *
-        // //             (vis.barHeight + 10)
-        // //           // i * (vis.barHeight + 10)
-        // //         )
-        // //       })
-        // //   )
-
-        this.svg()
-          .selectAll('path.gene')
-          .data(this.dataGenes, (d) => d.mRNA_id)
-          .join(
-            (enter) =>
-              enter
-                .append('path')
-                .attr(
-                  'd',
-                  d3
-                    .symbol()
-                    .size(this.barHeight * 4)
-                    .type(d3.symbolTriangle)
-                    .type((d) => vis.shapeGenerator[d.homology_id])
-                  // .type(d3.symbolTriangle)
-                )
-                .attr('transform', function (d, i) {
-                  const key = `${d.genome_number}_${d.sequence_number}`
-                  let rotation
-
-                  if (vis.anchor) {
-                    let anchorStart = vis.anchorLookup[key]
-                    // console.log('anchorStart', anchorStart)
-
-                    if (d.strand === '+') {
-                      rotation = `translate(${
-                        vis.margin.left * 3 +
-                        vis.xScale(d.mRNA_start_position - anchorStart)
-                      },${
-                        vis.margin.top * 2 +
-                        vis.barHeight / 2 +
-                        vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                          (vis.barHeight + 10)
-                      }
-                    )`
-                    } else {
-                      return `translate(${
-                        vis.margin.left * 3 +
-                        vis.xScale(d.mRNA_start_position - anchorStart)
-                      },${
-                        vis.margin.top * 2 +
-                        vis.barHeight / 2 +
-                        vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                          (vis.barHeight + 10)
-                      }
-                    )`
-                    }
-
-                    return rotation
-                  } else {
-                    if (d.strand === '+') {
-                      rotation = `translate(${
-                        vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                      },${
-                        vis.margin.top * 2 +
-                        vis.barHeight / 2 +
-                        vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                          (vis.barHeight + 10)
-                      }
-                    )`
-                    } else {
-                      return `translate(${
-                        vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                      },${
-                        vis.margin.top * 2 +
-                        vis.barHeight / 2 +
-                        vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                          (vis.barHeight + 10)
-                      }
-                    )`
-                    }
-
-                    return rotation
-                  }
-                })
-                // .attr('transform', function (d, i) {
-                //   const key = `${d.genome_number}_${d.sequence_number}`
-                //   let rotation
-
-                //   if (d.strand === '+') {
-                //     rotation = `translate(${
-                //       vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                //     },${
-                //       vis.margin.top * 2 +
-                //       vis.barHeight / 2 +
-                //       vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                //         (vis.barHeight + 10)
-                //     }
-                //     )`
-                //   } else {
-                //     return `translate(${
-                //       vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                //     },${
-                //       vis.margin.top * 2 +
-                //       vis.barHeight / 2 +
-                //       vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                //         (vis.barHeight + 10)
-                //     }
-                //     )`
-                //   }
-
-                //   return rotation
-                // })
-                .attr('class', 'gene')
-                .attr('hg', (d) => d.homology_id)
-                .attr('z-index', 100)
-                .attr('stroke', (d) =>
-                  vis.colorGenes
-                    ? vis.upstreamHomologies.includes(d.homology_id)
-                      ? vis.colorScale(d.homology_id)
-                      : ''
+          (update) =>
+            update
+              .transition()
+              .duration(this.transitionTime)
+              .attr('fill', (d) =>
+                vis.colorGenes ? vis.colorScale(d.homology_id) : 'black'
+              )
+              .attr('stroke-width', (d) =>
+                vis.upstreamHomologies.includes(d.homology_id) ? '3px' : ''
+              )
+              .attr('stroke', (d) =>
+                vis.colorGenes
+                  ? vis.upstreamHomologies.includes(d.homology_id)
+                    ? vis.colorScale(d.homology_id)
                     : ''
-                )
-                .attr('stroke-width', (d) =>
-                  vis.upstreamHomologies.includes(d.homology_id) ? '3px' : ''
-                )
-                .attr('fill', (d) =>
-                  vis.colorGenes ? vis.colorScale(d.homology_id) : 'black'
-                )
-                .attr('opacity', 0.8),
+                  : ''
+              )
+              .attr('transform', function (d, i) {
+                const key = `${d.genome_number}_${d.sequence_number}`
+                let rotation
 
-            (update) =>
-              update
-                .transition()
-                .duration(this.transitionTime)
-                // .attr('transform', function (d, i) {
-                //   const key = `${d.genome_number}_${d.sequence_number}`
+                if (vis.anchor) {
+                  let anchorStart = vis.anchorLookup[key]
+                  // console.log('anchorStart', anchorStart)
 
-                //   return `translate(${
-                //     vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                //   },${vis.margin.top * 2 + vis.barHeight / 2 + vis.sortedMrnaIndices[vis.chromosomeNr][i] * (vis.barHeight + 10)}
-                //     )rotate(-270)`
-                // }),
-                .attr('fill', (d) =>
-                  vis.colorGenes ? vis.colorScale(d.homology_id) : 'black'
-                )
-                .attr('stroke-width', (d) =>
-                  vis.upstreamHomologies.includes(d.homology_id) ? '3px' : ''
-                )
-                .attr('stroke', (d) =>
-                  vis.colorGenes
-                    ? vis.upstreamHomologies.includes(d.homology_id)
-                      ? vis.colorScale(d.homology_id)
-                      : ''
-                    : ''
-                )
-                .attr('transform', function (d, i) {
-                  const key = `${d.genome_number}_${d.sequence_number}`
-                  let rotation
-
-                  if (vis.anchor) {
-                    let anchorStart = vis.anchorLookup[key]
-                    // console.log('anchorStart', anchorStart)
-
-                    if (d.strand === '+') {
-                      rotation = `translate(${
-                        vis.margin.left * 3 +
-                        vis.xScale(d.mRNA_start_position - anchorStart)
-                      },${
-                        vis.margin.top * 2 +
-                        vis.barHeight / 2 +
-                        vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                          (vis.barHeight + 10)
-                      }
-                    )` // rotate(-270)`
-                    } else {
-                      return `translate(${
-                        vis.margin.left * 3 +
-                        vis.xScale(d.mRNA_start_position - anchorStart)
-                      },${
-                        vis.margin.top * 2 +
-                        vis.barHeight / 2 +
-                        vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                          (vis.barHeight + 10)
-                      }
-                    )` //rotate(-450)`
+                  if (d.strand === '+') {
+                    rotation = `translate(${
+                      vis.margin.left * 3 +
+                      vis.xScale(d.mRNA_start_position - anchorStart)
+                    },${
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
                     }
-
-                    return rotation
+                  )` // rotate(-270)`
                   } else {
-                    if (d.strand === '+') {
-                      rotation = `translate(${
-                        vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                      },${
-                        vis.margin.top * 2 +
-                        vis.barHeight / 2 +
-                        vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                          (vis.barHeight + 10)
-                      }
-                    )` //rotate(-270)`
-                    } else {
-                      return `translate(${
-                        vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                      },${
-                        vis.margin.top * 2 +
-                        vis.barHeight / 2 +
-                        vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                          (vis.barHeight + 10)
-                      }
-                    )` //rotate(-450)`
+                    return `translate(${
+                      vis.margin.left * 3 +
+                      vis.xScale(d.mRNA_start_position - anchorStart)
+                    },${
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
                     }
-
-                    return rotation
+                  )` //rotate(-450)`
                   }
-                }),
-            // .attr('transform', function (d, i) {
-            //   const key = `${d.genome_number}_${d.sequence_number}`
 
-            //   let rotation
+                  return rotation
+                } else {
+                  if (d.strand === '+') {
+                    rotation = `translate(${
+                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
+                    },${
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
+                    }
+                  )` //rotate(-270)`
+                  } else {
+                    return `translate(${
+                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
+                    },${
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
+                    }
+                  )`
+                  }
 
-            //   if (d.strand === '+') {
-            //     rotation = `translate(${
-            //       vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-            //     },${
-            //       vis.margin.top * 2 +
-            //       vis.barHeight / 2 +
-            //       vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-            //         (vis.barHeight + 10)
-            //     }
-            //     )`
-            //   } else {
-            //     return `translate(${
-            //       vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-            //     },${
-            //       vis.margin.top * 2 +
-            //       vis.barHeight / 2 +
-            //       vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-            //         (vis.barHeight + 10)
-            //     }
-            //     )`
-            //   }
+                  return rotation
+                }
+              }),
 
-            //   return rotation
-            // }),
-            (exit) => exit.remove()
-          )
-      }
+
+          (exit) => exit.remove()
+        )
+      
     },
     drawNotifications() {
       let vis = this
-
-      if (this.dataGenes !== undefined) {
-        const densityObjects = groupInfoDensity(this.dataGenes)
+      const genes = this.dataGenes
+      if (genes === undefined) {
+        const densityObjects = groupInfoDensity(genes)
 
         const dataDensity = {}
         Object.keys(densityObjects).forEach((key) => {

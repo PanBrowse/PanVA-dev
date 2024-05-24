@@ -1,8 +1,11 @@
+import type { GroupInfo } from "@/types"
+import type { Dictionary } from "lodash"
+
 export const chromosomesLookup = (sequences) => {
   /**
    * Returns all sequences per chromosome
    */
-  const lookup = {}
+  const lookup:Dictionary<any> = {}
   sequences.forEach((sequence) => {
     const key = sequence.phasing_chromosome
     const rows = lookup[key] || []
@@ -12,11 +15,11 @@ export const chromosomesLookup = (sequences) => {
   return lookup
 }
 
-export const groupInfosLookup = (groupInfo) => {
+export const groupInfosLookup = (groupInfo: GroupInfo[]) => {
   /**
    * Returns all mrNAs per chromosome
    */
-  const lookup = {}
+  const lookup:Dictionary<GroupInfo[]> = {}
   groupInfo.forEach((info) => {
     const key = info.phasing_chromosome
     const rows = lookup[key] || []
@@ -26,13 +29,13 @@ export const groupInfosLookup = (groupInfo) => {
   return lookup
 }
 
-export const groupInfoDensity = (groupInfo) => {
+export const groupInfoDensity = (groupInfo: GroupInfo[]) => {
   /**
    * Returns all mrNAs per chromosome
    */
-  const lookup = {}
+  const lookup:Dictionary<GroupInfo[]> = {}
   groupInfo.forEach((item) => {
-    const newKey = `${item.genome_number}_${item.sequence_number}`
+    const newKey: string = `${item.genome_number}_${item.sequence_number}`
     const rows = lookup[newKey] || []
     rows.push(item)
     lookup[newKey] = rows
@@ -40,14 +43,14 @@ export const groupInfoDensity = (groupInfo) => {
   return lookup
 }
 
-export const sequencesIdLookup = (chrLookup) => {
+export const sequencesIdLookup = (chrLookup: Dictionary<any>) => {
   /**
    * Returns a mapping of sequence ids and their initial order per chromosome
    */
-  const lookup = {}
+  const lookup:Dictionary<Dictionary<number>> = {}
   Object.keys(chrLookup).forEach((key) => {
     const object = chrLookup[key].reduce(
-      (obj, item, dataIndex) =>
+      (obj, item, dataIndex:number) =>
         Object.assign(obj, { [item.sequence_id]: dataIndex }),
       {}
     )
@@ -58,11 +61,11 @@ export const sequencesIdLookup = (chrLookup) => {
   return lookup
 }
 
-export const sortedSequenceIdsLookup = (chrLookup) => {
+export const sortedSequenceIdsLookup = (chrLookup:Dictionary<any>) => {
   /**
    * Returns for each chromosome the intial sorting order of sequences
    */
-  const lookup = {}
+  const lookup:Dictionary<string[]> = {}
 
   Object.keys(chrLookup).forEach((key) => {
     // console.log(key, chrLookup[key], [...Array(chrLookup[key].length).keys()])
@@ -73,18 +76,18 @@ export const sortedSequenceIdsLookup = (chrLookup) => {
   return lookup
 }
 
-export const sortedGroupInfosLookup = (grInfoLookup, seqIdLookup) => {
+export const sortedGroupInfosLookup = (grInfoLookup: Dictionary<any>, seqIdLookup:Dictionary<any>) => {
   /**
    * Returns intitial sorting indices of gene set per chromosome
    */
-  const lookup = {}
+  const lookup:Dictionary<any> = {}
   const that = this
   Object.keys(grInfoLookup).forEach((key) => {
     const groupLookup = grInfoLookup[key]
     const sequenceLookup = seqIdLookup[key]
     const ids =
       lookup[key] ||
-      groupLookup.map(function (item) {
+      groupLookup.map(function (item:GroupInfo) {
         const newKey = `${item.genome_number}_${item.sequence_number}`
         if (key != 'unphased') {
           return sequenceLookup[newKey]

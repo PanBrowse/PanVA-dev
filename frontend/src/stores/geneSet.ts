@@ -1,5 +1,5 @@
 import { ConsoleSqlOutlined } from '@ant-design/icons-vue'
-import { sortBy } from 'lodash'
+import { sortBy, type Dictionary } from 'lodash'
 import { defineStore } from 'pinia'
 
 import {
@@ -25,22 +25,22 @@ export const useGeneSetStore = defineStore('geneSet', {
     homologies: [] as Homology[],
     sequences: [] as SequenceMetrics[],
     groupInfo: [] as GroupInfo[],
-    chromosomes: [] as Number,
+    chromosomes: [] as (Number | String)[],
     numberOfChromosomes: 0,
     chrFocus: 5,
     chrFocusDensity: {},
     homologyFocus: 232273529, //set to CDF1
-    homologyGroups: [],
-    upstreamHomologies: [],
+    homologyGroups: [] as number[],
+    upstreamHomologies: [] as number[],
 
     // Sorting
     sorting: 'genome_number',
-    sortedChromosomeSequenceIndices: {},
+    sortedChromosomeSequenceIndices: {} as Dictionary<any>,
     sortedMrnaIndices: {},
 
     // Clustering
     linkage: 3,
-    clusteringOrder: {},
+    clusteringOrder: {} as any,
     protein: 50,
     orientation: 0,
     size: 0,
@@ -164,7 +164,7 @@ export const useGeneSetStore = defineStore('geneSet', {
 
       this.isInitialized = true
     },
-    async changeSorting(sorting) {
+    async changeSorting(sorting: string) {
       // Update the sorting
       this.sorting = sorting
 
@@ -185,7 +185,7 @@ export const useGeneSetStore = defineStore('geneSet', {
 
       // reverse sorting
       if (sorting === 'genome_number_desc') {
-        const objectMap = (obj, fn) =>
+        const objectMap = (obj:any, fn:(v:any, k:any, i:any)=>any) =>
           Object.fromEntries(
             Object.entries(obj).map(([k, v], i) => [k, fn(v, k, i)])
           )
@@ -200,9 +200,9 @@ export const useGeneSetStore = defineStore('geneSet', {
         )
 
         // update mrnaIdLookup
-        const seqLookupNew = {} // need to update old?
+        const seqLookupNew: Dictionary<any>  = {} // need to update old?
         Object.keys(seqLookup).forEach((chr) => {
-          const chrObj = {}
+          const chrObj: Dictionary<any> = {}
 
           Object.keys(seqLookup[chr]).forEach((key) => {
             const idx = seqLookup[chr][key]
@@ -234,14 +234,14 @@ export const useGeneSetStore = defineStore('geneSet', {
         // console.log('protein sorting', this.linkage, this.clusteringOrder)
         // console.log('sequenceLookup', seqLookup)
 
-        const lookup = {}
+        const lookup: Dictionary<any>  = {}
         Object.keys(seqLookup).forEach((chr) => {
-          const proteinArray = this.clusteringOrder[chr]
+          const proteinArray: string[] = this.clusteringOrder[chr]
 
           const newLookupProt = Object.fromEntries(
             proteinArray.map((sequenceID, dataIndex) => [sequenceID, dataIndex])
           )
-          const proteinIndices = []
+          const proteinIndices:number[] = []
           // console.log('newLookupProt', newLookupProt)
 
           Object.keys(seqLookup[chr]).forEach((key) => {
@@ -260,9 +260,9 @@ export const useGeneSetStore = defineStore('geneSet', {
         this.sortedChromosomeSequenceIndices = lookup
 
         // update mrnaIdLookup
-        const seqLookupNew = {} // need to update old?
+        const seqLookupNew: Dictionary<any>  = {} // need to update old?
         Object.keys(seqLookup).forEach((chr) => {
-          const chrObj = {}
+          const chrObj: Dictionary<any>  = {}
 
           Object.keys(seqLookup[chr]).forEach((key) => {
             const idx = seqLookup[chr][key]
@@ -280,7 +280,7 @@ export const useGeneSetStore = defineStore('geneSet', {
         return
       }
     },
-    deleteChromosome(chr) {
+    deleteChromosome(chr:string) {
       console.log('delete chromosome', chr)
       const chromosomesUpdated = [...this.chromosomes]
       const value = parseInt(chr.split('chr')[1])
@@ -294,10 +294,10 @@ export const useGeneSetStore = defineStore('geneSet', {
       this.numberOfChromosomes = chromosomesUpdated.length
       this.chromosomes = chromosomesUpdated
     },
-    getChromosome(key) {
+    getChromosome(key:string) {
       return this.chromosomeLookup[key]
     },
-    getGroupInfo(key) {
+    getGroupInfo(key:string) {
       return this.groupInfoLookup[key]
     },
   },
@@ -306,7 +306,7 @@ export const useGeneSetStore = defineStore('geneSet', {
       /**
        * Returns all sequences per chromosome
        */
-      const lookup = {}
+      const lookup : Dictionary<SequenceMetrics[]> ={}
       this.sequences.forEach((sequence) => {
         const key = sequence.phasing_chromosome
         const rows = lookup[key] || []
@@ -319,7 +319,7 @@ export const useGeneSetStore = defineStore('geneSet', {
       /**
        * Returns a mapping of sequence ids and their initial order per chromosome
        */
-      const lookup = {}
+      const lookup: Dictionary<Dictionary<number>>  = {}
       Object.keys(this.chromosomeLookup).forEach((key) => {
         const object = this.chromosomeLookup[key].reduce(
           (obj, item, dataIndex) =>
@@ -336,10 +336,10 @@ export const useGeneSetStore = defineStore('geneSet', {
       /**
        * Returns all mrNAs per chromosome
        */
-      const lookup = {}
-      this.groupInfo.forEach((info) => {
+      const lookup: Dictionary<GroupInfo[] >  = {}
+      this.groupInfo.forEach((info: GroupInfo) => {
         const key = info.phasing_chromosome
-        const rows = lookup[key] || []
+        const rows: GroupInfo[] = lookup[key] || []
         rows.push(info)
         lookup[key] = rows
       })
@@ -349,7 +349,7 @@ export const useGeneSetStore = defineStore('geneSet', {
       /**
        * Returns intitial sorting indices of gene set per chromosome
        */
-      const lookup = {}
+      const lookup: Dictionary<number | number[]> = {}
       const that = this
       Object.keys(this.groupInfoLookup).forEach((key) => {
         const groupLookup = this.groupInfoLookup[key]
