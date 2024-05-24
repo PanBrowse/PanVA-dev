@@ -419,14 +419,14 @@ export default {
       this.idleTimeout = null
     },
     updateZoom( zoomEvent ) {
-      console.log('zoom factor', zoomEvent)
+      console.log('zoom event', zoomEvent)
 
       // If no zoom, back to initial coordinate. Otherwise, update X axis domain
       if (!zoomEvent) {
         if (!this.idleTimeout)
           return (this.idleTimeout = setTimeout(this.idled, 350)) // This allows to wait a little bit
         this.xScale.domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
-      } else {
+      } else if (zoomEvent.sourceEvent.type === 'wheel') {
         const regionLength = Math.abs( this.xScale.domain()[1] - this.xScale.domain()[0])
         this.xScale.domain([
           this.xScale.domain()[0] - (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
@@ -448,7 +448,7 @@ export default {
         this.svg().selectAll('circle.density').remove()
         this.svg().selectAll('text.density-value-focus').remove()
         this.draw()
-      }
+      } 
     },
     drawBars() {
       let vis = this
