@@ -39,12 +39,12 @@ import { Gene } from '../interfaces/interfaces'
 export default {
   name: 'SequencesDetails',
   props: {
-    chromosomeNr: Number,
+    chromosomeNr: Number | 'unphased',
     name: String,
     data: Array,
     dataGenes: Array,
-    dataMin: {type: Number, required: true},
-    dataMax: {type: Number, required: true},
+    dataMin: { type: Number, required: true },
+    dataMax: { type: Number, required: true },
     nrColumns: Number,
     maxGC: {type: Number, required: true},
     minGC: {type: Number, required: true},
@@ -137,6 +137,7 @@ export default {
         : d3
             .scaleLinear()
             .domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
+            
             // .domain([-this.anchorMax, this.anchorMax])
             .nice()
             .rangeRound([
@@ -263,41 +264,34 @@ export default {
       console.log('brush selection', selection)
 
       // If no selection, back to initial coordinate. Otherwise, update X axis domain
-      if (!selection) {
-        if (!this.idleTimeout)
-          return (this.idleTimeout = setTimeout(this.idled, 350)) // This allows to wait a little bit
-        this.xScale.domain([this.dataMin  > 0 ? 0 : this.dataMin, this.dataMax ??  100])
-      } else {
-        console.log(
-          'range',
+      if (!selection) {return} 
+      console.log(
+        'range',
 
-          this.xScale.invert(selection[0] - (this.margin.left *3)),
-          this.xScale.invert(selection[1] - (this.margin.left *3))
+        this.xScale.invert(selection[0] - (this.margin.left *3)),
+        this.xScale.invert(selection[1] - (this.margin.left *3)),
+
+      )
+      this.xScale.domain([
+        this.xScale.invert(selection[0] - (this.margin.left *3)),
+        this.xScale.invert(selection[1] - (this.margin.left *3)),
+      ])
+
+      this.svg().select('.brush').call(this.brush.move, null) // This remove the grey brush area as soon as the selection has been done
+      this.svg()
+        .select('.x-axis')
+        .transition()
+        .duration(1000)
+        .call(
+          d3.axisTop(this.xScale)
         )
-        this.xScale.domain([
-          this.xScale.invert(selection[0] - (this.margin.left *3)),
-          this.xScale.invert(selection[1] - (this.margin.left *3)),
-        ])
+        .call((g) => g.select('.domain').remove())
+        .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
+        .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
 
-        this.svg().select('.brush').call(this.brush.move, null) // This remove the grey brush area as soon as the selection has been done
-
-        this.svg()
-          .select('.x-axis')
-          .transition()
-          .duration(1000)
-          .call(
-            d3.axisTop(this.xScale)
-
-            // .tickValues(this.ticksXdomain)
-          )
-          .call((g) => g.select('.domain').remove())
-          .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
-          .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
-
-        this.svg().selectAll('circle.density').remove()
-        this.svg().selectAll('text.density-value-focus').remove()
-        this.draw()
-      }
+      this.svg().selectAll('circle.density').remove()
+      this.svg().selectAll('text.density-value-focus').remove()
+      this.draw()
     },
     resetZoom() {
       let vis = this
@@ -423,36 +417,33 @@ export default {
       this.idleTimeout = null
     },
     updateZoom( zoomEvent ) {
-      console.log('zoom event', zoomEvent)
+      // console.log('zoom event', zoomEvent)
 
       // If no zoom, back to initial coordinate. Otherwise, update X axis domain
-      if (!zoomEvent) {
-        if (!this.idleTimeout)
-          return (this.idleTimeout = setTimeout(this.idled, 350)) // This allows to wait a little bit
-        this.xScale.domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
-      } else if (zoomEvent.sourceEvent.type === 'wheel') {
-        const regionLength = Math.abs( this.xScale.domain()[1] - this.xScale.domain()[0])
-        this.xScale.domain([
-          this.xScale.domain()[0] - (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
-          this.xScale.domain()[1] +  (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001)
-        ])
+      if (!zoomEvent) { return; }
+      if (zoomEvent.sourceEvent.type !== 'wheel') { return; }
 
-        this.svg()
-          .select('.x-axis')
-          .transition()
-          .duration(1000)
-          .call(
-            d3.axisTop(this.xScale)
+      const regionLength = Math.abs( this.xScale.domain()[1] - this.xScale.domain()[0])
+      this.xScale.domain([
+        this.xScale.domain()[0] - (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
+        this.xScale.domain()[1] +  (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001)
+      ])
 
-          )
-          .call((g) => g.select('.domain').remove())
-          .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
-          .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
+      this.svg()
+        .select('.x-axis')
+        .transition()
+        .duration(300)
+        .call(
+          d3.axisTop(this.xScale)
 
-        this.svg().selectAll('circle.density').remove()
-        this.svg().selectAll('text.density-value-focus').remove()
-        this.draw()
-      } 
+        )
+        .call((g) => g.select('.domain').remove())
+        .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
+        .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
+
+      this.svg().selectAll('circle.density').remove()
+      this.svg().selectAll('text.density-value-focus').remove()
+      this.draw()
     },
     drawBars() {
       let vis = this
@@ -1228,7 +1219,7 @@ export default {
       .brushX() // Add the brush feature using the d3.brush function
       .extent([
         [this.margin.left * 3, 0],
-        [this.visWidth, this.visHeight],
+        [this.visWidth - (this.margin.left * 3), this.visHeight],
       ])
       .on('end', this.updateChart)
 

@@ -35,7 +35,7 @@ export const useGeneSetStore = defineStore('geneSet', {
 
     // Sorting
     sorting: 'genome_number',
-    sortedChromosomeSequenceIndices: {} as Dictionary<any>,
+    sortedChromosomeSequenceIndices: {} as Dictionary<number[]>,
     sortedMrnaIndices: {},
 
     // Clustering
@@ -200,9 +200,9 @@ export const useGeneSetStore = defineStore('geneSet', {
         )
 
         // update mrnaIdLookup
-        const seqLookupNew: Dictionary<any>  = {} // need to update old?
+        const seqLookupNew: Dictionary<Dictionary<number>>  = {} // need to update old?
         Object.keys(seqLookup).forEach((chr) => {
-          const chrObj: Dictionary<any> = {}
+          const chrObj: Dictionary<number> = {}
 
           Object.keys(seqLookup[chr]).forEach((key) => {
             const idx = seqLookup[chr][key]
@@ -234,7 +234,7 @@ export const useGeneSetStore = defineStore('geneSet', {
         // console.log('protein sorting', this.linkage, this.clusteringOrder)
         // console.log('sequenceLookup', seqLookup)
 
-        const lookup: Dictionary<any>  = {}
+        const lookup: Dictionary<number[]>  = {}
         Object.keys(seqLookup).forEach((chr) => {
           const proteinArray: string[] = this.clusteringOrder[chr]
 
@@ -260,9 +260,9 @@ export const useGeneSetStore = defineStore('geneSet', {
         this.sortedChromosomeSequenceIndices = lookup
 
         // update mrnaIdLookup
-        const seqLookupNew: Dictionary<any>  = {} // need to update old?
+        const seqLookupNew: Dictionary<Dictionary<number>>  = {} // need to update old?
         Object.keys(seqLookup).forEach((chr) => {
-          const chrObj: Dictionary<any>  = {}
+          const chrObj: Dictionary<number>  = {}
 
           Object.keys(seqLookup[chr]).forEach((key) => {
             const idx = seqLookup[chr][key]

@@ -1,11 +1,11 @@
-import type { GroupInfo } from "@/types"
+import type { GroupInfo, Sequence, SequenceMetrics } from "@/types"
 import type { Dictionary } from "lodash"
 
-export const chromosomesLookup = (sequences) => {
+export const chromosomesLookup = (sequences: SequenceMetrics[]) => {
   /**
    * Returns all sequences per chromosome
    */
-  const lookup:Dictionary<any> = {}
+  const lookup:Dictionary<SequenceMetrics[]> = {}
   sequences.forEach((sequence) => {
     const key = sequence.phasing_chromosome
     const rows = lookup[key] || []
@@ -43,14 +43,14 @@ export const groupInfoDensity = (groupInfo: GroupInfo[]) => {
   return lookup
 }
 
-export const sequencesIdLookup = (chrLookup: Dictionary<any>) => {
+export const sequencesIdLookup = (chrLookup: Dictionary<SequenceMetrics[]>): Dictionary<Dictionary<number>> => {
   /**
    * Returns a mapping of sequence ids and their initial order per chromosome
    */
   const lookup:Dictionary<Dictionary<number>> = {}
   Object.keys(chrLookup).forEach((key) => {
-    const object = chrLookup[key].reduce(
-      (obj, item, dataIndex:number) =>
+    const object: Dictionary<number> = chrLookup[key].reduce(
+      (obj: Dictionary<Dictionary<number>>, item:SequenceMetrics, dataIndex:number) =>
         Object.assign(obj, { [item.sequence_id]: dataIndex }),
       {}
     )
@@ -61,11 +61,11 @@ export const sequencesIdLookup = (chrLookup: Dictionary<any>) => {
   return lookup
 }
 
-export const sortedSequenceIdsLookup = (chrLookup:Dictionary<any>) => {
+export const sortedSequenceIdsLookup = (chrLookup:Dictionary<SequenceMetrics[]>) => {
   /**
    * Returns for each chromosome the intial sorting order of sequences
    */
-  const lookup:Dictionary<string[]> = {}
+  const lookup:Dictionary<number[]> = {}
 
   Object.keys(chrLookup).forEach((key) => {
     // console.log(key, chrLookup[key], [...Array(chrLookup[key].length).keys()])
@@ -76,11 +76,11 @@ export const sortedSequenceIdsLookup = (chrLookup:Dictionary<any>) => {
   return lookup
 }
 
-export const sortedGroupInfosLookup = (grInfoLookup: Dictionary<any>, seqIdLookup:Dictionary<any>) => {
+export const sortedGroupInfosLookup = (grInfoLookup: Dictionary<GroupInfo[]>, seqIdLookup:Dictionary<Dictionary<number>>) => {
   /**
    * Returns intitial sorting indices of gene set per chromosome
    */
-  const lookup:Dictionary<any> = {}
+  const lookup:Dictionary<number[]> = {}
   const that = this
   Object.keys(grInfoLookup).forEach((key) => {
     const groupLookup = grInfoLookup[key]
@@ -103,7 +103,7 @@ export const sortedGroupInfosLookup = (grInfoLookup: Dictionary<any>, seqIdLooku
 }
 
 // filter outliers GC conent
-export const filterOutliers = (someArray) => {
+export const filterOutliers = (someArray: []) => {
   if (someArray.length < 4) return someArray
 
   let values, q1, q3, iqr, maxValue, minValue
