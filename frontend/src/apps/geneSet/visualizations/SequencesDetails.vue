@@ -33,16 +33,15 @@ import { asterisk, cross, plus } from '@/helpers/customSymbols'
 // import * as fisheye from '@/helpers/fisheye'
 import { useGeneSetStore } from '@/stores/geneSet'
 import { useGlobalStore } from '@/stores/global'
-import type { SequenceMetrics } from '@/types'
-import { Gene } from '../interfaces/interfaces'
+import type { GroupInfo, SequenceMetrics } from '@/types'
 
 export default {
   name: 'SequencesDetails',
   props: {
-    chromosomeNr: Number | 'unphased',
+    chromosomeNr: Number || 'unphased',
     name: String,
     data: Array,
-    dataGenes: Array,
+    dataGenes: {type: Array},
     dataMin: { type: Number, required: true },
     dataMax: { type: Number, required: true },
     nrColumns: Number,
@@ -756,23 +755,24 @@ export default {
     drawGenes() {
       let vis = this
       console.log('this.dataGenes', this.dataGenes)
-      const genes = this.dataGenes
-      if (genes === undefined) { return }
 
+      if (this.dataGenes === undefined) { return }
+      const genes = this.dataGenes as GroupInfo[]
         /// connection lines
       if (this.showLinks) {
         this.svg().selectAll('path.connection').remove()
         this.homologyGroups.forEach((homology) => {
-          const path_focus = genes.filter(
-            (d) => d.homology_id == homology //this.homologyFocus
+          const path_focus: GroupInfo[] = genes.filter(
+            (d) => d.homology_id == homology//this.homologyFocus
           )
 
           // console.log('path focus', path_focus)
-          const newPathFocus = path_focus.map((v) => ({
-            ...v,
-            sequence_id: `${v.genome_number}_${v.sequence_number}`,
+          const newPathFocus = path_focus.map((v: GroupInfo) => (
+            {
+              ...v,
+              sequence_id: `${v.genome_number}_${v.sequence_number}`,
           }))
-('newPathFocus', newPathFocus)
+          console.log('newPathFocus', newPathFocus)
           console.log(Object.keys(this.sequenceIdLookup[this.chromosomeNr]))
 
           let sortOrder = Object.keys(
