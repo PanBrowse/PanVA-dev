@@ -25,7 +25,8 @@ import { CloseCircleOutlined, ConsoleSqlOutlined } from '@ant-design/icons-vue'
 import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 // import * as d3Fisheye from 'd3-fisheye'
-import { range, type Dictionary } from 'lodash'
+// import * as d3Fisheye from 'd3-fisheye'
+import type { Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 
 import { groupInfoDensity } from '@/helpers/chromosome'
@@ -34,7 +35,6 @@ import { asterisk, cross, plus } from '@/helpers/customSymbols'
 import { useGeneSetStore } from '@/stores/geneSet'
 import { useGlobalStore } from '@/stores/global'
 import type { GroupInfo, SequenceMetrics } from '@/types'
-import type { Gene } from '../interfaces/interfaces'
 
 export default {
   name: 'SequencesDetails',
@@ -235,6 +235,15 @@ export default {
         this.xScale.invert(selection[0] - (this.margin.left *3)),
         this.xScale.invert(selection[1] - (this.margin.left *3)),
       ])
+
+      // Update individual scales
+      for (const [key, value] of Object.entries(this.xScaleLookup)) {
+        const value1 = value as d3.ScaleLinear<number, any, any>
+        this.xScaleLookup[key] = value1.domain([
+          value1.invert(selection[0] - (this.margin.left *3)),
+          value1.invert(selection[1] - (this.margin.left *3))
+        ])
+      }
 
       this.svg().select('.brush').call(this.brush.move, null) // This remove the grey brush area as soon as the selection has been done
       this.svg()
@@ -817,47 +826,27 @@ export default {
               )
               .attr('transform', function (d, i) {
                 const key = `${d.genome_number}_${d.sequence_number}`
+                const shortKey = `${d.genome_number}`
                 let transform
                 let xTransform = 0
                 let yTransform = 0
+                const currentScale = vis.xScaleLookup[shortKey]
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
-                  // console.log('anchorStart', anchorStart)
-
-                  // if (d.strand === '+') {
                     xTransform = 
                       vis.margin.left * 3 +
-                      vis.xScale(d.mRNA_start_position - anchorStart)
+                      currentScale(d.mRNA_start_position - anchorStart)
                     yTransform =
                       vis.margin.top * 2 +
                       vis.barHeight / 2 +
                       vis.sortedMrnaIndices[vis.chromosomeNr][i] *
                         (vis.barHeight + 10)
-                    
-                  // } else {
-                  //   xTransform =
-                  //     vis.margin.left * 3 +
-                  //     vis.xScale(d.mRNA_start_position - anchorStart)
-                  //   yTransform =
-                  //     vis.margin.top * 2 +
-                  //     vis.barHeight / 2 +
-                  //     vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                  //       (vis.barHeight + 10)
-                  // }
 
                 } else {
-                  // if (d.strand === '+') {
-                  //   xTransform = 
-                  //     vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                  //   yTransform =
-                  //     vis.margin.top * 2 +
-                  //     vis.barHeight / 2 +
-                  //     vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                  //       (vis.barHeight + 10)
-                  // } else {
+
                     xTransform = 
-                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
+                      vis.margin.left * 3 + currentScale(d.gene_start_position)
                     yTransform =
                       vis.margin.top * 2 +
                       vis.barHeight / 2 +
@@ -905,62 +894,38 @@ export default {
               )
               .attr('transform', function (d, i) {
                 const key = `${d.genome_number}_${d.sequence_number}`
-                let rotation
+                const shortKey = `${d.genome_number}`
+                let transform
+                let xTransform = 0
+                let yTransform = 0
+                const currentScale = vis.xScaleLookup[shortKey]
+                console.log(currentScale(0))
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
-                  // console.log('anchorStart', anchorStart)
-
-                  if (d.strand === '+') {
-                    rotation = `translate(${
+                    xTransform = 
                       vis.margin.left * 3 +
-                      vis.xScale(d.mRNA_start_position - anchorStart)
-                    },${
+                      currentScale(d.mRNA_start_position - anchorStart)
+                    yTransform =
                       vis.margin.top * 2 +
                       vis.barHeight / 2 +
                       vis.sortedMrnaIndices[vis.chromosomeNr][i] *
                         (vis.barHeight + 10)
-                    }
-                  )` // rotate(-270)`
-                  } else {
-                    return `translate(${
-                      vis.margin.left * 3 +
-                      vis.xScale(d.mRNA_start_position - anchorStart)
-                    },${
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                    }
-                  )` //rotate(-450)`
-                  }
 
-                  return rotation
                 } else {
-                  if (d.strand === '+') {
-                    rotation = `translate(${
-                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                    },${
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                    }
-                  )` //rotate(-270)`
-                  } else {
-                    return `translate(${
-                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                    },${
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                    }
-                  )`
-                  }
 
-                  return rotation
+                    xTransform = 
+                      vis.margin.left * 3 + currentScale(d.gene_start_position)
+                    yTransform =
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
+                  // }
                 }
+                transform = `translate(${xTransform},${yTransform})`
+                return transform
+             
               }),
 
 
@@ -1160,6 +1125,23 @@ export default {
 
     let anchorMax = d3.max(divergentScale)
     this.anchorMax = anchorMax ?? 0
+
+    let xScaleLookup:Dictionary<d3.ScaleLinear<number, number, never>> = {}
+    let calculateXScale = (sequence: SequenceMetrics, range: number[]) => {
+      return d3.scaleLinear().rangeRound(range).domain([-anchorMax/10, anchorMax/10])
+    }
+
+    this.data?.forEach(sequence => {
+      const key = `${sequence.genome_number}`
+      let range = [
+              0,
+              this.visWidth - this.margin.yAxis + this.margin.left * 4,
+            ]
+      let scale = calculateXScale(sequence, range)
+      xScaleLookup[key] = scale
+    })
+
+    this.xScaleLookup = xScaleLookup
 
     this.drawXAxis() // draw axis once
 
