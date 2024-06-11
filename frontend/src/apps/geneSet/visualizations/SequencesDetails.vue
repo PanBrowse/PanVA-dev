@@ -238,10 +238,10 @@ export default {
 
       // Update individual scales
       for (const [key, value] of Object.entries(this.xScaleLookup)) {
-        const value1 = value as d3.ScaleLinear<number, any, any>
-        this.xScaleLookup[key] = value1.domain([
-          value1.invert(selection[0] - (this.margin.left *3)),
-          value1.invert(selection[1] - (this.margin.left *3))
+        const currentScale = value as d3.ScaleLinear<number, any, any>
+        this.xScaleLookup[key] = currentScale.domain([
+          currentScale.invert(selection[0] - (this.margin.left *3)),
+          currentScale.invert(selection[1] - (this.margin.left *3))
         ])
       }
 
@@ -308,8 +308,8 @@ export default {
       let vis = this
       // Add event listener on keydown
       document.addEventListener('keydown', (event) => {
-        var name = event.key
-        var code = event.code
+        let name = event.key
+        let code = event.code
         // Alert the key name and key code on keydown
         console.log('key', name, code)
         if (event.key === 'ArrowLeft') {
@@ -320,7 +320,7 @@ export default {
 
           // console.log('anchor?', vis.anchor)
 
-          var newDomain
+          let newDomain
 
           if (vis.anchor) {
             newDomain = [
@@ -401,6 +401,17 @@ export default {
         this.xScale.domain()[0] - (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
         this.xScale.domain()[1] +  (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001)
       ])
+
+            // Update individual scales
+      for (const [key, value] of Object.entries(this.xScaleLookup)) {
+        const currentScale = value as d3.ScaleLinear<number, any, any>
+        const regionLength = Math.abs( currentScale.domain()[1] - currentScale.domain()[0])
+
+        this.xScaleLookup[key] = currentScale.domain([
+          currentScale.domain()[0] - (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
+          currentScale.domain()[1] + (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
+        ])
+      }
 
       this.svg()
         .select('.x-axis')
@@ -1128,7 +1139,7 @@ export default {
 
     let xScaleLookup:Dictionary<d3.ScaleLinear<number, number, never>> = {}
     let calculateXScale = (sequence: SequenceMetrics, range: number[]) => {
-      return d3.scaleLinear().rangeRound(range).domain([-anchorMax/10, anchorMax/10])
+      return d3.scaleLinear().rangeRound(range).domain([-anchorMax, anchorMax])
     }
 
     this.data?.forEach(sequence => {
