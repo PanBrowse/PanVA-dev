@@ -334,6 +334,27 @@ export default {
             ]
           }
 
+          // Update individual scales
+          for (const [key, value] of Object.entries(this.xScaleLookup)) {
+            const currentScale = value as d3.ScaleLinear<number, any, any>
+            const prevDomain = currentScale.domain()
+            
+            let newDomain
+            if (vis.anchor) {
+              newDomain = [
+                prevDomain[0] - rangeDomain,
+                prevDomain[1] - rangeDomain,
+              ]
+            } else {
+              newDomain = [
+                prevDomain[0] - rangeDomain < 0 ? 0 : prevDomain[0] - rangeDomain,
+                prevDomain[1] - rangeDomain,
+              ]
+            }
+
+            this.xScaleLookup[key] = currentScale.domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]]).nice()
+          }
+
           console.log('new domain', newDomain, vis.xScale.domain())
 
           vis.xScale
@@ -364,6 +385,21 @@ export default {
               ? vis.dataMax
               : prevDomain[1] + rangeDomain,
           ]
+            // Update individual scales
+          for (const [key, value] of Object.entries(this.xScaleLookup)) {
+            const currentScale = value as d3.ScaleLinear<number, any, any>
+            const prevDomain = currentScale.domain()
+
+            const newDomain = [
+              prevDomain[0] + rangeDomain,
+              prevDomain[1] + rangeDomain > vis.dataMax
+                ? vis.dataMax
+                : prevDomain[1] + rangeDomain,
+            ]
+
+            this.xScaleLookup[key] = currentScale.domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]]).nice()
+          }
+
           console.log('new domain', newDomain, vis.xScale.domain())
 
           vis.xScale
