@@ -26,7 +26,7 @@ import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 // import * as d3Fisheye from 'd3-fisheye'
 // import * as d3Fisheye from 'd3-fisheye'
-import { floor, type Dictionary } from 'lodash'
+import { floor, includes, indexOf, type Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 
 import { groupInfoDensity } from '@/helpers/chromosome'
@@ -221,6 +221,7 @@ export default {
 
     
     updateDomain(inputScale:d3.ScaleLinear<number, any, any>, newDomainBounds: [number, number] ) {
+      if(newDomainBounds[0] === newDomainBounds[1]) {return inputScale}
       const oldDomain: number[] = inputScale.domain().sort((a,b) => a-b)
       const oldRange: number[] = inputScale.range().sort((a,b) => a-b)
       const newDomainBoundsSorted = newDomainBounds.sort((a,b) => a-b)
@@ -229,14 +230,16 @@ export default {
       const newDomainFirstGene: number = oldDomain.findIndex(d => d > newDomainBoundsSorted[0])
       const newDomainLastGene: number = oldDomain.findIndex(d => d > newDomainBoundsSorted[1]) 
       console.log(newDomainFirstGene, newDomainLastGene)
-      const newDomain: number[] = [newDomainBoundsSorted[0], ...oldDomain.slice(newDomainFirstGene, newDomainLastGene), newDomainBoundsSorted[1]]
+      const inViewGenes = oldDomain.slice(newDomainFirstGene, newDomainLastGene)
+      console.log('inview genes: ', inViewGenes)
+      
+      const newDomain: number[] = inViewGenes.length > 0 ? [newDomainBoundsSorted[0], ...inViewGenes, newDomainBoundsSorted[1]] :[newDomainBoundsSorted[0], newDomainBoundsSorted[1]] 
 
       const selectedRange= [inputScale(newDomainBoundsSorted[0]), inputScale(newDomainBoundsSorted[1])]
-
-
       const conversionScale = d3.scaleLinear().domain(selectedRange).range([oldRange[0], oldRange[oldRange.length-1]])
-      const newRange = [oldRange[0], ...oldRange.slice(newDomainFirstGene, newDomainLastGene).map(d => conversionScale(d)), oldRange[oldRange.length-1]]
-      console.log(conversionScale(Number(selectedRange[1])), [oldRange[0], oldRange[oldRange.length-1]])
+
+      const newRangePointsInView = oldRange.slice(newDomainFirstGene, newDomainLastGene).map(d => conversionScale(d))
+      const newRange = newRangePointsInView.length > 0 ? [oldRange[0], ...newRangePointsInView, oldRange[oldRange.length-1]] : [oldRange[0], oldRange[oldRange.length-1]]
       return inputScale.domain(newDomain).range(newRange)
     },
 
@@ -261,10 +264,13 @@ export default {
       // Update individual scales
       for (const [key, value] of Object.entries(this.xScaleLookup)) {
         const currentScale = value as d3.ScaleLinear<number, any, any>
-        this.xScaleLookup[key] = this.updateDomain(currentScale, [
+        const newDomain: [number, number] = [
           currentScale.invert(selection[0] - (this.margin.left *3)),
           currentScale.invert(selection[1] - (this.margin.left *3))
-        ])
+        ]
+
+        if(newDomain[0] === newDomain[1]) {console.log('selection: ', selection, 'domain: ', newDomain, 'old domain', currentScale.domain(), 'old range', currentScale.range())}
+        this.xScaleLookup[key] = this.updateDomain(currentScale, newDomain )
       }
 
       this.svg().select('.brush').call(this.brush.move, null) // This remove the grey brush area as soon as the selection has been done
@@ -471,7 +477,7 @@ export default {
         const currentScale = value as d3.ScaleLinear<number, any, any>
         const regionLength = Math.abs( currentScale.domain()[1] - currentScale.domain()[0])
 
-        this.xScaleLookup[key] = currentScale.domain([
+        this.xScaleLookup[key] = this.updateDomain(currentScale, [
           currentScale.domain()[0] - (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
           currentScale.domain()[1] + (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
         ])
@@ -974,7 +980,6 @@ export default {
                 let xTransform = 0
                 let yTransform = 0
                 const currentScale = vis.xScaleLookup[key]
-                console.log(currentScale(0))
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
@@ -1207,16 +1212,24 @@ export default {
       if(genes === undefined || genes.length === 0) {
         return d3.scaleLinear().rangeRound(range).domain([-anchorMax, anchorMax])
       }
+      
+      const uniquePositions: number[] = []
+      const uniquePositionGenes = genes.filter(d => {
+        if(uniquePositions.includes(d.gene_start_position)) {return false}
 
-      const nGenes = genes.length
+        uniquePositions.push(d.gene_start_position)
+        return true
+      })
+
+      let genePositions = uniquePositionGenes.map(gene => gene.gene_start_position).sort((a,b) => a-b)
+      const nGenes = uniquePositionGenes.length
       const rangeAtom = nGenes === 0 ? 10 : floor((range[1] - range[0]) / nGenes)
       const dividedRange = [...Array(nGenes)].map((d, i) => i * rangeAtom) 
-      let genePositions = genes.map(gene => gene.gene_start_position).sort((a,b) => a-b)
       
       const key = `${genes[0].genome_number}_${genes[0].sequence_number}`
       const anchorValue = anchorLookup[key]
       genePositions = genePositions.map(pos => pos - anchorValue)
-      console.log(dividedRange, genePositions)
+
       return d3.scaleLinear().rangeRound(dividedRange).domain(genePositions)
     }
 
