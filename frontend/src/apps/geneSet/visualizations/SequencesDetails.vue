@@ -220,26 +220,40 @@ export default {
     },
 
     
-    updateDomain(inputScale: d3.ScaleLinear<number, any, any>, newRelativeRangeBounds: [number, number], referenceScale: d3.ScaleLinear<number, any, any>, assignedWindowRange?:[number, number]) {
-      if(newRelativeRangeBounds[0] === newRelativeRangeBounds[1]) {return inputScale}
-      const newRelariveRangeBoundsSorted = newRelativeRangeBounds.sort((a,b) => a-b)
+    updateDomain(inputScale: d3.ScaleLinear<number, any, any>, newLocalRangeBounds: [number, number], referenceScale: d3.ScaleLinear<number, any, any>, assignedWindowRange?:[number, number]) {
+      if(newLocalRangeBounds[0] === newLocalRangeBounds[1]) {return inputScale}
+      const newRelariveRangeBoundsSorted = newLocalRangeBounds.sort((a,b) => a-b)
       const referenceRange: number[] = referenceScale.range().sort((a,b) => a-b)
       const windowRange = assignedWindowRange ?? [referenceRange[0], referenceRange[referenceRange.length-1]]
-   
-      const newAbsoluteRange = [
-        referenceScale(inputScale.invert(newRelariveRangeBoundsSorted[0])),
-        referenceScale(inputScale.invert(newRelariveRangeBoundsSorted[1]))  
+      const oldDomain = [inputScale.domain()[0], inputScale.domain()[inputScale.domain().length -1]]
+      const referenceDomain = referenceScale.domain()
+
+      const oldRangeGlobal = [
+        referenceScale(oldDomain[0]),
+        referenceScale(oldDomain[1])  
       ]
-      const newWindowFirstGene: number = referenceRange.findIndex(d => d > newAbsoluteRange[0])
-      const newWindowLastGene: number = referenceRange.findIndex(d => d > newAbsoluteRange[1]) 
 
-      const absolutePointsInView = referenceRange.slice(newWindowFirstGene, newWindowLastGene)
-      const conversionScale = d3.scaleLinear().domain(newAbsoluteRange).range(windowRange)
+      // calculate new range bounds in global coordinates
+      const percentageLeft = newRelariveRangeBoundsSorted[0]/(windowRange[1] - windowRange[0])
+      const percentageRight = (newRelariveRangeBoundsSorted[1] - windowRange[1])/(windowRange[1] - windowRange[0])
+      const oldRangeLengthGlobal = oldRangeGlobal[1] - oldRangeGlobal[0] 
+      const newRangeGlobal = [
+        oldRangeGlobal[0] + percentageLeft * oldRangeLengthGlobal,
+        oldRangeGlobal[1] + percentageRight * oldRangeLengthGlobal 
+      ]
 
-      const newRangePointsInView = absolutePointsInView.map(d => conversionScale(d))
-      const newRange: number[] = [windowRange[0], ...newRangePointsInView, windowRange[1]]
+      // find points in the new view range
+      const newWindowFirstGeneIndex: number = referenceRange.findIndex(d => d > newRangeGlobal[0])
+      const newWindowLastGeneIndex: number = referenceRange.findIndex(d => d > newRangeGlobal[1]) 
+      const newRangeInViewGlobal = referenceRange.slice(newWindowFirstGeneIndex, newWindowLastGeneIndex)
+      const genesInView = referenceDomain.slice(newWindowFirstGeneIndex, newWindowLastGeneIndex)
 
-      const newDomain = [newAbsoluteRange[0], ...absolutePointsInView, newAbsoluteRange[1]].map(point => referenceScale.invert(point))
+      // Calculate newRange and newDomain
+      const globalToLocal = d3.scaleLinear().domain(newRangeGlobal).range(windowRange)
+      const newRangeInViewLocal = newRangeInViewGlobal.map(d => globalToLocal(d))
+      const newRange: number[] = [windowRange[0], ...newRangeInViewLocal, windowRange[1]]
+      const newDomain = [referenceScale.invert(newRangeGlobal[0]), ...genesInView, referenceScale.invert(newRangeGlobal[1])]
+
       return inputScale.domain(newDomain).range(newRange)
     },
 
@@ -387,8 +401,6 @@ export default {
             this.xScaleLookup[key] = currentScale.domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]]).nice()
           }
 
-          console.log('new domain', newDomain, vis.xScale.domain())
-
           vis.xScale
             .domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]])
             .nice()
@@ -465,12 +477,11 @@ export default {
       if (!zoomEvent) { return; }
       if (zoomEvent.sourceEvent.type !== 'wheel') { return; }
 
+      // calculate new bounds for the range
       const xPosition = zoomEvent.sourceEvent.pageX
-
-      const percentage = (xPosition - this.xScale.range()[0] + (3* this.margin.left))/(this.xScale.range()[this.xScale.domain().length -1] -  this.xScale.range()[0] )
-      const currentRangeBounds = [this.xScale.range()[0] , this.xScale.range()[this.xScale.range().length -1 ]]
+      const percentage = (xPosition - this.xScale.range()[0] - (3* this.margin.left))/(this.xScale.range()[this.xScale.domain().length -1] -  this.xScale.range()[0] - (3* this.margin.left) )
+      const currentRangeBounds: [number, number] = [this.xScale.range()[0] , this.xScale.range()[this.xScale.range().length - 1 ]]
       const rangeWidth = Math.abs((this.xScale.range()[this.xScale.range().length -1] -  this.xScale.range()[0]))
-
       const newRangeBounds = [
         currentRangeBounds[0] - (zoomEvent.sourceEvent.wheelDelta * rangeWidth  * 0.001 * percentage),
         currentRangeBounds[1] + (zoomEvent.sourceEvent.wheelDelta * rangeWidth * 0.001 * (1-percentage)) 
@@ -478,26 +489,15 @@ export default {
 
       this.xScale.domain([this.xScale.invert(newRangeBounds[0]), this.xScale.invert(newRangeBounds[1])])
 
-
             // Update individual scales
       for (const [key, value] of Object.entries(this.xScaleLookup)) {
         const currentScale = value as d3.ScaleLinear<number, any, any>
-        const currentRangeLimit =[currentScale.range()[0], currentScale.range().at(-1) ?? 0]
-        // const currentDomainLimit =[currentScale.domain()[0], currentScale.domain().at(-1) ?? 0]
-        const currentDomainLimit =[currentScale.invert(currentRangeBounds[0]), currentScale.invert(currentRangeBounds[1])]
-        const regionLength = Math.abs( currentDomainLimit[1] - currentDomainLimit[0])
-        const rangeLength = currentRangeLimit[0] - currentRangeLimit[1]
 
-        // const percentage = Math.abs((xPosition - currentRangeLimit[0])/(currentRangeLimit[1] -  currentRangeLimit[0]))
-        const newDomainLimits: [number, number] = [
-          currentScale.invert(newRangeBounds[0]),
-          currentScale.invert(newRangeBounds[1]) 
-        ] 
-
-        this.xScaleLookup[key] = this.updateDomain(currentScale, newRangeBounds as [number, number],
-        this.xScaleBasic[key],
-        currentRangeBounds
-      )
+        this.xScaleLookup[key] = this.updateDomain(
+          currentScale, newRangeBounds as [number, number],
+          this.xScaleBasic[key],
+          currentRangeBounds
+        )
       }
 
       this.svg()
