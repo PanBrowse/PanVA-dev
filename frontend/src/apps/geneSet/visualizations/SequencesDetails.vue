@@ -26,7 +26,7 @@ import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 // import * as d3Fisheye from 'd3-fisheye'
 // import * as d3Fisheye from 'd3-fisheye'
-import { divide, floor, includes, indexOf, round, type Dictionary } from 'lodash'
+import { divide, floor, includes, indexOf, random, round, type Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 
 import { groupInfoDensity } from '@/helpers/chromosome'
@@ -35,6 +35,7 @@ import { asterisk, cross, plus } from '@/helpers/customSymbols'
 import { useGeneSetStore } from '@/stores/geneSet'
 import { useGlobalStore } from '@/stores/global'
 import type { GroupInfo, SequenceMetrics } from '@/types'
+import { calculateXScale, updateRangeBounds } from '@/helpers/axisStretch'
 
 export default {
   name: 'SequencesDetails',
@@ -219,44 +220,6 @@ export default {
         .attr('y', 0)
     },
 
-    
-    updateDomain(inputScale: d3.ScaleLinear<number, any, any>, newLocalRangeBounds: [number, number], referenceScale: d3.ScaleLinear<number, any, any>, assignedWindowRange?:[number, number]) {
-      if(newLocalRangeBounds[0] === newLocalRangeBounds[1]) {return inputScale}
-      const newRelariveRangeBoundsSorted = newLocalRangeBounds.sort((a,b) => a-b)
-      const referenceRange: number[] = referenceScale.range().sort((a,b) => a-b)
-      const windowRange = assignedWindowRange ?? [referenceRange[0], referenceRange[referenceRange.length-1]]
-      const oldDomain = [inputScale.domain()[0], inputScale.domain()[inputScale.domain().length -1]]
-      const referenceDomain = referenceScale.domain()
-
-      const oldRangeGlobal = [
-        referenceScale(oldDomain[0]),
-        referenceScale(oldDomain[1])  
-      ]
-
-      // calculate new range bounds in global coordinates
-      const percentageLeft = newRelariveRangeBoundsSorted[0]/(windowRange[1] - windowRange[0])
-      const percentageRight = (newRelariveRangeBoundsSorted[1] - windowRange[1])/(windowRange[1] - windowRange[0])
-      const oldRangeLengthGlobal = oldRangeGlobal[1] - oldRangeGlobal[0] 
-      const newRangeGlobal = [
-        oldRangeGlobal[0] + percentageLeft * oldRangeLengthGlobal,
-        oldRangeGlobal[1] + percentageRight * oldRangeLengthGlobal 
-      ]
-
-      // find points in the new view range
-      const newWindowFirstGeneIndex: number = referenceRange.findIndex(d => d > newRangeGlobal[0])
-      const newWindowLastGeneIndex: number = referenceRange.findIndex(d => d > newRangeGlobal[1]) 
-      const newRangeInViewGlobal = referenceRange.slice(newWindowFirstGeneIndex, newWindowLastGeneIndex)
-      const genesInView = referenceDomain.slice(newWindowFirstGeneIndex, newWindowLastGeneIndex)
-
-      // Calculate newRange and newDomain
-      const globalToLocal = d3.scaleLinear().domain(newRangeGlobal).range(windowRange)
-      const newRangeInViewLocal = newRangeInViewGlobal.map(d => globalToLocal(d))
-      const newRange: number[] = [windowRange[0], ...newRangeInViewLocal, windowRange[1]]
-      const newDomain = [referenceScale.invert(newRangeGlobal[0]), ...genesInView, referenceScale.invert(newRangeGlobal[1])]
-
-      return inputScale.domain(newDomain).range(newRange)
-    },
-
     ///////////////////////////////////////////////////////////////////////////////Update chart////////////////////////////////////
     updateChart({ selection }): NodeJS.Timeout | undefined {
       console.log('brush selection', selection)
@@ -265,10 +228,8 @@ export default {
       if (!selection) {return} 
       console.log(
         'range',
-
         this.xScale.invert(selection[0] - (this.margin.left *3)),
         this.xScale.invert(selection[1] - (this.margin.left *3)),
-
       )
 
       this.xScale.domain([
@@ -279,15 +240,8 @@ export default {
       // Update individual scales
       for (const [key, value] of Object.entries(this.xScaleLookup)) {
         const currentScale = value as d3.ScaleLinear<number, any, any>
-        // const newDomain: [number, number] = [
-        //   currentScale.invert(selection[0] - (this.margin.left *3)),
-        //   currentScale.invert(selection[1] - (this.margin.left *3))
-        // ]
-        const newRange: [number, number] = [
-        selection[0] ,
-        selection[1] ,
-      ]
-        this.xScaleLookup[key] = this.updateDomain(currentScale, newRange, this.xScaleBasic[key])
+        const newRange: [number, number] = [selection[0], selection[1]]
+        this.xScaleLookup[key] = updateRangeBounds(currentScale, newRange, this.xScaleBasic[key])
       }
 
       this.svg().select('.brush').call(this.brush.move, null) // This remove the grey brush area as soon as the selection has been done
@@ -493,7 +447,7 @@ export default {
       for (const [key, value] of Object.entries(this.xScaleLookup)) {
         const currentScale = value as d3.ScaleLinear<number, any, any>
 
-        this.xScaleLookup[key] = this.updateDomain(
+        this.xScaleLookup[key] = updateRangeBounds(
           currentScale, newRangeBounds as [number, number],
           this.xScaleBasic[key],
           currentRangeBounds
@@ -1226,32 +1180,6 @@ export default {
     // Create individual scales 
     let xScaleLookup:Dictionary<d3.ScaleLinear<number, number, never>> = {}
     let xScaleBasic:Dictionary<d3.ScaleLinear<number, number, never>> = {}
-    let calculateXScale = (range: number[], genes?: GroupInfo[]) => {
-      if(genes === undefined || genes.length === 0) {
-        return d3.scaleLinear().rangeRound(range).domain([-anchorMax, anchorMax])
-      }
-      
-      const uniquePositions: number[] = []
-      const uniquePositionGenes = genes.filter(d => {
-        if(uniquePositions.includes(d.gene_start_position)) {return false}
-
-        uniquePositions.push(d.gene_start_position)
-        return true
-      })
-
-      let genePositions = uniquePositionGenes.map(gene => gene.gene_start_position).sort((a,b) => a-b)
-      const nGenes = uniquePositionGenes.length
-      const rangeAtom = nGenes === 0 ? 10 : round((range[1] - range[0]) / nGenes)
-      const dividedRange = [...Array(nGenes)].map((d, i) => i * rangeAtom) 
-      // make sure all scales have the same end range
-      dividedRange[dividedRange.length - 1] = range[1]
-      
-      const key = `${genes[0].genome_number}_${genes[0].sequence_number}`
-      const anchorValue = anchorLookup[key]
-      genePositions = genePositions.map(pos => pos - anchorValue)
-
-      return d3.scaleLinear().rangeRound(dividedRange).domain(genePositions)
-    }
 
     this.data?.forEach(sequence => {
       const key = sequence.sequence_id
@@ -1262,12 +1190,14 @@ export default {
 
       let scale = calculateXScale(
         range, 
-        this.dataGenes?.filter(d =>  `${d.genome_number}_${d.sequence_number}` === key)
+        this.dataGenes?.filter(d =>  `${d.genome_number}_${d.sequence_number}` === key),
+        anchorLookup[key]
       )
       xScaleLookup[key] = scale
       xScaleBasic[key] = calculateXScale(
         range, 
-        this.dataGenes?.filter(d =>  `${d.genome_number}_${d.sequence_number}` === key)
+        this.dataGenes?.filter(d =>  `${d.genome_number}_${d.sequence_number}` === key),
+        anchorLookup[key]
       )
     })
     this.xScaleLookup = xScaleLookup
