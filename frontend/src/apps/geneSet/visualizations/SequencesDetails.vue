@@ -26,16 +26,20 @@ import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 // import * as d3Fisheye from 'd3-fisheye'
 // import * as d3Fisheye from 'd3-fisheye'
-import { divide, floor, includes, indexOf, random, round, type Dictionary } from 'lodash'
+import { floor,  type Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 
 import { groupInfoDensity } from '@/helpers/chromosome'
-import { asterisk, cross, plus } from '@/helpers/customSymbols'
 // import * as fisheye from '@/helpers/fisheye'
 import { useGeneSetStore } from '@/stores/geneSet'
-import { useGlobalStore } from '@/stores/global'
 import type { GroupInfo, SequenceMetrics } from '@/types'
-import { calculateXScale, updateRangeBounds } from '@/helpers/axisStretch'
+import { calculateIndividualScales , updateRangeBounds } from '@/helpers/axisStretch'
+import { GraphNode, runForceSimulation } from '@/helpers/springSimulation'
+import { ref } from 'vue'
+
+const compressionViewWindowRange = ref<[number, number]>([0,1])
+const geneToWindowLookup = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
+const geneToCompressionLookup = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
 
 export default {
   name: 'SequencesDetails',
@@ -116,7 +120,9 @@ export default {
     visHeight() {
       return this.svgHeight
     },
-
+    windowRange(): [number, number] {
+      return [ 0, this.visWidth - (this.margin.yAxis + this.margin.left * 3) ]
+    },
     xScale() {
       return this.anchor
         ? d3
@@ -236,12 +242,20 @@ export default {
         this.xScale.invert(selection[0] - (this.margin.left *3)),
         this.xScale.invert(selection[1] - (this.margin.left *3)),
       ])
+      const globalRangeWidth = compressionViewWindowRange.value[1] - compressionViewWindowRange.value[0]
+      const currentGlobalRangeBounds: [number, number] = compressionViewWindowRange.value
+      const rangeWidth = this.windowRange[1] - this.windowRange[0]
+      const selectionPercentages = [(selection[0]  - this.margin.yAxis )/rangeWidth, (selection[1] - this.margin.yAxis )/rangeWidth]
+      const newRangeBoundsGlobal: [number, number] = [
+        currentGlobalRangeBounds[0] + (selectionPercentages[0] * globalRangeWidth),
+        currentGlobalRangeBounds[0] + (selectionPercentages[1] * globalRangeWidth) 
+      ]
+      compressionViewWindowRange.value = newRangeBoundsGlobal
 
       // Update individual scales
-      for (const [key, value] of Object.entries(this.xScaleLookup)) {
-        const currentScale = value as d3.ScaleLinear<number, any, any>
-        const newRange: [number, number] = [selection[0], selection[1]]
-        this.xScaleLookup[key] = updateRangeBounds(currentScale, newRange, this.xScaleBasic[key])
+      for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
+        const currentScale = value as d3.ScaleLinear<number, number, never>
+        geneToWindowLookup.value[key] = updateRangeBounds(currentScale, newRangeBoundsGlobal, geneToCompressionLookup.value[key], this.windowRange)
       }
 
       this.svg().select('.brush').call(this.brush.move, null) // This remove the grey brush area as soon as the selection has been done
@@ -334,7 +348,7 @@ export default {
           }
 
           // Update individual scales
-          for (const [key, value] of Object.entries(this.xScaleLookup)) {
+          for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
             const currentScale = value as d3.ScaleLinear<number, any, any>
             const prevDomain = currentScale.domain()
             const rangeDomain = floor((prevDomain[prevDomain.length-1] - prevDomain[0] )/2)
@@ -352,7 +366,7 @@ export default {
               ]
             }
 
-            this.xScaleLookup[key] = currentScale.domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]]).nice()
+            geneToWindowLookup[key] = currentScale.domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]]).nice()
           }
 
           vis.xScale
@@ -384,7 +398,7 @@ export default {
               : prevDomain[1] + rangeDomain,
           ]
             // Update individual scales
-          for (const [key, value] of Object.entries(this.xScaleLookup)) {
+          for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
             const currentScale = value as d3.ScaleLinear<number, any, any>
             const prevDomain = currentScale.domain()
             const rangeDomain = floor((prevDomain[1] - prevDomain[0] )/2)
@@ -396,7 +410,7 @@ export default {
                 : prevDomain[1] + rangeDomain,
             ]
 
-            this.xScaleLookup[key] = currentScale.domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]]).nice()
+            geneToWindowLookup.value[key] = currentScale.domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]]).nice()
           }
 
           console.log('new domain', newDomain, vis.xScale.domain())
@@ -433,26 +447,34 @@ export default {
 
       // calculate new bounds for the range
       const xPosition = zoomEvent.sourceEvent.pageX
-      const percentage = (xPosition - this.xScale.range()[0] - (3* this.margin.left))/(this.xScale.range()[this.xScale.domain().length -1] -  this.xScale.range()[0] - (3* this.margin.left) )
+      const percentageXZoom = (xPosition - this.windowRange[0] - this.margin.yAxis - (this.margin.left * 3)  )/(this.windowRange[1] - this.windowRange[0] )
       const currentRangeBounds: [number, number] = [this.xScale.range()[0] , this.xScale.range()[this.xScale.range().length - 1 ]]
       const rangeWidth = Math.abs((this.xScale.range()[this.xScale.range().length -1] -  this.xScale.range()[0]))
       const newRangeBounds = [
-        currentRangeBounds[0] - (zoomEvent.sourceEvent.wheelDelta * rangeWidth  * 0.001 * percentage),
-        currentRangeBounds[1] + (zoomEvent.sourceEvent.wheelDelta * rangeWidth * 0.001 * (1-percentage)) 
+        currentRangeBounds[0] - (zoomEvent.sourceEvent.wheelDelta * rangeWidth  * 0.001 * percentageXZoom),
+        currentRangeBounds[1] + (zoomEvent.sourceEvent.wheelDelta * rangeWidth * 0.001 * (1-percentageXZoom)) 
       ]
 
+      const globalRangeWidth = compressionViewWindowRange.value[1] - compressionViewWindowRange.value[0]
+      const newGlobalRangeBounds: [number, number] = [
+      compressionViewWindowRange.value[0] - (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth  * 0.001 * percentageXZoom),
+        compressionViewWindowRange.value[1] + (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth * 0.001 * (1-percentageXZoom)) 
+      ]
+
+      compressionViewWindowRange.value = newGlobalRangeBounds
+
       this.xScale.domain([this.xScale.invert(newRangeBounds[0]), this.xScale.invert(newRangeBounds[1])])
-
             // Update individual scales
-      for (const [key, value] of Object.entries(this.xScaleLookup)) {
-        const currentScale = value as d3.ScaleLinear<number, any, any>
-
-        this.xScaleLookup[key] = updateRangeBounds(
-          currentScale, newRangeBounds as [number, number],
-          this.xScaleBasic[key],
-          currentRangeBounds
+      for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
+        const currentScale = value as d3.ScaleLinear<number, number, never>
+        geneToWindowLookup.value[key] = updateRangeBounds(
+          currentScale, 
+          newGlobalRangeBounds,
+          geneToCompressionLookup.value[key],
+          this.windowRange
         )
       }
+
 
       this.svg()
         .select('.x-axis')
@@ -882,7 +904,7 @@ export default {
                 let transform
                 let xTransform = 0
                 let yTransform = 0
-                const currentScale = vis.xScaleLookup[key]
+                const currentScale = geneToWindowLookup.value[key]
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
@@ -950,7 +972,7 @@ export default {
                 let transform
                 let xTransform = 0
                 let yTransform = 0
-                const currentScale = vis.xScaleLookup[key]
+                const currentScale = geneToWindowLookup.value[key]
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
@@ -1160,7 +1182,7 @@ export default {
     let anchorLookup: Dictionary<number> = {}
     homologyAnchor?.forEach((item) => {
       const key = `${item.genome_number}_${item.sequence_number}`
-      anchorLookup[key] = item.mRNA_start_position
+      anchorLookup[key] = 0 //item.mRNA_start_position
     })
     // console.log('anchorLookup', anchorLookup)
     this.anchorLookup = anchorLookup
@@ -1177,42 +1199,49 @@ export default {
     let anchorMax = d3.max(divergentScale)
     this.anchorMax = anchorMax ?? 0
 
-    // Create individual scales 
-    let xScaleLookup:Dictionary<d3.ScaleLinear<number, number, never>> = {}
-    let xScaleBasic:Dictionary<d3.ScaleLinear<number, number, never>> = {}
 
-    this.data?.forEach(sequence => {
-      const key = sequence.sequence_id
-      let range = [
-              0,
-              this.visWidth - this.margin.yAxis + this.margin.left * 4,
-            ]
+     // Create individual scales 
+    ///
 
-      let scale = calculateXScale(
-        range, 
-        this.dataGenes?.filter(d =>  `${d.genome_number}_${d.sequence_number}` === key),
-        anchorLookup[key]
-      )
-      xScaleLookup[key] = scale
-      xScaleBasic[key] = calculateXScale(
-        range, 
-        this.dataGenes?.filter(d =>  `${d.genome_number}_${d.sequence_number}` === key),
-        anchorLookup[key]
-      )
+    const newGenePositions: GraphNode[] = runForceSimulation(this.dataGenes?? [], this.data ?? [])
+    // init
+    let xScaleGeneToWindowInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
+    let xScaleGeneToCompressionInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
+    //determine global ranges'
+    const sortedCompressionRangeGlobal = (newGenePositions.map(d => d.position)).sort((a,b) => a-b)
+    const edgesOfNewRangeGlobal: [number, number] = [sortedCompressionRangeGlobal[0],  sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length -1]]
+    compressionViewWindowRange.value = edgesOfNewRangeGlobal
+    const uniquePositions: number[] = []
+    const allUniqueGenePositions = newGenePositions.filter(d => {
+      if(uniquePositions.includes(d.position)) { return false; }
+      uniquePositions.push(d.position)
+      return true;
     })
-    this.xScaleLookup = xScaleLookup
-    this.xScaleBasic = xScaleBasic
+    this.data?.forEach(sequence => {
+      const [geneToCompression, scaleGeneToWindow] = calculateIndividualScales(
+        sequence, 
+        allUniqueGenePositions, 
+        edgesOfNewRangeGlobal, 
+        this.windowRange
+      )
+      const key = sequence.sequence_id
+      xScaleGeneToCompressionInit[key] = geneToCompression
+      xScaleGeneToWindowInit[key] = scaleGeneToWindow
+    })
+    //assign scale dictionaries
+    geneToWindowLookup.value = xScaleGeneToWindowInit
+    geneToCompressionLookup.value = xScaleGeneToCompressionInit
+
 
     this.drawXAxis() // draw axis once
-
     this.draw()
 
     // Add brushing
     var brush = d3
       .brushX() // Add the brush feature using the d3.brush function
       .extent([
-        [this.margin.left * 3, 0],
-        [this.visWidth - (this.margin.left * 3), this.visHeight],
+        [this.windowRange[0] +  this.margin.yAxis + (this.margin.left * 3), 0],
+        [this.windowRange[1] +  this.margin.yAxis + (this.margin.left * 3), this.visHeight],
       ])
       .on('end', this.updateChart)
 

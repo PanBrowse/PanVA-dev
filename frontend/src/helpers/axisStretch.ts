@@ -1,6 +1,8 @@
-import type { GroupInfo } from "@/types"
+import type { Gene } from "@/apps/geneSet/interfaces/interfaces"
+import type { GroupInfo, SequenceMetrics } from "@/types"
 import * as d3 from 'd3'
 import { round } from "lodash"
+import type { GraphNode } from "./springSimulation"
 
 export const calculateXScale = (range: number[], genes?: GroupInfo[], anchor?: number) => {
     if(genes === undefined || genes.length === 0) {
@@ -30,39 +32,59 @@ export const calculateXScale = (range: number[], genes?: GroupInfo[], anchor?: n
   }
 
 
-export const updateRangeBounds = (inputScale: d3.ScaleLinear<number, any, any>, newLocalRangeBounds: [number, number], referenceScale: d3.ScaleLinear<number, any, any>, assignedWindowRange?:[number, number]) => {
-    if(newLocalRangeBounds[0] === newLocalRangeBounds[1]) {return inputScale}
-    const newRelariveRangeBoundsSorted = newLocalRangeBounds.sort((a,b) => a-b)
-    const referenceRange: number[] = referenceScale.range().sort((a,b) => a-b)
-    const windowRange = assignedWindowRange ?? [referenceRange[0], referenceRange[referenceRange.length-1]]
-    const oldDomain = [inputScale.domain()[0], inputScale.domain()[inputScale.domain().length -1]]
-    const referenceDomain = referenceScale.domain()
-
-    const oldRangeGlobal = [
-      referenceScale(oldDomain[0]),
-      referenceScale(oldDomain[1])  
-    ]
-
-    // calculate new range bounds in global coordinates
-    const percentageLeft = newRelariveRangeBoundsSorted[0]/(windowRange[1] - windowRange[0])
-    const percentageRight = (newRelariveRangeBoundsSorted[1] - windowRange[1])/(windowRange[1] - windowRange[0])
-    const oldRangeLengthGlobal = oldRangeGlobal[1] - oldRangeGlobal[0] 
-    const newRangeGlobal = [
-      oldRangeGlobal[0] + percentageLeft * oldRangeLengthGlobal,
-      oldRangeGlobal[1] + percentageRight * oldRangeLengthGlobal 
-    ]
-
+export const updateRangeBounds = (inputScale: d3.ScaleLinear<number, number, never>, newRangeBoundsGlobal: [number, number], referenceScale: d3.ScaleLinear<number, number, never>, assignedWindowRange?:[number, number]) => {
+    if(newRangeBoundsGlobal[0] === newRangeBoundsGlobal[1]) {return inputScale}
+    const compressedRange: number[] = referenceScale.range()
+    const windowRange = assignedWindowRange ?? [compressedRange[0], compressedRange[compressedRange.length-1]]
+    const geneDomain = referenceScale.domain()
+    const newRangeGlobal = newRangeBoundsGlobal
     // find points in the new view range
-    const newWindowFirstGeneIndex: number = referenceRange.findIndex(d => d > newRangeGlobal[0])
-    const newWindowLastGeneIndex: number = referenceRange.findIndex(d => d > newRangeGlobal[1]) 
-    const newRangeInViewGlobal = referenceRange.slice(newWindowFirstGeneIndex, newWindowLastGeneIndex)
-    const genesInView = referenceDomain.slice(newWindowFirstGeneIndex, newWindowLastGeneIndex)
+    const newWindowFirstGeneIndex: number = compressedRange.findIndex(d => d > newRangeGlobal[0])
+    const newWindowLastGeneIndex: number = compressedRange.findIndex(d => d > newRangeGlobal[1]) 
+    const newGenesInViewCompressed = compressedRange.slice(newWindowFirstGeneIndex, newWindowLastGeneIndex)
+    const newGenesInViewDomain = geneDomain.slice(newWindowFirstGeneIndex, newWindowLastGeneIndex)
 
     // Calculate newRange and newDomain
     const globalToLocal = d3.scaleLinear().domain(newRangeGlobal).range(windowRange)
-    const newRangeInViewLocal = newRangeInViewGlobal.map(d => globalToLocal(d))
+    const newRangeInViewLocal = newGenesInViewCompressed.map(d => globalToLocal(d))
     const newRange: number[] = [windowRange[0], ...newRangeInViewLocal, windowRange[1]]
-    const newDomain = [referenceScale.invert(newRangeGlobal[0]), ...genesInView, referenceScale.invert(newRangeGlobal[1])]
+    const newDomain = [referenceScale.invert(newRangeGlobal[0]), ...newGenesInViewDomain, referenceScale.invert(newRangeGlobal[1])]
 
-    return inputScale.domain(newDomain).range(newRange)
+    return d3.scaleLinear().domain(newDomain).range(newRange)
+  }
+
+
+  export const filterUniquePosition = (genes: GroupInfo[]) => {
+    const uniquePositions: number[] = []
+    const uniquePositionGenes = genes.filter(d => {
+      if(uniquePositions.includes(d.gene_start_position)) {return false}
+      uniquePositions.push(d.gene_start_position)
+      return true
+    })
+    return uniquePositionGenes
+  }
+
+
+  export const calculateIndividualScales = (
+    sequence: SequenceMetrics, 
+    allUniqueGenePositions: GraphNode[], 
+    newCompressionRangeEdges: [number, number], 
+    windowRangeEdges: [number, number]
+  ):[d3.ScaleLinear<number, number, never>, d3.ScaleLinear<number, number, never>] => {
+    const key = sequence.sequence_id
+    const uniqueGenePositions = allUniqueGenePositions.filter(d => String(d.sequenceId) === key).sort(d => d.originalPosition)
+    const scaleCompressionToWindow = d3.scaleLinear().domain(newCompressionRangeEdges).range(windowRangeEdges)
+
+    const compressionRange = uniqueGenePositions.map(d => d.position )
+    const geneRangeInner = uniqueGenePositions.map(d => d.originalPosition )
+    const scaleGeneToCompression = d3.scaleLinear().domain(geneRangeInner).range(compressionRange)
+    
+    const endPointsGeneRange = [scaleGeneToCompression.invert(newCompressionRangeEdges[0]), scaleGeneToCompression.invert(newCompressionRangeEdges[1])]
+    const geneRange = [endPointsGeneRange[0], ...geneRangeInner, endPointsGeneRange[1]]
+    const windowRangeInner = compressionRange.map(d => scaleCompressionToWindow(d))
+    const windowRange = [windowRangeEdges[0], ...windowRangeInner, windowRangeEdges[1]]
+    const scaleGeneToWindow = d3.scaleLinear().domain(geneRange).range(windowRange)
+
+    return [scaleGeneToCompression, scaleGeneToWindow]
+
   }
