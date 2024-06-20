@@ -326,112 +326,50 @@ export default {
         let code = event.code
         // Alert the key name and key code on keydown
         console.log('key', name, code)
+        const prevDomainGlobal = compressionViewWindowRange.value 
+        console.log('previous domain', prevDomainGlobal)
+        const rangeDomain = prevDomainGlobal[1] - prevDomainGlobal[0]
+        console.log('range domain', rangeDomain)
+
+        // update global domain
+        let newDomain: [number, number]
         if (event.key === 'ArrowLeft') {
-          const prevDomain = vis.xScale.domain()
-          console.log('previous domain', prevDomain)
-          const rangeDomain = 100000
-          console.log('range domain', rangeDomain)
-
-          // console.log('anchor?', vis.anchor)
-
-          let newDomain
-
-          if (vis.anchor) {
             newDomain = [
-              prevDomain[0] - rangeDomain,
-              prevDomain[1] - rangeDomain,
+              prevDomainGlobal[0] - rangeDomain/4,
+              prevDomainGlobal[1] - rangeDomain/4,
             ]
-          } else {
-            newDomain = [
-              prevDomain[0] - rangeDomain < 0 ? 0 : prevDomain[0] - rangeDomain,
-              prevDomain[1] - rangeDomain,
-            ]
-          }
-
-          // Update individual scales
-          for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
-            const currentScale = value as d3.ScaleLinear<number, any, any>
-            const prevDomain = currentScale.domain()
-            const rangeDomain = floor((prevDomain[prevDomain.length-1] - prevDomain[0] )/2)
             
-            let newDomain
-            if (vis.anchor) {
-              newDomain = [
-                prevDomain[0] - rangeDomain,
-                prevDomain[prevDomain.length-1] - rangeDomain,
-              ]
-            } else {
-              newDomain = [
-                prevDomain[0] - rangeDomain < 0 ? 0 : prevDomain[0] - rangeDomain,
-                prevDomain[prevDomain.length-1] - rangeDomain,
-              ]
-            }
-
-            geneToWindowLookup[key] = currentScale.domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]]).nice()
-          }
-
-          vis.xScale
-            .domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]])
-            .nice()
-
-          vis
-            .svg()
-            .select('.x-axis')
-            .call(d3.axisTop(vis.xScale))
-            .call((g) => g.select('.domain').remove())
-            .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
-            .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
-
-          vis.svg().selectAll('circle.density').remove()
-          vis.svg().selectAll('text.density-value-focus').remove()
-          vis.draw()
         }
-        if (event.key === 'ArrowRight') {
-          const prevDomain = vis.xScale.domain()
-          console.log('previous domain', prevDomain)
-          const rangeDomain = 100000
-          console.log('range domain', rangeDomain)
-
-          const newDomain = [
-            prevDomain[0] + rangeDomain,
-            prevDomain[1] + rangeDomain > vis.dataMax
-              ? vis.dataMax
-              : prevDomain[1] + rangeDomain,
-          ]
-            // Update individual scales
-          for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
-            const currentScale = value as d3.ScaleLinear<number, any, any>
-            const prevDomain = currentScale.domain()
-            const rangeDomain = floor((prevDomain[1] - prevDomain[0] )/2)
-
-            const newDomain = [
-              prevDomain[0] + rangeDomain,
-              prevDomain[1] + rangeDomain > vis.dataMax
-                ? vis.dataMax
-                : prevDomain[1] + rangeDomain,
+        else if (event.key === 'ArrowRight') {
+          newDomain = [
+              prevDomainGlobal[0] + rangeDomain/4,
+              prevDomainGlobal[1] + rangeDomain/4,
             ]
-
-            geneToWindowLookup.value[key] = currentScale.domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]]).nice()
-          }
-
-          console.log('new domain', newDomain, vis.xScale.domain())
-
-          vis.xScale
-            .domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]])
-            .nice()
-
-          vis
-            .svg()
-            .select('.x-axis')
-            .call(d3.axisTop(vis.xScale))
-            .call((g) => g.select('.domain').remove())
-            .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
-            .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
-
-          vis.svg().selectAll('circle.density').remove()
-          vis.svg().selectAll('text.density-value-focus').remove()
-          vis.draw()
         }
+        else { return }
+        compressionViewWindowRange.value = newDomain
+
+        // Update individual scales
+        for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
+          const currentScale = value 
+          geneToWindowLookup.value[key] = updateRangeBounds(currentScale, newDomain, geneToCompressionLookup.value[key], this.windowRange) 
+        }
+
+        vis.xScale
+          .domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]])
+          .nice()
+
+        vis
+          .svg()
+          .select('.x-axis')
+          .call(d3.axisTop(vis.xScale))
+          .call((g) => g.select('.domain').remove())
+          .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
+          .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
+
+        vis.svg().selectAll('circle.density').remove()
+        vis.svg().selectAll('text.density-value-focus').remove()
+        vis.draw()
       })
     },
     idled() {
@@ -447,25 +385,25 @@ export default {
       if (zoomEvent.sourceEvent.type !== 'wheel') { return; }
 
       // calculate new bounds for the range
-      const xPosition = zoomEvent.sourceEvent.pageX
-      const percentageXZoom = (xPosition - this.windowRange[0] - this.margin.yAxis - (this.margin.left * 3)  )/(this.windowRange[1] - this.windowRange[0] )
+      const zoomCenterX = zoomEvent.sourceEvent.pageX
+      const percentageZoomLeft = (zoomCenterX - this.windowRange[0] - this.margin.yAxis - (this.margin.left * 3)  )/(this.windowRange[1] - this.windowRange[0] )
       const currentRangeBounds: [number, number] = [this.xScale.range()[0] , this.xScale.range()[this.xScale.range().length - 1 ]]
       const rangeWidth = Math.abs((this.xScale.range()[this.xScale.range().length -1] -  this.xScale.range()[0]))
       const newRangeBounds = [
-        currentRangeBounds[0] - (zoomEvent.sourceEvent.wheelDelta * rangeWidth  * 0.001 * percentageXZoom),
-        currentRangeBounds[1] + (zoomEvent.sourceEvent.wheelDelta * rangeWidth * 0.001 * (1-percentageXZoom)) 
+        currentRangeBounds[0] - (zoomEvent.sourceEvent.wheelDelta * rangeWidth  * 0.001 * percentageZoomLeft),
+        currentRangeBounds[1] + (zoomEvent.sourceEvent.wheelDelta * rangeWidth * 0.001 * (1-percentageZoomLeft)) 
       ]
 
       const globalRangeWidth = compressionViewWindowRange.value[1] - compressionViewWindowRange.value[0]
       const newGlobalRangeBounds: [number, number] = [
-      compressionViewWindowRange.value[0] - (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth  * 0.001 * percentageXZoom),
-        compressionViewWindowRange.value[1] + (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth * 0.001 * (1-percentageXZoom)) 
+      compressionViewWindowRange.value[0] - (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth  * 0.001 * percentageZoomLeft),
+        compressionViewWindowRange.value[1] + (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth * 0.001 * (1-percentageZoomLeft)) 
       ]
 
       compressionViewWindowRange.value = newGlobalRangeBounds
 
       this.xScale.domain([this.xScale.invert(newRangeBounds[0]), this.xScale.invert(newRangeBounds[1])])
-            // Update individual scales
+      // Update individual scales
       for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
         const currentScale = value as d3.ScaleLinear<number, number, never>
         geneToWindowLookup.value[key] = updateRangeBounds(
@@ -475,7 +413,6 @@ export default {
           this.windowRange
         )
       }
-
 
       this.svg()
         .select('.x-axis')
