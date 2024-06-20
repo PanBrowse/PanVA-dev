@@ -37,6 +37,7 @@ import { calculateIndividualScales , updateRangeBounds } from '@/helpers/axisStr
 import { GraphNode, runForceSimulation } from '@/helpers/springSimulation'
 import { ref } from 'vue'
 
+// states
 const compressionViewWindowRange = ref<[number, number]>([0,1])
 const geneToWindowLookup = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
 const geneToCompressionLookup = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
@@ -863,17 +864,15 @@ export default {
                   let anchorStart = vis.anchorLookup[key]
                   return (
                     vis.margin.left * 3 +
-                    vis.xScale(d.mRNA_start_position - anchorStart)
+                    geneToWindowLookup.value[key](d.mRNA_start_position - anchorStart)
                   )
                 })
                 .y(function (d, i) {
                   return (
                     vis.margin.top * 2 +
                     vis.barHeight / 2 +
-                    // vis.sortedMrnaIndices[vis.chromosomeNr][i] *
                     vis.sequenceIdLookup[vis.chromosomeNr][d.sequence_id] *
                       (vis.barHeight + 10)
-                    // i * (vis.barHeight + 10)
                   )
                 })
             )
