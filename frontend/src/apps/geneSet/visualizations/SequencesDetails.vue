@@ -26,21 +26,22 @@ import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 // import * as d3Fisheye from 'd3-fisheye'
 // import * as d3Fisheye from 'd3-fisheye'
-import { floor,  type Dictionary } from 'lodash'
+import type {  Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 
 import { groupInfoDensity } from '@/helpers/chromosome'
 // import * as fisheye from '@/helpers/fisheye'
 import { useGeneSetStore } from '@/stores/geneSet'
 import type { GroupInfo, SequenceMetrics } from '@/types'
-import { calculateIndividualScales , updateRangeBounds } from '@/helpers/axisStretch'
-import { GraphNode, runForceSimulation } from '@/helpers/springSimulation'
-import { ref } from 'vue'
+import { calculateCompressionFactor, calculateIndividualScales , calculateWidth, updateRangeBounds } from '@/helpers/axisStretch'
+import { runForceSimulation } from '@/helpers/springSimulation'
+import { computed, ref } from 'vue'
+
+import type { GraphNode } from  "@/helpers/springSimulationUtils"
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0,1])
-const geneToWindowLookup = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
-const geneToCompressionLookup = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
+const geneToCompressionScales = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
 
 export default {
   name: 'SequencesDetails',
@@ -82,11 +83,6 @@ export default {
     barHeight: 6,
     sortedSequenceIds: [],
     idleTimeout: {type: [null, Number]},
-    // anchorMin: 0,
-    // anchorMax: 0,
-    // brush: null,
-    // xScale: undefined,
-    // ticksXdomain: []
   }),
   computed: {
     ...mapState(useGeneSetStore, [
@@ -105,7 +101,7 @@ export default {
       'showNotificationsDetail',
       'homologyFocus',
       'anchor',
-      'colorGenes',
+      // 'colorGenes',
       'showLinks',
     ]),
     cardName() {
@@ -128,7 +124,6 @@ export default {
       return this.anchor
         ? d3
             .scaleLinear()
-            // .domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
             .domain([-this.anchorMax, this.anchorMax])
             .nice()
             .rangeRound([
@@ -138,17 +133,12 @@ export default {
         : d3
             .scaleLinear()
             .domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
-            
-            // .domain([-this.anchorMax, this.anchorMax])
             .nice()
             .rangeRound([
               0,
               this.visWidth - this.margin.yAxis + this.margin.left * 4,
             ])
     },
- 
-    //   return ticks
-    // },
     colorScale():  d3.ScaleOrdinal<string, unknown, never> {
       return d3
         .scaleOrdinal()
@@ -163,7 +153,18 @@ export default {
     },
     colorScaleGenome(): d3.ScaleOrdinal<string, unknown, never> {
       return d3.scaleOrdinal().domain(['1','2','3','4','5']).range(d3.schemeCategory10)
-      // .interpolator(d3.interpolateViridis)
+    },
+    colorGenes(){
+      let nGenesTotal = 0
+      let nOfGenomes = 0
+      for( const [key, value] of Object.entries(this.geneToWindowScales)){
+        nGenesTotal = nGenesTotal + value.domain().length - 2
+        nOfGenomes = nOfGenomes + 1
+      }
+      if( nGenesTotal / nOfGenomes < 10) {
+        return true
+      }
+      return false
     },
     shapeGenerator() {
       const shapes = [
@@ -184,6 +185,13 @@ export default {
       )
       return obj
     },
+    geneToWindowScales() {
+      let newScales: Dictionary<d3.ScaleLinear<number, number, never>> = {}
+      Object.entries(geneToCompressionScales.value).forEach((scaleEntry) => {
+        newScales[scaleEntry[0]] = updateRangeBounds(scaleEntry[1], compressionViewWindowRange.value , scaleEntry[1], this.windowRange )
+      });
+      return newScales
+    }
   },
   methods: {
     ...mapActions(useGeneSetStore, ['deleteChromosome']),
@@ -228,7 +236,7 @@ export default {
     },
 
     ///////////////////////////////////////////////////////////////////////////////Update chart////////////////////////////////////
-    updateChart({ selection }): NodeJS.Timeout | undefined {
+    updateChartBrushing({ selection }): NodeJS.Timeout | undefined {
       console.log('brush selection', selection)
 
       // If no selection, back to initial coordinate. Otherwise, update X axis domain
@@ -252,12 +260,6 @@ export default {
         currentGlobalRangeBounds[0] + (selectionPercentages[1] * globalRangeWidth) 
       ]
       compressionViewWindowRange.value = newRangeBoundsGlobal
-
-      // Update individual scales
-      for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
-        const currentScale = value as d3.ScaleLinear<number, number, never>
-        geneToWindowLookup.value[key] = updateRangeBounds(currentScale, newRangeBoundsGlobal, geneToCompressionLookup.value[key], this.windowRange)
-      }
 
       this.svg().select('.brush').call(this.brush.move, null) // This remove the grey brush area as soon as the selection has been done
       this.svg()
@@ -338,7 +340,6 @@ export default {
               prevDomainGlobal[0] - rangeDomain/4,
               prevDomainGlobal[1] - rangeDomain/4,
             ]
-            
         }
         else if (event.key === 'ArrowRight') {
           newDomain = [
@@ -348,12 +349,6 @@ export default {
         }
         else { return }
         compressionViewWindowRange.value = newDomain
-
-        // Update individual scales
-        for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
-          const currentScale = value 
-          geneToWindowLookup.value[key] = updateRangeBounds(currentScale, newDomain, geneToCompressionLookup.value[key], this.windowRange) 
-        }
 
         vis.xScale
           .domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]])
@@ -378,9 +373,6 @@ export default {
     
     ///////////////////////////////////////////////////////////////////////////////update zoom ////////////////////////////////////
     updateZoom( zoomEvent) {
-      // console.log('zoom event', zoomEvent)
-
-      // If no zoom, back to initial coordinate. Otherwise, update X axis domain
       if (!zoomEvent) { return; }
       if (zoomEvent.sourceEvent.type !== 'wheel') { return; }
 
@@ -393,26 +385,13 @@ export default {
         currentRangeBounds[0] - (zoomEvent.sourceEvent.wheelDelta * rangeWidth  * 0.001 * percentageZoomLeft),
         currentRangeBounds[1] + (zoomEvent.sourceEvent.wheelDelta * rangeWidth * 0.001 * (1-percentageZoomLeft)) 
       ]
-
       const globalRangeWidth = compressionViewWindowRange.value[1] - compressionViewWindowRange.value[0]
       const newGlobalRangeBounds: [number, number] = [
       compressionViewWindowRange.value[0] - (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth  * 0.001 * percentageZoomLeft),
         compressionViewWindowRange.value[1] + (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth * 0.001 * (1-percentageZoomLeft)) 
       ]
-
       compressionViewWindowRange.value = newGlobalRangeBounds
-
-      this.xScale.domain([this.xScale.invert(newRangeBounds[0]), this.xScale.invert(newRangeBounds[1])])
-      // Update individual scales
-      for (const [key, value] of Object.entries(geneToWindowLookup.value)) {
-        const currentScale = value as d3.ScaleLinear<number, number, never>
-        geneToWindowLookup.value[key] = updateRangeBounds(
-          currentScale, 
-          newGlobalRangeBounds,
-          geneToCompressionLookup.value[key],
-          this.windowRange
-        )
-      }
+      this.xScale.domain(newRangeBounds)
 
       this.svg()
         .select('.x-axis')
@@ -420,7 +399,6 @@ export default {
         .duration(300)
         .call(
           d3.axisTop(this.xScale)
-
         )
         .call((g) => g.select('.domain').remove())
         .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
@@ -433,11 +411,9 @@ export default {
     ///////////////////////////////////////////////////////////////////////////////Draw bars ////////////////////////////////////
     drawBars() {
       let vis = this
-
-      // console.log('data sequence details', this.data)
       this.svg()
         .selectAll('rect.bar-chr')
-        .data(this.data, (d:any) => d.sequence_id)
+        .data(this.data ?? [], (d:any) => d.sequence_id)
         .join(
           (enter) =>
             enter
@@ -447,21 +423,15 @@ export default {
                 `translate(${this.margin.left * 3},${this.margin.top * 2})`
               )
               .attr('class', 'bar-chr')
-              // .attr('x', this.xScale(0))
-              .attr('x', this.anchor ? this.xScale(-35000000) : this.xScale(0))
+              .attr('x', this.xScale(0))
               .attr(
                 'y',
                 (d, i) =>
                   this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
                   (this.barHeight + 10)
               )
-              // .attr('width', function (d) {
-              //   return vis.xScale(d.sequence_length)
-              // })
               .attr('width', (d) =>
-                this.anchor
-                  ? this.xScale(70000000)
-                  : vis.xScale(d.sequence_length)
+                vis.xScale(d.sequence_length) - vis.xScale(0)
               )
               .attr('height', this.barHeight)
 
@@ -471,7 +441,6 @@ export default {
                   color = vis.colorScaleGenome(String(d.genome_number))
                 } else {
                   color = '#f0f2f5'
-                  // color = '#fff'
                 }
                 return color
               })
@@ -489,7 +458,7 @@ export default {
             update
               .transition()
               .duration(this.transitionTime)
-              .attr('x', this.anchor ? this.xScale(-35000000) : this.xScale(0))
+              .attr('x', this.xScale(0))
               .attr('fill',  (d)  => {
                 let color:any
                 if (vis.colorGenomes == true) {
@@ -515,13 +484,8 @@ export default {
                   this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
                   (this.barHeight + 10)
               )
-              // .attr('width', function (d) {
-              //   return vis.xScale(d.sequence_length)
-              // }),
               .attr('width', (d) =>
-                this.anchor
-                  ? this.xScale(70000000)
-                  : vis.xScale(d.sequence_length)
+                vis.xScale(d.sequence_length) - vis.xScale(0)
               ),
 
           (exit) => exit.remove()
@@ -530,9 +494,7 @@ export default {
     ///////////////////////////////////////////////////////////////////////////////Draw context bars ////////////////////////////////////
     drawContextBars() {
       let vis = this
-      
       if( this.data === undefined) {return}
-
       this.svg()
         .selectAll('rect.bar-chr-context')
         .data(this.data, (d:any) => d.sequence_id)
@@ -617,15 +579,108 @@ export default {
           (exit) => exit.remove()
         )
     },
-    
 
+
+    drawSquishBars() {
+      let vis = this
+      if( vis.dataGenes === undefined) { return }
+      this.svg()
+        .selectAll('rect.bar-chr-context')
+        .data(vis.dataGenes ?? [])
+        .join(
+          (enter) =>
+            enter
+              .append('rect')
+              .attr(
+                'transform',
+                `translate(${this.margin.left * 3},${this.margin.top * 2})`
+              )
+              .attr('class', 'bar-chr-context')
+              .attr('x', (d) => {
+                const key:string = `${d.genome_number}_${d.sequence_number}`
+                const position = d.gene_start_position < compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : d.gene_start_position
+                return this.geneToWindowScales[key](position)
+              })
+              .attr(
+                'y',
+                (d, i) => {
+                  const key:string = `${d.genome_number}_${d.sequence_number}`
+                  const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
+                  const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
+                  return ypos
+                }
+              )
+              .attr('width', (d) => {
+                const key:string = `${d.genome_number}_${d.sequence_number}`
+                const currentGeneToWindowScale = this.geneToWindowScales[key]
+                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
+                return calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position) 
+              })
+              .attr('height',  (d) => {
+                const key:string = `${d.genome_number}_${d.sequence_number}`
+                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.gene_start_position)
+                return Math.min(this.barHeight * Math.sqrt(compressionFactor), this.barHeight)
+              })
+              .attr('fill', (d) => {
+                if (vis.colorGenomes == true) {
+                  return vis.colorScaleGenome(String(d.genome_number)) as string 
+                } 
+                return 'gray' 
+              })
+              .attr('opacity', () => {
+                if (vis.colorGenomes == true) { return 0.5 } 
+                return 1
+              })
+              .attr('clip-path', 'url(#clipDetails)'),
+          (update) =>
+            update
+              .transition()
+              .duration(this.transitionTime)              
+              .attr('x', (d) => {
+                const key:string = `${d.genome_number}_${d.sequence_number}`
+                const genePositionCompression = geneToCompressionScales.value[key](d.gene_start_position) 
+                const compressionPosition = genePositionCompression < compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : genePositionCompression
+                const genePosition = geneToCompressionScales.value[key].invert(compressionPosition)
+                return this.geneToWindowScales[key](genePosition)
+              })
+              .attr('fill', (d) => {
+                if (vis.colorGenomes == true) {
+                  return vis.colorScaleGenome(String(d.genome_number)) as string 
+                } 
+                return 'gray' 
+              })
+              .attr('opacity', () => {
+                if (vis.colorGenomes == true) { return 0.5 } 
+                return 1
+              })
+              .attr(
+                'y',
+                (d, i) => {
+                  const key:string = `${d.genome_number}_${d.sequence_number}`
+                  const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
+                  if(index === 0) {console.log('zero', key)}
+                  const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
+                  return ypos
+                }
+              )
+              .attr('width', (d) => {
+                const key:string = `${d.genome_number}_${d.sequence_number}`
+                const currentGeneToWindowScale = this.geneToWindowScales[key]
+                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
+                return calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position)
+              }),
+          (exit) => exit.remove()
+        )
+    },
     // Drawing specification starts here ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////Draw ////////////////////////////////////
     draw() {
       if (this.chromosomeNr !== 'unphased') {
-        this.drawBars()
-        this.drawContextBars()
+        // this.drawBars()
+        // this.drawContextBars()
+        this.drawSquishBars()
         this.addLabels()
         this.drawGenes()
 
@@ -801,7 +856,7 @@ export default {
                   let anchorStart = vis.anchorLookup[key]
                   return (
                     vis.margin.left * 3 +
-                    geneToWindowLookup.value[key](d.mRNA_start_position - anchorStart)
+                    vis.geneToWindowScales[key](d.mRNA_start_position - anchorStart)
                   )
                 })
                 .y(function (d, i) {
@@ -831,7 +886,7 @@ export default {
                   .symbol()
                   .size(this.barHeight * 4)
                   .type(d3.symbolTriangle)
-                  .type((d) => vis.shapeGenerator[d.homology_id])
+                  // .type((d) => vis.shapeGenerator[d.homology_id])
                 // .type(d3.symbolTriangle)
               )
               .attr('transform', function (d, i) {
@@ -840,7 +895,7 @@ export default {
                 let transform
                 let xTransform = 0
                 let yTransform = 0
-                const currentScale = geneToWindowLookup.value[key]
+                const currentScale = vis.geneToWindowScales[key]
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
@@ -881,8 +936,8 @@ export default {
                 vis.upstreamHomologies.includes(d.homology_id) ? '3px' : ''
               )
               .attr('fill', (d) =>
-                vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
-              )
+              vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
+              )     
               .attr('opacity', 0.8),
 
           (update) =>
@@ -908,7 +963,7 @@ export default {
                 let transform
                 let xTransform = 0
                 let yTransform = 0
-                const currentScale = geneToWindowLookup.value[key]
+                const currentScale = vis.geneToWindowScales[key]
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
@@ -1165,8 +1220,8 @@ export default {
       xScaleGeneToWindowInit[key] = scaleGeneToWindow
     })
     //assign scale dictionaries
-    geneToWindowLookup.value = xScaleGeneToWindowInit
-    geneToCompressionLookup.value = xScaleGeneToCompressionInit
+    // geneToWindowLookup.value = xScaleGeneToWindowInit
+    geneToCompressionScales.value = xScaleGeneToCompressionInit
 
 
     this.drawXAxis() // draw axis once
@@ -1179,7 +1234,7 @@ export default {
         [this.windowRange[0] +  this.margin.yAxis + (this.margin.left * 3), 0],
         [this.windowRange[1] +  this.margin.yAxis + (this.margin.left * 3), this.visHeight],
       ])
-      .on('end', this.updateChart)
+      .on('end', this.updateChartBrushing)
 
     this.brush = brush
 
@@ -1292,7 +1347,7 @@ export default {
       this.drawXAxis() // redraw
       this.draw()
     },
-  },
+  }
 }
 </script>
 

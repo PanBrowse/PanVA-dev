@@ -2,7 +2,7 @@ import type { Gene } from "@/apps/geneSet/interfaces/interfaces"
 import type { GroupInfo, SequenceMetrics } from "@/types"
 import * as d3 from 'd3'
 import { round } from "lodash"
-import type { GraphNode } from "./springSimulation"
+import type { GraphNode } from  "./springSimulationUtils"
 
 export const calculateXScale = (range: number[], genes?: GroupInfo[], anchor?: number) => {
     if(genes === undefined || genes.length === 0) {
@@ -45,8 +45,8 @@ export const updateRangeBounds = (inputScale: d3.ScaleLinear<number, number, nev
     const newGenesInViewDomain = geneDomain.slice(newWindowFirstGeneIndex, newWindowLastGeneIndex)
 
     // Calculate newRange and newDomain
-    const globalToLocal = d3.scaleLinear().domain(newRangeGlobal).range(windowRange)
-    const newRangeInViewLocal = newGenesInViewCompressed.map(d => globalToLocal(d))
+    const compressionToWindowScale = d3.scaleLinear().domain(newRangeGlobal).range(windowRange)
+    const newRangeInViewLocal = newGenesInViewCompressed.map(d => compressionToWindowScale(d))
     const newRange: number[] = [windowRange[0], ...newRangeInViewLocal, windowRange[1]]
     const newDomain = [referenceScale.invert(newRangeGlobal[0]), ...newGenesInViewDomain, referenceScale.invert(newRangeGlobal[1])]
 
@@ -87,4 +87,27 @@ export const updateRangeBounds = (inputScale: d3.ScaleLinear<number, number, nev
 
     return [scaleGeneToCompression, scaleGeneToWindow]
 
+  }
+
+  export const calculateCompressionFactor = (geneToCompression:d3.ScaleLinear<number, number, never>, genePosition: number) => {
+    const genePositionsDomain: number[] = geneToCompression.domain()
+    const genePositionsCompression: number[] = geneToCompression.range()
+    const currentGeneIndex: number = genePositionsDomain.findIndex(domainPoint => genePosition <= domainPoint ) 
+    if(currentGeneIndex + 1 >= genePositionsDomain.length || currentGeneIndex === -1){ return 0}
+    const differenceGeneCoordinates = genePositionsDomain[currentGeneIndex + 1] - genePositionsDomain[currentGeneIndex]
+    const differenceCompressionCoordinates = genePositionsCompression[currentGeneIndex + 1] - genePositionsCompression[currentGeneIndex]
+    const compressionFactor =  differenceGeneCoordinates / differenceCompressionCoordinates
+    return compressionFactor
+  }
+
+  export const calculateWidth = (geneToCompression: d3.ScaleLinear<number, number, never>, geneToWindow: d3.ScaleLinear<number, number, never>, windowRange: [number, number], genePosition:number) => {
+    const genePositions: number[] = geneToCompression.domain()
+    const indexOfCurrentGene: number = genePositions.findIndex(domainPoint => genePosition <= domainPoint ) 
+    if(indexOfCurrentGene >= genePositions.length || indexOfCurrentGene === -1){ return 0 }
+    const currentGenePosition = genePositions[indexOfCurrentGene]
+    const nextGenePosition: number = genePositions[indexOfCurrentGene + 1] 
+    const windowCoordinateNext = Math.min(geneToWindow(nextGenePosition), windowRange[1])
+    const windowCoordinateCurrent = Math.max(geneToWindow(currentGenePosition), windowRange[0]) //) Math.max(currentGeneToWindowScale(currentGenePosition), this.windowRange[0])
+    const width =  windowCoordinateNext - windowCoordinateCurrent 
+    return Math.max(width, 0)
   }
