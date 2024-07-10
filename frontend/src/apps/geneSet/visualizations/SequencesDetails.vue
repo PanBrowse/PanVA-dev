@@ -33,15 +33,17 @@ import { groupInfoDensity } from '@/helpers/chromosome'
 // import * as fisheye from '@/helpers/fisheye'
 import { useGeneSetStore } from '@/stores/geneSet'
 import type { GroupInfo, SequenceMetrics } from '@/types'
-import { calculateCompressionFactor, calculateIndividualScales , calculateWidth, updateRangeBounds } from '@/helpers/axisStretch'
+import { calculateCompressionFactor, calculateIndividualScales , calculateWidth, updateViewportRangeBounds } from '@/helpers/axisStretch'
 import { runForceSimulation } from '@/helpers/springSimulation'
-import { computed, ref } from 'vue'
+import {  ref } from 'vue'
 
 import type { GraphNode } from  "@/helpers/springSimulationUtils"
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0,1])
 const geneToCompressionScales = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
+const globalCompressionFactor = ref<number>(1)
+const currentHeat = ref<number>(1000)
 
 export default {
   name: 'SequencesDetails',
@@ -118,7 +120,7 @@ export default {
       return this.svgHeight
     },
     windowRange(): [number, number] {
-      return [ 0, this.visWidth - (this.margin.yAxis + this.margin.left * 3) ]
+      return [ this.margin.left, this.visWidth - this.margin.left ]
     },
     xScale() {
       return this.anchor
@@ -188,7 +190,7 @@ export default {
     geneToWindowScales() {
       let newScales: Dictionary<d3.ScaleLinear<number, number, never>> = {}
       Object.entries(geneToCompressionScales.value).forEach((scaleEntry) => {
-        newScales[scaleEntry[0]] = updateRangeBounds(scaleEntry[1], compressionViewWindowRange.value , scaleEntry[1], this.windowRange )
+        newScales[scaleEntry[0]] = updateViewportRangeBounds(scaleEntry[1], compressionViewWindowRange.value , scaleEntry[1], this.windowRange )
       });
       return newScales
     }
@@ -579,54 +581,65 @@ export default {
           (exit) => exit.remove()
         )
     },
-
-
     drawSquishBars() {
       let vis = this
       if( vis.dataGenes === undefined) { return }
       this.svg()
-        .selectAll('rect.bar-chr-context')
+        .selectAll('path.bar-chr-context')
         .data(vis.dataGenes ?? [])
         .join(
           (enter) =>
             enter
-              .append('rect')
+              .append('path')
               .attr(
                 'transform',
                 `translate(${this.margin.left * 3},${this.margin.top * 2})`
               )
               .attr('class', 'bar-chr-context')
-              .attr('x', (d) => {
+              .attr('d', (d) => {
                 const key:string = `${d.genome_number}_${d.sequence_number}`
-                const position = d.gene_start_position < compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : d.gene_start_position
-                return this.geneToWindowScales[key](position)
-              })
-              .attr(
-                'y',
-                (d, i) => {
-                  const key:string = `${d.genome_number}_${d.sequence_number}`
-                  const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
-                  const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
-                  return ypos
-                }
-              )
-              .attr('width', (d) => {
-                const key:string = `${d.genome_number}_${d.sequence_number}`
+                const position = d.gene_start_position //< compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : d.gene_start_position
+              
+                const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
+                const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
+
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 const currentGeneToCompressionScale = geneToCompressionScales.value[key]
-                return calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position) 
-              })
-              .attr('height',  (d) => {
-                const key:string = `${d.genome_number}_${d.sequence_number}`
-                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
-                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.gene_start_position)
-                return Math.min(this.barHeight * Math.sqrt(compressionFactor), this.barHeight)
+                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position) 
+                const defaultConnectionThickness = 2
+
+                const x0 = this.geneToWindowScales[key](position)
+                const x1controlStart = x0 + (width *3/7)
+                const x1controlEnd = x0 + (width *4/7)
+                const x1 = x0 + (width/2)
+                const x2 = x0 + width
+                const x3 = x2
+                const x4 = x1
+                const x5 = x0
+                const x6 = x0
+
+                const y0 = ypos + this.barHeight / 2 - defaultConnectionThickness / 2
+                const y1 = y0 - 10
+                const y2 = y0
+                const y3 = ypos + this.barHeight / 2 + defaultConnectionThickness / 2
+                const y4 = y3 + 10
+                const y5 = y3
+                const y6 = y0
+
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.gene_start_position)  /globalCompressionFactor.value
+                const beta = Math.min(Math.sqrt(compressionFactor)/10, 1)
+                const lineUpper: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x0, y0], [x1controlStart,y0], [x1,y1],  [x1controlEnd,y0], [x2, y2]])  ?? ''
+                const lineConnect = d3.line()([[x6, y6], [x2, y2], [x3, y3], [x5, y5],  [x6, y6]])
+                const lineLower: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x3, y3], [x1controlEnd,y3], [x4,y4],  [x1controlStart,y3], [x5, y5]]) ?? ''
+
+                const line = lineUpper  + lineLower + lineConnect
+                return line
               })
               .attr('fill', (d) => {
                 if (vis.colorGenomes == true) {
                   return vis.colorScaleGenome(String(d.genome_number)) as string 
                 } 
-                return 'gray' 
+                return 'lightgray' 
               })
               .attr('opacity', () => {
                 if (vis.colorGenomes == true) { return 0.5 } 
@@ -637,38 +650,66 @@ export default {
             update
               .transition()
               .duration(this.transitionTime)              
-              .attr('x', (d) => {
+              .attr('d', (d) => {
                 const key:string = `${d.genome_number}_${d.sequence_number}`
                 const genePositionCompression = geneToCompressionScales.value[key](d.gene_start_position) 
                 const compressionPosition = genePositionCompression < compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : genePositionCompression
                 const genePosition = geneToCompressionScales.value[key].invert(compressionPosition)
-                return this.geneToWindowScales[key](genePosition)
+                
+                const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
+                const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
+
+                const currentGeneToWindowScale = this.geneToWindowScales[key]
+                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
+                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position) 
+                const defaultConnectionThickness = 2
+                const x0 = this.geneToWindowScales[key](genePosition)
+                const x1controlStart = x0 + (width *3/7)
+                const x1controlEnd = x0 + (width *4/7)
+                const x1 = x0 + (width/2)
+                const x2 = x0 + width
+                const x3 = x2
+                const x4 = x1
+                const x5 = x0
+                const x6 = x0
+
+                const y0 = ypos + this.barHeight / 2 - defaultConnectionThickness / 2
+                const y1 = y0 - 10
+                const y2 = y0
+                const y3 = ypos + this.barHeight / 2 + defaultConnectionThickness / 2
+                const y4 = y3 + 10
+                const y5 = y3
+                const y6 = y0
+
+
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.gene_start_position) / globalCompressionFactor.value
+                if(compressionFactor < 1) {
+                  const yTopMod = ypos - Math.max((1- compressionFactor), 0.5) + this.barHeight /2
+                  const yBottomMod = ypos + Math.max((1- compressionFactor), 0.5) + this.barHeight /2
+
+                  const lineConnect = d3.line()([[x6, yTopMod], [x2, yTopMod], [x3, yBottomMod], [x5, yBottomMod],  [x6, yTopMod]])
+                  
+                  return lineConnect
+                }
+                const beta = Math.min(Math.sqrt(compressionFactor)/10, 1)
+                const lineUpper: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x0, y0], [x1controlStart,y0], [x1,y1],  [x1controlEnd,y0], [x2, y2]])  ?? ''
+                const lineConnect = d3.line()([[x6, y6], [x2, y2], [x3, y3], [x5, y5],  [x6, y6]])
+                const lineLower: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x3, y3], [x1controlEnd,y3], [x4,y4],  [x1controlStart,y3], [x5, y5]]) ?? ''
+                // const lineConnectStart = d3.line()([ [x6, y6]])
+
+                const line = lineUpper  + lineLower + lineConnect
+
+                return line //lineUpper + d3.line()([[x2,y2], [x3,y3]]) + lineLower + d3.line()([[x5,y5], [x6,y6]]) // + lineConnect //+ lineConnectStart
               })
               .attr('fill', (d) => {
                 if (vis.colorGenomes == true) {
                   return vis.colorScaleGenome(String(d.genome_number)) as string 
                 } 
-                return 'gray' 
+                return 'lightgray' 
               })
               .attr('opacity', () => {
                 if (vis.colorGenomes == true) { return 0.5 } 
                 return 1
-              })
-              .attr(
-                'y',
-                (d, i) => {
-                  const key:string = `${d.genome_number}_${d.sequence_number}`
-                  const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
-                  if(index === 0) {console.log('zero', key)}
-                  const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
-                  return ypos
-                }
-              )
-              .attr('width', (d) => {
-                const key:string = `${d.genome_number}_${d.sequence_number}`
-                const currentGeneToWindowScale = this.geneToWindowScales[key]
-                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
-                return calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position)
               }),
           (exit) => exit.remove()
         )
@@ -804,7 +845,6 @@ export default {
     ///////////////////////////////////////////////////////////////////////////// Draw genes ////////////////////////////////////////////////
     drawGenes() {
       let vis = this
-      // console.log('this.dataGenes', this.dataGenes)
 
       if (this.dataGenes === undefined) { return }
       const genes: GroupInfo[] = this.dataGenes
@@ -816,7 +856,7 @@ export default {
             (d) => d.homology_id == homology //this.homologyFocus
           )
 
-          // console.log('path focus', path_focus)
+          console.log('path focus', path_focus)
           const newPathFocus = path_focus.map((v) => ({
             ...v,
             sequence_id: `${v.genome_number}_${v.sequence_number}`,
@@ -1109,11 +1149,6 @@ export default {
                 )
                 .attr('dy', -4)
                 .attr('y', (d, i) => {
-                  console.log(
-                    d.sequence_id,
-                    i,
-                    this.sequenceIdLookup[5][d.sequence_id]
-                  )
                   return (
                     (this.sequenceIdLookup[this.chromosomeNr][d.sequence_id] -
                       1) *
@@ -1159,7 +1194,6 @@ export default {
         this.margin.top * 2
     } else {
       this.svgHeight = document.getElementById('contentChr').offsetHeight
-      console.log('this.svgHeight', this.svgHeight)
     }
 
     // Anchor
@@ -1168,14 +1202,12 @@ export default {
     const homologyAnchor = this.dataGenes?.filter(
       (gene) => gene.homology_id === this.homologyFocus
     )
-    // console.log('geneSet', this.dataGenes, homologyAnchor)
 
     let anchorLookup: Dictionary<number> = {}
     homologyAnchor?.forEach((item) => {
       const key = `${item.genome_number}_${item.sequence_number}`
       anchorLookup[key] = 0 //item.mRNA_start_position
     })
-    // console.log('anchorLookup', anchorLookup)
     this.anchorLookup = anchorLookup
 
     const divergentScale = this.dataGenes.map((item) => {
@@ -1194,35 +1226,35 @@ export default {
      // Create individual scales 
     ///
 
-    const newGenePositions: GraphNode[] = runForceSimulation(this.dataGenes?? [], this.data ?? [])
-    // init
+    let newGenePositions: GraphNode[] = runForceSimulation(this.dataGenes?? [], this.data ?? [], currentHeat.value, 0.5, 232273529)
+
     let xScaleGeneToWindowInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
     let xScaleGeneToCompressionInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
     //determine global ranges'
     const sortedCompressionRangeGlobal = (newGenePositions.map(d => d.position)).sort((a,b) => a-b)
     const edgesOfNewRangeGlobal: [number, number] = [sortedCompressionRangeGlobal[0],  sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length -1]]
+    const oldRanges = newGenePositions.map(d => d.originalPosition).sort((a,b) => a-b)
+    const edgesOfOldRange = [oldRanges[0], oldRanges[oldRanges.length -1 ]]
+    const overallCompressionFactor = (edgesOfOldRange[1] - edgesOfOldRange[0]) / (edgesOfNewRangeGlobal[1] - edgesOfNewRangeGlobal[0])
+    globalCompressionFactor.value = overallCompressionFactor
     compressionViewWindowRange.value = edgesOfNewRangeGlobal
-    const uniquePositions: number[] = []
-    const allUniqueGenePositions = newGenePositions.filter(d => {
-      if(uniquePositions.includes(d.position)) { return false; }
-      uniquePositions.push(d.position)
-      return true;
-    })
+    
     this.data?.forEach(sequence => {
+      const key = sequence.sequence_id
+      const genePositionsOnSequence = newGenePositions
+        .filter(d => String(d.sequenceId) === key)
+        .sort(d => d.originalPosition)
+  
       const [geneToCompression, scaleGeneToWindow] = calculateIndividualScales(
-        sequence, 
-        allUniqueGenePositions, 
+        genePositionsOnSequence, 
         edgesOfNewRangeGlobal, 
         this.windowRange
       )
-      const key = sequence.sequence_id
       xScaleGeneToCompressionInit[key] = geneToCompression
       xScaleGeneToWindowInit[key] = scaleGeneToWindow
     })
     //assign scale dictionaries
-    // geneToWindowLookup.value = xScaleGeneToWindowInit
     geneToCompressionScales.value = xScaleGeneToCompressionInit
-
 
     this.drawXAxis() // draw axis once
     this.draw()
