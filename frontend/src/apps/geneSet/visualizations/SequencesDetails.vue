@@ -38,12 +38,14 @@ import { runForceSimulation } from '@/helpers/springSimulation'
 import {  ref } from 'vue'
 
 import type { GraphNode } from  "@/helpers/springSimulationUtils"
+import { crossDetection } from '@/helpers/crossDetection'
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0,1])
 const geneToCompressionScales = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
 const globalCompressionFactor = ref<number>(1)
 const currentHeat = ref<number>(1000)
+const crossingHomologyGroups = ref<number[]>([])
 
 export default {
   name: 'SequencesDetails',
@@ -911,6 +913,63 @@ export default {
         })
       } else {
         this.svg().selectAll('path.connection').remove()
+        this.homologyGroups.filter(d => crossingHomologyGroups.value.includes(d)).forEach((homology) => {
+          const path_focus = genes.filter(
+            (d) => d.homology_id == homology //this.homologyFocus
+          )
+
+          console.log('path focus', path_focus)
+          const newPathFocus = path_focus.map((v) => ({
+            ...v,
+            sequence_id: `${v.genome_number}_${v.sequence_number}`,
+          }))
+          console.log('newPathFocus', newPathFocus)
+          console.log(Object.keys(this.sequenceIdLookup[this.chromosomeNr]))
+
+          let sortOrder = Object.keys(
+            this.sequenceIdLookup[this.chromosomeNr]
+          )
+
+          let sortedPath = [...newPathFocus].sort(function (a, b) {
+            return (
+              sortOrder.indexOf(a.sequence_id) -
+              sortOrder.indexOf(b.sequence_id)
+            )
+          })
+
+          // Add the line
+          this.svg()
+            .append('path')
+            .datum(sortedPath)
+            .attr('class', 'connection')
+            .attr('fill', 'none')
+            .attr(
+              'stroke',
+              vis.colorGenomes ? 'black' : vis.colorScale(String(homology)) as string
+            )
+            .attr('stroke-width', 1.5)
+            .attr(
+              'd',
+              d3
+                .line()
+                .x(function (d) {
+                  const key = `${d.genome_number}_${d.sequence_number}`
+                  let anchorStart = vis.anchorLookup[key]
+                  return (
+                    vis.margin.left * 3 +
+                    vis.geneToWindowScales[key](d.mRNA_start_position - anchorStart)
+                  )
+                })
+                .y(function (d, i) {
+                  return (
+                    vis.margin.top * 2 +
+                    vis.barHeight / 2 +
+                    vis.sequenceIdLookup[vis.chromosomeNr][d.sequence_id] *
+                      (vis.barHeight + 10)
+                  )
+                })
+            )
+        })
       }
 
       this.svg()
@@ -1231,9 +1290,10 @@ export default {
 
 
      // Create individual scales 
-    ///
-
+    ///    
     let newGenePositions: GraphNode[] = runForceSimulation(this.dataGenes?? [], this.data ?? [], currentHeat.value, 0.5, 232273529)
+
+    crossingHomologyGroups.value = crossDetection(newGenePositions)
 
     let xScaleGeneToWindowInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
     let xScaleGeneToCompressionInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
