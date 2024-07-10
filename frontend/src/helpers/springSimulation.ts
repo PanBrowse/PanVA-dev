@@ -3,7 +3,6 @@ import { GraphNode, applyOrderConstraint, evaluateForces, applyMinimumdistance, 
 
 export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetrics[], fromHeat:number = 1000, toHeat: number = 0.1, initializeOnHomologygroup?:number) => {
     let heat = fromHeat
-
     let nodes: GraphNode[] = []
     let excludedHomologyGroup = 0 // 232290464
  
@@ -70,7 +69,6 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
       if(terminate) { return nodes }
     }
   }
-
 
   export const updateNodes = (nodes: GraphNode[], heat: number, excludedHomologyGroup:number=0): [GraphNode[], boolean] => {
     const newUpdatedNodes:GraphNode[] = []

@@ -1004,6 +1004,13 @@ export default {
                 let xTransform = 0
                 let yTransform = 0
                 const currentScale = vis.geneToWindowScales[key]
+                let rotation = '' 
+                if(d.strand === '+') {
+                  rotation = 'rotate(90)'
+                }
+                else if(d.strand === '-') {
+                  rotation =  'rotate(-90)'
+                }
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
@@ -1027,7 +1034,7 @@ export default {
                         (vis.barHeight + 10)
                   // }
                 }
-                transform = `translate(${xTransform},${yTransform})`
+                transform = `translate(${xTransform},${yTransform})${rotation}`
                 return transform
              
               }),
