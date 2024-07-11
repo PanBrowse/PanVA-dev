@@ -57,10 +57,10 @@ export const updateViewportRangeBounds = (
     
     // create scale from gene coordinates to viewPort (window) coordinates
     const endPointsGeneRange = [geneToCompressionScale.invert(newCompressionRangeEdges[0]), geneToCompressionScale.invert(newCompressionRangeEdges[1])]
-    const geneRange = [endPointsGeneRange[0], ...geneRangeInner, endPointsGeneRange[1]]
+    const geneRange = geneRangeInner[geneRangeInner.length - 1] === endPointsGeneRange[1] ?  [endPointsGeneRange[0]  , ...geneRangeInner] : [endPointsGeneRange[0]  , ...geneRangeInner, endPointsGeneRange[1]]
     const scaleCompressionToWindow = d3.scaleLinear().domain(newCompressionRangeEdges).range(windowRangeEdges)
     const windowRangeInner = compressionRange.map(d => scaleCompressionToWindow(d))
-    const windowRange = [windowRangeEdges[0], ...windowRangeInner, windowRangeEdges[1]]
+    const windowRange = windowRangeInner[windowRangeInner.length -1 ] === windowRangeEdges[1] ? [windowRangeEdges[0], ...windowRangeInner] : [windowRangeEdges[0], ...windowRangeInner, windowRangeEdges[1]]
     const geneToWindowScale = d3.scaleLinear().domain(geneRange).range(windowRange)
 
     return [geneToCompressionScale, geneToWindowScale]

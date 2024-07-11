@@ -1,5 +1,6 @@
 import type { GroupInfo, SequenceMetrics } from "@/types"
-import { GraphNode, applyOrderConstraint, evaluateForces, applyMinimumdistance, type xConnections } from "./springSimulationUtils"
+import { GraphNode, applyOrderConstraint, evaluateForces as evaluateForcesNode, applyMinimumdistance, type xConnections, evaluateForcesY } from "./springSimulationUtils"
+import { abs } from "./math"
 
 export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetrics[], fromHeat:number = 1000, toHeat: number = 0.1, initializeOnHomologygroup?:number) => {
     let heat = fromHeat
@@ -66,7 +67,20 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
     while(true) {
       [nodes, terminate] = updateNodes(nodes, heat)
       heat = heat * 0.95
-      if(terminate) { return nodes }
+      if(terminate) {  
+        // if(initializeOnHomologygroup !== undefined) {
+        //   let anchor = 0
+        //   sequences.forEach((sequence) => {
+        //     const sequenceMembers = nodes.filter(d => d.sequenceId === sequence.sequence_id)
+        //     const anchorElement = sequenceMembers.find(d => d.homologyGroup === initializeOnHomologygroup)
+        //     if(anchorElement === undefined) {anchor = 0}
+        //     else {anchor = anchorElement.position}
+        //     sequenceMembers.forEach(gene => {
+        //       gene.position = gene.position - anchor
+        //     })
+        //   })
+        // }
+        return nodes }
     }
   }
 
@@ -74,13 +88,37 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
     const newUpdatedNodes:GraphNode[] = []
     let terminate = false
     let largestStep = 0
+    const touchingDistance = 1000
+
     for(const node of nodes) {
       const leftNode = node.connectionsX.left ? nodes.find(d => d.id === node.connectionsX.left![0]) : undefined
       const rightNode = node.connectionsX.right ? nodes.find(d => d.id === node.connectionsX.right![0]) : undefined
       const connectedXNodes = [leftNode, rightNode]
       const connectedYNodes = nodes.filter(d => node.connectionsY.includes(d.id))        
-      let force = evaluateForces(node, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup)
-      force = force 
+      let force = evaluateForcesNode(node, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup)
+
+      // normal force from the right
+      if(rightNode && abs(rightNode.position - node.position) <= touchingDistance) {
+        const rightLeftNode = rightNode.connectionsX.left ? nodes.find(d => d.id === rightNode.connectionsX.left![0]) : undefined
+        const rightRightNode = rightNode.connectionsX.right ? nodes.find(d => d.id === rightNode.connectionsX.right![0]) : undefined
+        const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
+        const rightConnectedYNodes = nodes.filter(d => rightNode.connectionsY.includes(d.id))        
+
+        const forcesOnRightNeighbour = evaluateForcesNode(rightNode, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
+        force = force + Math.min(forcesOnRightNeighbour, 0)
+      }
+      // normal force from the left
+      if(leftNode && abs(leftNode.position - node.position) <= touchingDistance) {
+        const rightLeftNode = leftNode.connectionsX.left ? nodes.find(d => d.id === leftNode.connectionsX.left![0]) : undefined
+        const rightRightNode = leftNode.connectionsX.right ? nodes.find(d => d.id === leftNode.connectionsX.right![0]) : undefined
+        const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
+        const rightConnectedYNodes = nodes.filter(d => leftNode.connectionsY.includes(d.id))        
+
+        const forcesOnLeftNeighbour = evaluateForcesNode(leftNode, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
+        force = force + Math.max(forcesOnLeftNeighbour, 0)
+
+      }
+
       const deltaPos = (force * heat)
       const deltaPosConstrained =  applyOrderConstraint(node, connectedXNodes, deltaPos)
       const newPositionConstrained = node.position + deltaPosConstrained
@@ -91,7 +129,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
       newUpdatedNodes.push(updatedNode)
       largestStep = Math.abs(deltaPosConstrained) > largestStep ? Math.abs(deltaPosConstrained) : largestStep
     }
-    if(Math.abs(largestStep) < 0.1) { terminate = true }
+    if(Math.abs(largestStep) < 1) { terminate = true }
     // enforce minimum distance
     const newNodes: GraphNode[] = []
     const uniqueSequences: number[] = []
@@ -102,7 +140,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
     uniqueSequences.forEach( sequence => {
       const currentSequence = sequence
       const nodesOnSequence = newUpdatedNodes.filter(d => d.sequence === currentSequence) 
-      const spreadNodes = applyMinimumdistance(nodesOnSequence, 1000000)
+      const spreadNodes = applyMinimumdistance(nodesOnSequence, 1_000)
       newNodes.push(...spreadNodes)
     })
 

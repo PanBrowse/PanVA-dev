@@ -686,8 +686,8 @@ export default {
 
                 const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.gene_start_position) / globalCompressionFactor.value
                 if(compressionFactor < 1) {
-                  const yTopMod = ypos - Math.max((1- compressionFactor), 0.5) + this.barHeight /2
-                  const yBottomMod = ypos + Math.max((1- compressionFactor), 0.5) + this.barHeight /2
+                  const yTopMod = ypos - Math.max((1- compressionFactor), 0.2) + this.barHeight /2
+                  const yBottomMod = ypos + Math.max((1 - compressionFactor), 0.2) + this.barHeight /2
 
                   const lineConnect = d3.line()([[x6, yTopMod], [x2, yTopMod], [x3, yBottomMod], [x5, yBottomMod],  [x6, yTopMod]])
                   
@@ -858,13 +858,10 @@ export default {
             (d) => d.homology_id == homology //this.homologyFocus
           )
 
-          console.log('path focus', path_focus)
           const newPathFocus = path_focus.map((v) => ({
             ...v,
             sequence_id: `${v.genome_number}_${v.sequence_number}`,
           }))
-          console.log('newPathFocus', newPathFocus)
-          console.log(Object.keys(this.sequenceIdLookup[this.chromosomeNr]))
 
           let sortOrder = Object.keys(
             this.sequenceIdLookup[this.chromosomeNr]
@@ -918,13 +915,10 @@ export default {
             (d) => d.homology_id == homology //this.homologyFocus
           )
 
-          console.log('path focus', path_focus)
           const newPathFocus = path_focus.map((v) => ({
             ...v,
             sequence_id: `${v.genome_number}_${v.sequence_number}`,
           }))
-          console.log('newPathFocus', newPathFocus)
-          console.log(Object.keys(this.sequenceIdLookup[this.chromosomeNr]))
 
           let sortOrder = Object.keys(
             this.sequenceIdLookup[this.chromosomeNr]
@@ -995,7 +989,6 @@ export default {
                 let xTransform = 0
                 let yTransform = 0
                 const currentScale = vis.geneToWindowScales[key]
-
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
                     xTransform = 
@@ -1035,8 +1028,10 @@ export default {
                 vis.upstreamHomologies.includes(d.homology_id) ? '3px' : ''
               )
               .attr('fill', (d) =>
-              vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
-              )     
+              {
+              return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
+              }
+            )     
               .attr('opacity', 0.8),
 
           (update) =>
@@ -1044,7 +1039,9 @@ export default {
               .transition()
               .duration(this.transitionTime)
               .attr('fill', (d) =>
-                vis.colorGenes ? vis.colorScale(String(d.homology_id)) : 'black'
+              {
+              return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
+              }
               )
               .attr('stroke-width', (d) =>
                 vis.upstreamHomologies.includes(d.homology_id ?? 0) ? '3px' : ''

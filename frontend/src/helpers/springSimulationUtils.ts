@@ -40,9 +40,10 @@ export class GraphNode {
   
   }
 
-export const calculateAttractingForce = (distanceToNeighbour: number, expectedDistance: number) => {
+export const calculateAttractingForce = (distanceToNeighbour: number, expectedDistance: number, touchingDistance:number=1) => {
     const differenceToExpectedDistance = distanceToNeighbour - expectedDistance
-    if(differenceToExpectedDistance < 1) {return differenceToExpectedDistance}
+    if(abs(distanceToNeighbour) <= touchingDistance) {return 0}
+    if(abs(differenceToExpectedDistance) < 10) {return differenceToExpectedDistance}
     const force = (abs(differenceToExpectedDistance)/abs(expectedDistance) )
     const direction = Math.sign(expectedDistance)
     if(force <= 1) { return force * direction }
@@ -50,7 +51,7 @@ export const calculateAttractingForce = (distanceToNeighbour: number, expectedDi
   }
   
   const calculateAttractingForceY = (distanceToNeighbour: number) => {
-    if(abs(distanceToNeighbour) < 1 ) { return distanceToNeighbour }
+    if(abs(distanceToNeighbour) < 1 ) { return 0 }
     return  Math.log2(abs(distanceToNeighbour)) * Math.sign(distanceToNeighbour) * 100
   }
   
@@ -61,8 +62,8 @@ export const calculateAttractingForce = (distanceToNeighbour: number, expectedDi
     return  force * direction
 }
   
-  const calculateGravityForce = (distanceToNeighbour: number) => {
-    if(distanceToNeighbour === 0 ) { return 0 }
+  const calculateGravityForce = (distanceToNeighbour: number, minimumDistance:number=1) => {
+    if(abs(distanceToNeighbour) <= minimumDistance ) { return -0 * Math.sign(distanceToNeighbour)}
     return Math.sqrt(abs(distanceToNeighbour)) * Math.sign(distanceToNeighbour)
   }
   
@@ -73,16 +74,19 @@ export const calculateAttractingForce = (distanceToNeighbour: number, expectedDi
   
 export const evaluateForces = (currentNode:GraphNode, connectedXNodes: (GraphNode | undefined)[], connectedYNodes:GraphNode[], heat: number, excludedHomologyGroup?: number) => {
     let force = 0
-    const scalePartialForceY = 1000
-    const scalePartialForceX = 1
-    const scalePartialForceGravity = 10
-    const scaleRepelling = 10
+    const scalePartialForceY = 100000
+    const scalePartialForceX = 10
+    const scalePartialForceGravity = scalePartialForceX * 1000
+    const scaleRepelling = 0
+    const touchingDistance = 1000
+
     // Calculate contribution for all in the same homology group
     connectedYNodes.forEach(connectedNode => {
       const partialForce = calculateAttractingForceY(connectedNode.position - currentNode.position)
       if(currentNode.homologyGroup === excludedHomologyGroup) { force = force; console.log('excluded') }
       else { force = force + (partialForce * scalePartialForceY ) }
     })
+    // if(currentNode.sequence ===51) {console.log(force)}
   
     // calculate contribution from adjacent nodes
     let partialForce = 0
@@ -102,20 +106,20 @@ export const evaluateForces = (currentNode:GraphNode, connectedXNodes: (GraphNod
       else if(abs(neighbourDistance) < abs(expectedNeighbourDistance)) {
         partialForce = calculateRepellingForce(neighbourDistance, expectedNeighbourDistance) 
       } else {
-        partialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance) 
+        partialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance, touchingDistance) 
       }
   
       //add a contracting force to condense the view and a repelling force to spread out nodes
-      const gravityForce = calculateGravityForce(neighbourDistance)
+      const gravityForce = calculateGravityForce(neighbourDistance, touchingDistance)
+      // console.log(gravityForce * scalePartialForceGravity, currentNode.sequenceId)
       const repellingForce = calculateNaturalRepellingForce(neighbourDistance)
       force = force + (scalePartialForceX * partialForce) + (gravityForce * scalePartialForceGravity) + (repellingForce * scaleRepelling)
     })
-
     return force
   }
   
 export const applyOrderConstraint = (currentNode: GraphNode, connectedXNodes: (GraphNode|undefined)[], deltaPosIn: number) => {
-    const maxMove = 10000000
+    const maxMove = 100000000000000000000
     let bounds = [-maxMove, maxMove]
     let deltaPos = deltaPosIn
   
@@ -125,8 +129,8 @@ export const applyOrderConstraint = (currentNode: GraphNode, connectedXNodes: (G
     const previousDistanceRight = connectedRight ? connectedRight.position - currentNode.position : maxMove
     const previousDistanceLeft = connectedLeft ? connectedLeft.position - currentNode.position : -maxMove
 
-    bounds[0] = previousDistanceLeft * 3 / 7
-    bounds[1] = previousDistanceRight * 3 / 7
+    bounds[0] = Math.max(previousDistanceLeft * 3 / 7, -maxMove)
+    bounds[1] = Math.min(previousDistanceRight * 3 / 7,maxMove)
 
     //apply bounds
     if(deltaPos < 0) {
@@ -155,7 +159,7 @@ export const applyOrderConstraint = (currentNode: GraphNode, connectedXNodes: (G
       if(precedingNode.originalPosition === currentNode.originalPosition) { console.log('positions are not unique'); return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
       const differenceToMinDistance = distanceToPreceding - minimumDistance
       // Shift only if differene to min diff is bigger than 0, which means it is too close
-      const shift = Math.max(0, differenceToMinDistance)
+      const shift =  Math.max(0, differenceToMinDistance)
       accumulatedShift = accumulatedShift + shift
       shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift 
     })
@@ -169,4 +173,18 @@ export const applyOrderConstraint = (currentNode: GraphNode, connectedXNodes: (G
       node.position = newPosition
     })
     return nodesOnSequence
+  }
+
+  export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode[], heat: number, excludedHomologyGroup?: number) => {
+    let force = 0
+    const scalePartialForceY = 1000
+
+    // Calculate contribution for all in the same homology group
+    connectedYNodes.forEach(connectedNode => {
+      const partialForce = calculateAttractingForceY(connectedNode.position - currentNode.position)
+      if(currentNode.homologyGroup === excludedHomologyGroup) { force = force; console.log('excluded') }
+      else { force = force + (partialForce * scalePartialForceY ) }
+    })
+  
+    return force
   }
