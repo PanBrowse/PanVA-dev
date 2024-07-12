@@ -15,6 +15,8 @@ export class GraphNode {
     private _connectionsY: string[] = []
     private _sequenceId: string
     private _originalPosition: number
+    private _lastMove: number = 0
+    private _localTempScaling: number = 1
   
     constructor(id:string, position: number, homologyGroup:number, sequence: number, sequenceId: string, originalPosition?: number) {
       this._id = id,
@@ -33,11 +35,14 @@ export class GraphNode {
     public get homologyGroup() {return this._homologyGroup}
     public get connectionsX() {return this._connectionsX}
     public get connectionsY() {return this._connectionsY}
+    public get lastMove() {return this._lastMove}
+    public get localTempScaling() {return this._localTempScaling}
   
     public set connectionsX(connections: xConnections) {this._connectionsX = connections}
     public set connectionsY(connections: string[]) {this._connectionsY = connections}
     public set position(newPos: number) { this._position = newPos }
-  
+    public set lastMove(newMove: number) {this._lastMove = newMove}
+    public set localTempScaling(newScale: number) {this._localTempScaling = Math.abs(newScale)}
   }
 
 export const calculateAttractingForce = (distanceToNeighbour: number, expectedDistance: number, touchingDistance:number=1) => {

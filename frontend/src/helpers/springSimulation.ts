@@ -132,14 +132,19 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
         force = force + Math.max(forcesOnLeftNeighbour, 0)
 
       }
-
-      const deltaPos = force 
+      // local temperature change to reduce oscilation() (Frick et al.)
+      if(Math.sign(node.lastMove) !== Math.sign(force) ) {node.localTempScaling = node.localTempScaling * 0.9}
+      else {node.localTempScaling = node.localTempScaling * 1.1}
+      
+      const deltaPos = force * node.localTempScaling
       const deltaPosConstrained =  applyOrderConstraint(node, connectedXNodes, deltaPos, heat)
       const newPositionConstrained = node.position + deltaPosConstrained
 
       const updatedNode = new GraphNode(node.id, newPositionConstrained, node.homologyGroup, node.sequence, node.sequenceId, node.originalPosition)
       updatedNode.connectionsX = node.connectionsX
       updatedNode.connectionsY = node.connectionsY
+      updatedNode.lastMove = deltaPosConstrained
+      updatedNode.localTempScaling = node.localTempScaling
       newUpdatedNodes.push(updatedNode)
       largestStep = Math.abs(deltaPosConstrained) > largestStep ? Math.abs(deltaPosConstrained) : largestStep
     }
