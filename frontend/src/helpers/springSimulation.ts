@@ -3,7 +3,9 @@ import { GraphNode, applyOrderConstraint, evaluateForces as evaluateForcesNode, 
 import { abs } from "./math"
 
 export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetrics[], fromHeat:number = 1000, toHeat: number = 0.1, initializeOnHomologygroup?:number) => {
-    let heat = fromHeat
+  // simulates forces applied to all nodes in the graph
+  // if tuning of the evaluateForces function is bad it can result in strange behaviour (ugly layout)  
+  let heat = fromHeat
     let nodes: GraphNode[] = []
     let excludedHomologyGroup = 0 // 232290464
  
@@ -64,10 +66,21 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
     }
 
     let terminate = false
+    let nIterations = 0
+    let largestStep = 0
+    let currentHeatNIterations = 0
     while(true) {
-      [nodes, terminate] = updateNodes(nodes, heat)
-      heat = heat * 0.95
+      [nodes, terminate, largestStep] = updateNodes(nodes, heat)
+
+      nIterations = nIterations +1
+      currentHeatNIterations = currentHeatNIterations + 1
+      // repeat calculations for the same heat a few times (Davidson and Harel)
+      if(currentHeatNIterations > 9) {
+        heat = heat * 0.95
+        currentHeatNIterations = 0
+      }
       if(terminate) {  
+        // uncomment to center final nodes on the initializeHomologygroup
         // if(initializeOnHomologygroup !== undefined) {
         //   let anchor = 0
         //   sequences.forEach((sequence) => {
@@ -80,11 +93,12 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
         //     })
         //   })
         // }
+        console.log(nIterations, 'iterations in simulation')
         return nodes }
     }
   }
 
-  export const updateNodes = (nodes: GraphNode[], heat: number, excludedHomologyGroup:number=0): [GraphNode[], boolean] => {
+  export const updateNodes = (nodes: GraphNode[], heat: number, excludedHomologyGroup:number=0): [GraphNode[], boolean, number] => {
     const newUpdatedNodes:GraphNode[] = []
     let terminate = false
     let largestStep = 0
@@ -95,7 +109,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
       const rightNode = node.connectionsX.right ? nodes.find(d => d.id === node.connectionsX.right![0]) : undefined
       const connectedXNodes = [leftNode, rightNode]
       const connectedYNodes = nodes.filter(d => node.connectionsY.includes(d.id))        
-      let force = evaluateForcesNode(node, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup)
+      let [force, dummy] = evaluateForcesNode(node, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup)
 
       // normal force from the right
       if(rightNode && abs(rightNode.position - node.position) <= touchingDistance) {
@@ -104,7 +118,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
         const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
         const rightConnectedYNodes = nodes.filter(d => rightNode.connectionsY.includes(d.id))        
 
-        const forcesOnRightNeighbour = evaluateForcesNode(rightNode, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
+        const [dummy, forcesOnRightNeighbour] = evaluateForcesNode(rightNode, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
         force = force + Math.min(forcesOnRightNeighbour, 0)
       }
       // normal force from the left
@@ -114,13 +128,13 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
         const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
         const rightConnectedYNodes = nodes.filter(d => leftNode.connectionsY.includes(d.id))        
 
-        const forcesOnLeftNeighbour = evaluateForcesNode(leftNode, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
+        const [dummy, forcesOnLeftNeighbour] = evaluateForcesNode(leftNode, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
         force = force + Math.max(forcesOnLeftNeighbour, 0)
 
       }
 
-      const deltaPos = (force * heat)
-      const deltaPosConstrained =  applyOrderConstraint(node, connectedXNodes, deltaPos)
+      const deltaPos = force 
+      const deltaPosConstrained =  applyOrderConstraint(node, connectedXNodes, deltaPos, heat)
       const newPositionConstrained = node.position + deltaPosConstrained
 
       const updatedNode = new GraphNode(node.id, newPositionConstrained, node.homologyGroup, node.sequence, node.sequenceId, node.originalPosition)
@@ -129,6 +143,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
       newUpdatedNodes.push(updatedNode)
       largestStep = Math.abs(deltaPosConstrained) > largestStep ? Math.abs(deltaPosConstrained) : largestStep
     }
+    // console.log(largestStep)
     if(Math.abs(largestStep) < 1) { terminate = true }
     // enforce minimum distance
     const newNodes: GraphNode[] = []
@@ -140,13 +155,13 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
     uniqueSequences.forEach( sequence => {
       const currentSequence = sequence
       const nodesOnSequence = newUpdatedNodes.filter(d => d.sequence === currentSequence) 
-      const spreadNodes = applyMinimumdistance(nodesOnSequence, 1_000)
+      const spreadNodes = applyMinimumdistance(nodesOnSequence, 1_00)
       newNodes.push(...spreadNodes)
     })
 
     // check for order changes
     checkNodeOrder(newNodes)
-    return [newNodes, terminate]
+    return [newNodes, terminate, largestStep]
   }
 
 const checkNodeOrder = (newNodes: GraphNode[]) => {

@@ -42,17 +42,18 @@ export class GraphNode {
 
 export const calculateAttractingForce = (distanceToNeighbour: number, expectedDistance: number, touchingDistance:number=1) => {
     const differenceToExpectedDistance = distanceToNeighbour - expectedDistance
-    if(abs(distanceToNeighbour) <= touchingDistance) {return 0}
     if(abs(differenceToExpectedDistance) < 10) {return differenceToExpectedDistance}
     const force = (abs(differenceToExpectedDistance)/abs(expectedDistance) )
     const direction = Math.sign(expectedDistance)
-    if(force <= 1) { return force * direction }
+    if(force <= 1) { return force * direction  }
     return Math.log2(force) * direction / 100000
   }
   
   const calculateAttractingForceY = (distanceToNeighbour: number) => {
-    if(abs(distanceToNeighbour) < 1 ) { return 0 }
-    return  Math.log2(abs(distanceToNeighbour)) * Math.sign(distanceToNeighbour) * 100
+    if(abs(distanceToNeighbour) < 1 ) { return distanceToNeighbour }
+    const force = Math.log2(abs(distanceToNeighbour)) * 100
+    const direction = Math.sign(distanceToNeighbour)
+    return  force * direction
   }
   
   const calculateRepellingForce = (distanceToNeighbour: number, expectedDistance: number) => {
@@ -63,8 +64,10 @@ export const calculateAttractingForce = (distanceToNeighbour: number, expectedDi
 }
   
   const calculateGravityForce = (distanceToNeighbour: number, minimumDistance:number=1) => {
-    if(abs(distanceToNeighbour) <= minimumDistance ) { return -0 * Math.sign(distanceToNeighbour)}
-    return Math.sqrt(abs(distanceToNeighbour)) * Math.sign(distanceToNeighbour)
+    if(abs(distanceToNeighbour) === 0 ) { return 0 }
+    const force = Math.sqrt(abs(distanceToNeighbour))
+    const direction = Math.sign(distanceToNeighbour)
+    return force * direction
   }
   
   const calculateNaturalRepellingForce = (distanceToNeighbour: number) => {
@@ -73,53 +76,78 @@ export const calculateAttractingForce = (distanceToNeighbour: number, expectedDi
   }
   
 export const evaluateForces = (currentNode:GraphNode, connectedXNodes: (GraphNode | undefined)[], connectedYNodes:GraphNode[], heat: number, excludedHomologyGroup?: number) => {
-    let force = 0
-    const scalePartialForceY = 100000
+  // tune force contributions
+    const scalePartialForceY = 10000
     const scalePartialForceX = 10
-    const scalePartialForceGravity = scalePartialForceX * 1000
-    const scaleRepelling = 0
-    const touchingDistance = 1000
+    const scalePartialForceGravity = scalePartialForceX * 100000
+    const scaleRepelling = 10
+    const touchingDistance = 100
 
+    let forceOnNode = 0
     // Calculate contribution for all in the same homology group
+    let homologyGroupTotal = 0
     connectedYNodes.forEach(connectedNode => {
       const partialForce = calculateAttractingForceY(connectedNode.position - currentNode.position)
-      if(currentNode.homologyGroup === excludedHomologyGroup) { force = force; console.log('excluded') }
-      else { force = force + (partialForce * scalePartialForceY ) }
+      if(currentNode.homologyGroup === excludedHomologyGroup) { homologyGroupTotal = homologyGroupTotal; console.log('excluded') }
+      else { homologyGroupTotal = homologyGroupTotal + partialForce}
     })
-    // if(currentNode.sequence ===51) {console.log(force)}
   
     // calculate contribution from adjacent nodes
     let partialForce = 0
+    let gravityTotal = 0
+    let repellingTotal = 0
+    let dnaStringTotal = 0
+    const nodesAreTouching = [false, false]
     connectedXNodes.forEach((connectedNode, i) => {
       if(connectedNode === undefined) {return}
       const neighbourDistance = connectedNode.position - currentNode.position
       const side = i === 0 ? 'left' : 'right'
       const connection = currentNode.connectionsX[side]
       const expectedNeighbourDistance = connection ? connection[1] : i * (-1)
-  
+      if(abs(neighbourDistance) <= touchingDistance ) {
+        nodesAreTouching[i] = true
+      }
+
       if(Math.sign(expectedNeighbourDistance) !== Math.sign(neighbourDistance)) {
             // if different signs: order flipped,  this should never happen
           partialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance)
           console.log('order flipped', expectedNeighbourDistance, neighbourDistance, heat)
         }
-  
       else if(abs(neighbourDistance) < abs(expectedNeighbourDistance)) {
         partialForce = calculateRepellingForce(neighbourDistance, expectedNeighbourDistance) 
       } else {
         partialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance, touchingDistance) 
       }
+      dnaStringTotal = dnaStringTotal + partialForce
   
-      //add a contracting force to condense the view and a repelling force to spread out nodes
       const gravityForce = calculateGravityForce(neighbourDistance, touchingDistance)
-      // console.log(gravityForce * scalePartialForceGravity, currentNode.sequenceId)
+      gravityTotal = gravityTotal + gravityForce
+
       const repellingForce = calculateNaturalRepellingForce(neighbourDistance)
-      force = force + (scalePartialForceX * partialForce) + (gravityForce * scalePartialForceGravity) + (repellingForce * scaleRepelling)
+      repellingTotal = repellingTotal + repellingForce
     })
-    return force
+
+    forceOnNode = 
+      (scalePartialForceX * dnaStringTotal) 
+      + (scalePartialForceGravity * gravityTotal) 
+      + (scaleRepelling * repellingTotal)
+      + (scalePartialForceY * homologyGroupTotal)
+
+    let forceWithNormal = forceOnNode
+    nodesAreTouching.forEach((neighbourIsTooClose, i) => {
+      const neighbourDirection = i === 0 ? -1 : 1
+      const forceDirection = Math.sign(forceWithNormal)
+
+      if(neighbourIsTooClose && (neighbourDirection === forceDirection) ) {
+        forceWithNormal = 0
+      }
+    })
+    return [forceWithNormal, forceOnNode]
   }
   
-export const applyOrderConstraint = (currentNode: GraphNode, connectedXNodes: (GraphNode|undefined)[], deltaPosIn: number) => {
-    const maxMove = 100000000000000000000
+export const applyOrderConstraint = (currentNode: GraphNode, connectedXNodes: (GraphNode|undefined)[], deltaPosIn: number, heat: number) => {
+    // maximum allowed move depends on the heat (Davidson and Harel)
+    const maxMove = 1000 * heat
     let bounds = [-maxMove, maxMove]
     let deltaPos = deltaPosIn
   
