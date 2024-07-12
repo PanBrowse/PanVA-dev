@@ -82,7 +82,7 @@ export default {
       cardBody: 12,
     },
     cardHeaderHeight: 40,
-    transitionTime: 750,
+    transitionTime: 500,
     numberOfCols: 2,
     barHeight: 6,
     sortedSequenceIds: [],
@@ -965,7 +965,53 @@ export default {
             )
         })
       }
+      const geneRect: d3.SymbolType =  {
+        draw(context, size) {
+        context.rect(-size/2, -2, size/2 , 2)
+        }
+      }
 
+      const geneTrianglePositive: d3.SymbolType =  {
+
+        draw(context, size) {
+          const sqrt3 = Math.sqrt(3)
+          const x = Math.sqrt(size / (sqrt3 * 3));
+          context.moveTo(x*2, 0);
+          context.lineTo(-x, -sqrt3 * x);
+          context.lineTo(-x, sqrt3 * x);
+          context.closePath();
+        }
+      }
+      const geneTriangleNegative: d3.SymbolType =  {
+
+        draw(context, size) {
+          const sqrt3 = Math.sqrt(3)
+          const x = Math.sqrt(size / (sqrt3 * 3));
+          context.moveTo(-x*2, 0);
+          context.lineTo(x, -sqrt3 * x);
+          context.lineTo(x, sqrt3 * x);
+          context.closePath();
+        }
+}
+      const geneSymbol =  d3
+                  .symbol()
+                  .size((d:GroupInfo) => {
+                    const key = `${d.genome_number}_${d.sequence_number}`
+                    const currentGeneToWindow = this.geneToWindowScales[key]
+                    if(currentGeneToWindow(d.gene_end_position) - currentGeneToWindow(d.gene_start_position) > this.barHeight ) { 
+
+                      return ((currentGeneToWindow(d.gene_end_position) - currentGeneToWindow(d.gene_start_position)) )
+                     } 
+                    
+                    return this.barHeight * 4
+                  })
+                  .type((d) => {
+                    const key = `${d.genome_number}_${d.sequence_number}`
+                    const currentGeneToWindow = this.geneToWindowScales[key]
+                  return (currentGeneToWindow(d.gene_end_position) - currentGeneToWindow(d.gene_start_position)) > this.barHeight  
+                  ? geneRect 
+                  : d.strand === '+' ? geneTrianglePositive : geneTriangleNegative
+                  })
       this.svg()
         .selectAll('path.gene')
         .data(genes, (d) => d.mRNA_id)
@@ -973,15 +1019,7 @@ export default {
           (enter) =>
             enter
               .append('path')
-              .attr(
-                'd',
-                d3
-                  .symbol()
-                  .size(this.barHeight * 4)
-                  .type(d3.symbolTriangle)
-                  // .type((d) => vis.shapeGenerator[d.homology_id])
-                // .type(d3.symbolTriangle)
-              )
+              .attr('d', geneSymbol )
               .attr('transform', function (d, i) {
                 const key = `${d.genome_number}_${d.sequence_number}`
                 const shortKey = `${d.genome_number}`
@@ -1033,40 +1071,21 @@ export default {
               }
             )     
               .attr('opacity', 0.8),
+              // .attr('height', 5),
 
           (update) =>
             update
+
               .transition()
               .duration(this.transitionTime)
-              .attr('fill', (d) =>
-              {
-              return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
-              }
-              )
-              .attr('stroke-width', (d) =>
-                vis.upstreamHomologies.includes(d.homology_id ?? 0) ? '3px' : ''
-              )
-              .attr('stroke', (d) =>
-                vis.colorGenes
-                  ? vis.upstreamHomologies.includes(d.homology_id ?? 0)
-                    ? vis.colorScale(String(d.homology_id))
-                    : ''
-                  : ''
-              )
               .attr('transform', function (d, i) {
                 const key = `${d.genome_number}_${d.sequence_number}`
+                const currentGeneToWindow = vis.geneToWindowScales[key]
                 const shortKey = `${d.genome_number}`
                 let transform
                 let xTransform = 0
                 let yTransform = 0
                 const currentScale = vis.geneToWindowScales[key]
-                let rotation = '' 
-                if(d.strand === '+') {
-                  rotation = 'rotate(90)'
-                }
-                else if(d.strand === '-') {
-                  rotation =  'rotate(-90)'
-                }
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
@@ -1090,15 +1109,31 @@ export default {
                         (vis.barHeight + 10)
                   // }
                 }
-                transform = `translate(${xTransform},${yTransform})${rotation}`
+                transform = `translate(${xTransform},${yTransform})`
                 return transform
-             
-              }),
-
+              })
+              .attr(
+                'd',
+                geneSymbol
+              )
+              .attr('fill', (d) =>
+              {
+              return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
+              }
+              )
+              .attr('stroke-width', (d) =>
+                vis.upstreamHomologies.includes(d.homology_id ?? 0) ? '3px' : ''
+              )
+              .attr('stroke', (d) =>
+                vis.colorGenes
+                  ? vis.upstreamHomologies.includes(d.homology_id ?? 0)
+                    ? vis.colorScale(String(d.homology_id))
+                    : ''
+                  : ''
+              ),
 
           (exit) => exit.remove()
         )
-      
     },
 
     //////////////////////////////////////////////////////////////////// Draw notifications //////////////////////////////////////

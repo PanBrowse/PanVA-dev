@@ -149,7 +149,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
       largestStep = Math.abs(deltaPosConstrained) > largestStep ? Math.abs(deltaPosConstrained) : largestStep
     }
     // console.log(largestStep)
-    if(Math.abs(largestStep) < 1) { terminate = true }
+    if(Math.abs(largestStep) < 10) { terminate = true }
     // enforce minimum distance
     const newNodes: GraphNode[] = []
     const uniqueSequences: number[] = []
