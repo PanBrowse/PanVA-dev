@@ -655,7 +655,7 @@ export default {
               .attr('d', (d) => {
                 const key:string = `${d.genome_number}_${d.sequence_number}`
                 const genePositionCompression = geneToCompressionScales.value[key](d.gene_start_position) 
-                const compressionPosition = genePositionCompression < compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : genePositionCompression
+                const compressionPosition = genePositionCompression 
                 const genePosition = geneToCompressionScales.value[key].invert(compressionPosition)
                 
                 const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
