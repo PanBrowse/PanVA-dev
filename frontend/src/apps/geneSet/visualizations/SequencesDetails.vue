@@ -26,7 +26,7 @@ import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 // import * as d3Fisheye from 'd3-fisheye'
 // import * as d3Fisheye from 'd3-fisheye'
-import type {  Dictionary } from 'lodash'
+import { type Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 
 import { groupInfoDensity } from '@/helpers/chromosome'
@@ -40,6 +40,7 @@ import {  ref } from 'vue'
 import type { GraphNode } from  "@/helpers/springSimulationUtils"
 import { crossDetection } from '@/helpers/crossDetection'
 import { getGeneSymbolType, getGeneSymbolSize } from '@/helpers/symbols'
+
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0,1])
@@ -852,120 +853,77 @@ export default {
       if (this.dataGenes === undefined) { return }
       const genes: GroupInfo[] = this.dataGenes
         /// connection lines
-      if (this.showLinks) {
-        this.svg().selectAll('path.connection').remove()
-        this.homologyGroups.forEach((homology) => {
-          const path_focus = genes.filter(
-            (d) => d.homology_id == homology //this.homologyFocus
-          )
+      this.svg().selectAll('path.connection').remove()
+      let currentHomologyGroups = this.homologyGroups
 
-          const newPathFocus = path_focus.map((v) => ({
-            ...v,
-            sequence_id: `${v.genome_number}_${v.sequence_number}`,
-          }))
-
-          let sortOrder = Object.keys(
-            this.sequenceIdLookup[this.chromosomeNr]
-          )
-
-          let sortedPath = [...newPathFocus].sort(function (a, b) {
-            return (
-              sortOrder.indexOf(a.sequence_id) -
-              sortOrder.indexOf(b.sequence_id)
-            )
-          })
-
-          // Add the line
-
-          this.svg()
-            .append('path')
-            .datum(sortedPath)
-            .attr('class', 'connection')
-            .attr('fill', 'none')
-            .attr(
-              'stroke',
-              vis.colorGenomes ? 'black' : vis.colorScale(String(homology)) as string
-            )
-            .attr('stroke-width', 1.5)
-            .attr(
-              'd',
-              d3
-                .line()
-                .x(function (d) {
-                  const key = `${d.genome_number}_${d.sequence_number}`
-                  let anchorStart = vis.anchorLookup[key]
-                  return (
-                    vis.margin.left * 3 +
-                    vis.geneToWindowScales[key](d.mRNA_start_position - anchorStart)
-                  )
-                })
-                .y(function (d, i) {
-                  return (
-                    vis.margin.top * 2 +
-                    vis.barHeight / 2 +
-                    vis.sequenceIdLookup[vis.chromosomeNr][d.sequence_id] *
-                      (vis.barHeight + 10)
-                  )
-                })
-            )
-        })
-      } else {
-        this.svg().selectAll('path.connection').remove()
-        this.homologyGroups.filter(d => crossingHomologyGroups.value.includes(d)).forEach((homology) => {
-          const path_focus = genes.filter(
-            (d) => d.homology_id == homology //this.homologyFocus
-          )
-
-          const newPathFocus = path_focus.map((v) => ({
-            ...v,
-            sequence_id: `${v.genome_number}_${v.sequence_number}`,
-          }))
-
-          let sortOrder = Object.keys(
-            this.sequenceIdLookup[this.chromosomeNr]
-          )
-
-          let sortedPath = [...newPathFocus].sort(function (a, b) {
-            return (
-              sortOrder.indexOf(a.sequence_id) -
-              sortOrder.indexOf(b.sequence_id)
-            )
-          })
-
-          // Add the line
-          this.svg()
-            .append('path')
-            .datum(sortedPath)
-            .attr('class', 'connection')
-            .attr('fill', 'none')
-            .attr(
-              'stroke',
-              vis.colorGenomes ? 'black' : vis.colorScale(String(homology)) as string
-            )
-            .attr('stroke-width', 1.5)
-            .attr(
-              'd',
-              d3
-                .line()
-                .x(function (d) {
-                  const key = `${d.genome_number}_${d.sequence_number}`
-                  let anchorStart = vis.anchorLookup[key]
-                  return (
-                    vis.margin.left * 3 +
-                    vis.geneToWindowScales[key](d.mRNA_start_position - anchorStart)
-                  )
-                })
-                .y(function (d, i) {
-                  return (
-                    vis.margin.top * 2 +
-                    vis.barHeight / 2 +
-                    vis.sequenceIdLookup[vis.chromosomeNr][d.sequence_id] *
-                      (vis.barHeight + 10)
-                  )
-                })
-            )
-        })
+      if(this.showLinks === false) {
+        currentHomologyGroups = this.homologyGroups.filter(d => crossingHomologyGroups.value.includes(d))
       }
+      // draw the lines
+      currentHomologyGroups.forEach((homology) => {
+        const path_focus = genes.filter(
+          (d) => d.homology_id == homology //this.homologyFocus
+        )
+
+        const newPathFocus = path_focus.map((v) => ({
+          ...v,
+          sequence_id: `${v.genome_number}_${v.sequence_number}`,
+        }))
+
+        let sortOrder = Object.keys(
+          this.sequenceIdLookup[this.chromosomeNr]
+        )
+
+        let sortedPath = [...newPathFocus].sort(function (a, b) {
+          return (
+            sortOrder.indexOf(a.sequence_id) -
+            sortOrder.indexOf(b.sequence_id)
+          )
+        })
+
+        let connectionsLine = (  sortedPath: GroupInfo[]) =>  {
+          const currentPath = d3.path()
+          let previousWasRendered = false 
+          sortedPath.forEach((node, i) => {
+            const key = `${node.genome_number}_${node.sequence_number}`
+            const currentGeneToWindow = this.geneToWindowScales[key]
+
+            const nodePosition = vis.margin.left * 3 + currentGeneToWindow(node.gene_start_position)
+            const y  = vis.margin.top * 2 +
+              vis.barHeight / 2 + 
+              vis.sequenceIdLookup[vis.chromosomeNr][key] *
+              (vis.barHeight + 10)
+            if( nodePosition < this.windowRange[0] || nodePosition > this.windowRange[1]) {
+              previousWasRendered = false
+              currentPath.moveTo(nodePosition, y)
+            }
+            else if(previousWasRendered === false) {
+              currentPath.moveTo(nodePosition, y)
+              previousWasRendered = true
+            }
+            else {
+              previousWasRendered = true
+              currentPath.lineTo(nodePosition, y)
+            }
+          })
+          return currentPath
+        }
+
+        // Add the line
+        this.svg()
+          .append('path')
+          .datum(sortedPath)
+          .attr('class', 'connection')
+          .attr('fill', 'none')
+          .attr(
+            'stroke',
+            vis.colorGenomes ? 'black' : vis.colorScale(String(homology)) as string
+          )
+          .attr('stroke-width', 1.5)
+          .attr(
+            'd',  d => connectionsLine(d).toString())
+        }
+      )
 
       const geneSymbol = d3
         .symbol()
