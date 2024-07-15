@@ -967,7 +967,7 @@ export default {
       }
       const geneRect: d3.SymbolType =  {
         draw(context, size) {
-        context.rect(-size/2, -2, size/2 , 2)
+        context.rect(0, -2, size , 2)
         }
       }
 
