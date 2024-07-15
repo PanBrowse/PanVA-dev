@@ -39,6 +39,7 @@ import {  ref } from 'vue'
 
 import type { GraphNode } from  "@/helpers/springSimulationUtils"
 import { crossDetection } from '@/helpers/crossDetection'
+import { getGeneSymbolType, getGeneSymbolSize } from '@/helpers/symbols'
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0,1])
@@ -965,53 +966,20 @@ export default {
             )
         })
       }
-      const geneRect: d3.SymbolType =  {
-        draw(context, size) {
-        context.rect(0, -2, size , 2)
-        }
-      }
 
-      const geneTrianglePositive: d3.SymbolType =  {
+      const geneSymbol = d3
+        .symbol()
+        .size((d:GroupInfo) => {
+          const key = `${d.genome_number}_${d.sequence_number}`
+          const currentGeneToWindow = this.geneToWindowScales[key]
+          return getGeneSymbolSize(d, currentGeneToWindow, this.barHeight)
+        })
+        .type((d) => {
+          const key = `${d.genome_number}_${d.sequence_number}`
+          const currentGeneToWindow = this.geneToWindowScales[key]
+          return getGeneSymbolType(d, currentGeneToWindow, this.barHeight)
+        })
 
-        draw(context, size) {
-          const sqrt3 = Math.sqrt(3)
-          const x = Math.sqrt(size / (sqrt3 * 3));
-          context.moveTo(x*2, 0);
-          context.lineTo(-x, -sqrt3 * x);
-          context.lineTo(-x, sqrt3 * x);
-          context.closePath();
-        }
-      }
-      const geneTriangleNegative: d3.SymbolType =  {
-
-        draw(context, size) {
-          const sqrt3 = Math.sqrt(3)
-          const x = Math.sqrt(size / (sqrt3 * 3));
-          context.moveTo(-x*2, 0);
-          context.lineTo(x, -sqrt3 * x);
-          context.lineTo(x, sqrt3 * x);
-          context.closePath();
-        }
-}
-      const geneSymbol =  d3
-                  .symbol()
-                  .size((d:GroupInfo) => {
-                    const key = `${d.genome_number}_${d.sequence_number}`
-                    const currentGeneToWindow = this.geneToWindowScales[key]
-                    if(currentGeneToWindow(d.gene_end_position) - currentGeneToWindow(d.gene_start_position) > this.barHeight ) { 
-
-                      return ((currentGeneToWindow(d.gene_end_position) - currentGeneToWindow(d.gene_start_position)) )
-                     } 
-                    
-                    return this.barHeight * 4
-                  })
-                  .type((d) => {
-                    const key = `${d.genome_number}_${d.sequence_number}`
-                    const currentGeneToWindow = this.geneToWindowScales[key]
-                  return (currentGeneToWindow(d.gene_end_position) - currentGeneToWindow(d.gene_start_position)) > this.barHeight  
-                  ? geneRect 
-                  : d.strand === '+' ? geneTrianglePositive : geneTriangleNegative
-                  })
       this.svg()
         .selectAll('path.gene')
         .data(genes, (d) => d.mRNA_id)
@@ -1022,35 +990,16 @@ export default {
               .attr('d', geneSymbol )
               .attr('transform', function (d, i) {
                 const key = `${d.genome_number}_${d.sequence_number}`
-                const shortKey = `${d.genome_number}`
-                let transform
-                let xTransform = 0
-                let yTransform = 0
                 const currentScale = vis.geneToWindowScales[key]
-                if (vis.anchor) {
-                  let anchorStart = vis.anchorLookup[key]
-                    xTransform = 
-                      vis.margin.left * 3 +
-                      currentScale(d.mRNA_start_position - anchorStart)
-                    yTransform =
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-
-                } else {
-
-                    xTransform = 
-                      vis.margin.left * 3 + currentScale(d.gene_start_position)
-                    yTransform =
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                  // }
-                }
-                transform = `translate(${xTransform},${yTransform})`
-                return transform
+                let startPosition = vis.anchor 
+                  ? currentScale(d.mRNA_start_position - vis.anchorLookup[key]) 
+                  : currentScale(d.mRNA_start_position)
+                let xTransform = vis.margin.left * 3 + startPosition
+                let yTransform =
+                  vis.margin.top * 2 +
+                  vis.barHeight / 2 +
+                  vis.sortedMrnaIndices[vis.chromosomeNr][i] * (vis.barHeight + 10)
+                return `translate(${xTransform},${yTransform})`
               })
               .attr('class', 'gene')
               .attr('hg', (d: GroupInfo) => d.homology_id ?? 0)
@@ -1071,56 +1020,28 @@ export default {
               }
             )     
               .attr('opacity', 0.8),
-              // .attr('height', 5),
 
           (update) =>
             update
-
               .transition()
               .duration(this.transitionTime)
               .attr('transform', function (d, i) {
                 const key = `${d.genome_number}_${d.sequence_number}`
-                const currentGeneToWindow = vis.geneToWindowScales[key]
-                const shortKey = `${d.genome_number}`
-                let transform
-                let xTransform = 0
-                let yTransform = 0
                 const currentScale = vis.geneToWindowScales[key]
-
-                if (vis.anchor) {
-                  let anchorStart = vis.anchorLookup[key]
-                    xTransform = 
-                      vis.margin.left * 3 +
-                      currentScale(d.mRNA_start_position - anchorStart)
-                    yTransform =
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-
-                } else {
-
-                    xTransform = 
-                      vis.margin.left * 3 + currentScale(d.gene_start_position)
-                    yTransform =
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                  // }
-                }
-                transform = `translate(${xTransform},${yTransform})`
-                return transform
+                let startPosition = vis.anchor 
+                  ? currentScale(d.mRNA_start_position - vis.anchorLookup[key]) 
+                  : currentScale(d.mRNA_start_position)
+                let xTransform = vis.margin.left * 3 + startPosition
+                let yTransform =
+                  vis.margin.top * 2 +
+                  vis.barHeight / 2 +
+                  vis.sortedMrnaIndices[vis.chromosomeNr][i] * (vis.barHeight + 10)
+                return `translate(${xTransform},${yTransform})`
               })
-              .attr(
-                'd',
-                geneSymbol
-              )
-              .attr('fill', (d) =>
-              {
-              return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
-              }
-              )
+              .attr('d', geneSymbol)
+              .attr('fill', (d) =>{
+                return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
+              })
               .attr('stroke-width', (d) =>
                 vis.upstreamHomologies.includes(d.homology_id ?? 0) ? '3px' : ''
               )
