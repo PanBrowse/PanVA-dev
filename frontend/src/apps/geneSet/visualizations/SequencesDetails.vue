@@ -24,13 +24,10 @@
 import { CloseCircleOutlined, ConsoleSqlOutlined } from '@ant-design/icons-vue'
 import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
-// import * as d3Fisheye from 'd3-fisheye'
-// import * as d3Fisheye from 'd3-fisheye'
 import { type Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 
 import { groupInfoDensity } from '@/helpers/chromosome'
-// import * as fisheye from '@/helpers/fisheye'
 import { useGeneSetStore } from '@/stores/geneSet'
 import type { GroupInfo, SequenceMetrics } from '@/types'
 import { calculateCompressionFactor, calculateIndividualScales , calculateWidth, updateViewportRangeBounds } from '@/helpers/axisStretch'
@@ -39,7 +36,7 @@ import {  ref } from 'vue'
 
 import type { GraphNode } from  "@/helpers/springSimulationUtils"
 import { crossDetection } from '@/helpers/crossDetection'
-import { getGeneSymbolType, getGeneSymbolSize } from '@/helpers/symbols'
+import { getGeneSymbolType, getGeneSymbolSize } from '@/helpers/customSymbols'
 
 
 // states
@@ -602,15 +599,15 @@ export default {
               .attr('class', 'bar-chr-context')
               .attr('d', (d) => {
                 const key:string = `${d.genome_number}_${d.sequence_number}`
-                const position = d.gene_start_position //< compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : d.gene_start_position
+                const position = d.mRNA_start_position //< compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : d.mRNA_start_position
               
                 const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
                 const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 const currentGeneToCompressionScale = geneToCompressionScales.value[key]
-                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position) 
-                const defaultConnectionThickness = 2
+                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.mRNA_start_position) 
+                const defaultConnectionThickness = 8
 
                 const x0 = this.geneToWindowScales[key](position)
                 const x1controlStart = x0 + (width *3/7)
@@ -630,7 +627,7 @@ export default {
                 const y5 = y3
                 const y6 = y0
 
-                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.gene_start_position)  /globalCompressionFactor.value
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.mRNA_start_position)  /globalCompressionFactor.value
                 const beta = Math.min(Math.sqrt(compressionFactor)/10, 1)
                 const lineUpper: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x0, y0], [x1controlStart,y0], [x1,y1],  [x1controlEnd,y0], [x2, y2]])  ?? ''
                 const lineConnect = d3.line()([[x6, y6], [x2, y2], [x3, y3], [x5, y5],  [x6, y6]])
@@ -656,7 +653,7 @@ export default {
               .duration(this.transitionTime)              
               .attr('d', (d) => {
                 const key:string = `${d.genome_number}_${d.sequence_number}`
-                const genePositionCompression = geneToCompressionScales.value[key](d.gene_start_position) 
+                const genePositionCompression = geneToCompressionScales.value[key](d.mRNA_start_position) 
                 const compressionPosition = genePositionCompression 
                 const genePosition = geneToCompressionScales.value[key].invert(compressionPosition)
                 
@@ -665,7 +662,7 @@ export default {
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 const currentGeneToCompressionScale = geneToCompressionScales.value[key]
-                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position) 
+                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.mRNA_start_position) 
                 const defaultConnectionThickness = 2
                 const x0 = this.geneToWindowScales[key](genePosition)
                 const x1controlStart = x0 + (width *3/7)
@@ -686,10 +683,10 @@ export default {
                 const y6 = y0
 
 
-                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.gene_start_position) / globalCompressionFactor.value
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.mRNA_start_position) / globalCompressionFactor.value
                 if(compressionFactor < 1) {
-                  const yTopMod = ypos - Math.max((1- compressionFactor), 0.2) + this.barHeight /2
-                  const yBottomMod = ypos + Math.max((1 - compressionFactor), 0.2) + this.barHeight /2
+                  const yTopMod = ypos + Math.min((1- compressionFactor), 1) * (defaultConnectionThickness / 2)
+                  const yBottomMod = y3 - Math.min((1 - compressionFactor), 1)  * (defaultConnectionThickness / 2)
 
                   const lineConnect = d3.line()([[x6, yTopMod], [x2, yTopMod], [x3, yBottomMod], [x5, yBottomMod],  [x6, yTopMod]])
                   
@@ -699,7 +696,6 @@ export default {
                 const lineUpper: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x0, y0], [x1controlStart,y0], [x1,y1],  [x1controlEnd,y0], [x2, y2]])  ?? ''
                 const lineConnect = d3.line()([[x6, y6], [x2, y2], [x3, y3], [x5, y5],  [x6, y6]])
                 const lineLower: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x3, y3], [x1controlEnd,y3], [x4,y4],  [x1controlStart,y3], [x5, y5]]) ?? ''
-                // const lineConnectStart = d3.line()([ [x6, y6]])
 
                 const line = lineUpper  + lineLower + lineConnect
 
@@ -726,8 +722,8 @@ export default {
         // this.drawBars()
         // this.drawContextBars()
         this.drawSquishBars()
-        this.addLabels()
         this.drawGenes()
+        this.addLabels()
 
         this.showNotificationsDetail
           ? this.drawNotifications()
@@ -887,8 +883,11 @@ export default {
           sortedPath.forEach((node, i) => {
             const key = `${node.genome_number}_${node.sequence_number}`
             const currentGeneToWindow = this.geneToWindowScales[key]
-
-            const nodePosition = vis.margin.left * 3 + currentGeneToWindow(node.gene_start_position)
+            const nodePosition = vis.margin.left * 3 + 
+            (
+              currentGeneToWindow(node.mRNA_start_position) + 
+              currentGeneToWindow(node.mRNA_end_position)
+            ) / 2
             const y  = vis.margin.top * 2 +
               vis.barHeight / 2 + 
               vis.sequenceIdLookup[vis.chromosomeNr][key] *
@@ -930,7 +929,9 @@ export default {
         .size((d:GroupInfo) => {
           const key = `${d.genome_number}_${d.sequence_number}`
           const currentGeneToWindow = this.geneToWindowScales[key]
-          return getGeneSymbolSize(d, currentGeneToWindow, this.barHeight)
+          const size = getGeneSymbolSize(d, currentGeneToWindow, this.barHeight)
+          if(currentGeneToWindow(d.mRNA_start_position) > this.windowRange[1]  || currentGeneToWindow(d.mRNA_end_position) < this.windowRange[0]) {return 0}
+          return size
         })
         .type((d) => {
           const key = `${d.genome_number}_${d.sequence_number}`
@@ -1003,13 +1004,13 @@ export default {
               .attr('stroke-width', (d) =>
                 vis.upstreamHomologies.includes(d.homology_id ?? 0) ? '3px' : ''
               )
-              .attr('stroke', (d) =>
-                vis.colorGenes
-                  ? vis.upstreamHomologies.includes(d.homology_id ?? 0)
-                    ? vis.colorScale(String(d.homology_id))
-                    : ''
-                  : ''
-              ),
+              .attr('stroke', (d) =>  vis.colorScale(String(d.homology_id))),
+              //   vis.colorGenes
+              //     ? vis.upstreamHomologies.includes(d.homology_id ?? 0)
+              //       ? vis.colorScale(String(d.homology_id))
+              //       : ''
+              //     : ''
+              // ),
 
           (exit) => exit.remove()
         )

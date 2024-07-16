@@ -13,7 +13,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
     genes.forEach((gene, index) => {
       // add index to get unique id
       const uId = gene.gene_id + '_' + index.toString()
-      nodes.push(new GraphNode(uId, gene.gene_start_position, gene.homology_id, gene.sequence_number, `${gene.genome_number}_${gene.sequence_number}` ))
+      nodes.push(new GraphNode(uId, gene.mRNA_start_position, gene.homology_id, gene.sequence_number, `${gene.genome_number}_${gene.sequence_number}` ))
     })
     nodes.sort((d,b) => d.position - b.position)
 
