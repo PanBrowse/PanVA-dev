@@ -47,7 +47,8 @@ export const asterisk = {
 
 export const geneRect: d3.SymbolType =  {
   draw(context, size) {
-    context.rect(0, -2, size , 2)
+    context.moveTo(-size/2,0)
+    context.rect(-size/2, -1, size , 2)
   }
 }
 
@@ -72,16 +73,16 @@ export  const geneTriangleReverse: d3.SymbolType =  {
   }
 }
 
-export const getGeneSymbolType = (d: GroupInfo, currentGeneToWindow: d3.ScaleLinear<number, number, never>, barHeight: number) => {
+export const getGeneSymbolType = (d: GroupInfo, currentGeneToWindow: d3.ScaleLinear<number, number, never>, barHeight: number, showBars: boolean = true) => {
   const geneSize = currentGeneToWindow(d.mRNA_end_position) - currentGeneToWindow(d.mRNA_start_position)
-  return (geneSize > barHeight )  
+  return (geneSize > barHeight && showBars)  
   ? geneRect 
   : d.strand === '+' ? geneTriangleForward : geneTriangleReverse
 }
 
-export const getGeneSymbolSize = (d: GroupInfo, currentGeneToWindow: d3.ScaleLinear<number, number, never>, barHeight: number) => {
+export const getGeneSymbolSize = (d: GroupInfo, currentGeneToWindow: d3.ScaleLinear<number, number, never>, barHeight: number, showBars:boolean = true) => {
   const geneSize = currentGeneToWindow(d.mRNA_end_position) - currentGeneToWindow(d.mRNA_start_position)
-  return (geneSize > barHeight )  
+  return (geneSize > barHeight && showBars)  
     ? geneSize
     : barHeight * 4
 }

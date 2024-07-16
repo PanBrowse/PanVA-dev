@@ -45,6 +45,7 @@ const geneToCompressionScales = ref<Dictionary<d3.ScaleLinear<number, number, ne
 const globalCompressionFactor = ref<number>(1)
 const currentHeat = ref<number>(1000)
 const crossingHomologyGroups = ref<number[]>([])
+const showGeneBars = ref<boolean>(true)
 
 export default {
   name: 'SequencesDetails',
@@ -929,14 +930,14 @@ export default {
         .size((d:GroupInfo) => {
           const key = `${d.genome_number}_${d.sequence_number}`
           const currentGeneToWindow = this.geneToWindowScales[key]
-          const size = getGeneSymbolSize(d, currentGeneToWindow, this.barHeight)
+          const size = getGeneSymbolSize(d, currentGeneToWindow, this.barHeight, showGeneBars.value)
           if(currentGeneToWindow(d.mRNA_start_position) > this.windowRange[1]  || currentGeneToWindow(d.mRNA_end_position) < this.windowRange[0]) {return 0}
           return size
         })
         .type((d) => {
           const key = `${d.genome_number}_${d.sequence_number}`
           const currentGeneToWindow = this.geneToWindowScales[key]
-          return getGeneSymbolType(d, currentGeneToWindow, this.barHeight)
+          return getGeneSymbolType(d, currentGeneToWindow, this.barHeight, showGeneBars.value)
         })
 
       this.svg()
@@ -953,7 +954,10 @@ export default {
                 let startPosition = vis.anchor 
                   ? currentScale(d.mRNA_start_position - vis.anchorLookup[key]) 
                   : currentScale(d.mRNA_start_position)
-                let xTransform = vis.margin.left * 3 + startPosition
+                let endPosition = vis.anchor 
+                  ? currentScale(d.mRNA_end_position - vis.anchorLookup[key]) 
+                  : currentScale(d.mRNA_end_position)
+                let xTransform = vis.margin.left * 3 + ((startPosition + endPosition) / 2)
                 let yTransform =
                   vis.margin.top * 2 +
                   vis.barHeight / 2 +
@@ -990,7 +994,10 @@ export default {
                 let startPosition = vis.anchor 
                   ? currentScale(d.mRNA_start_position - vis.anchorLookup[key]) 
                   : currentScale(d.mRNA_start_position)
-                let xTransform = vis.margin.left * 3 + startPosition
+                let endPosition = vis.anchor 
+                  ? currentScale(d.mRNA_end_position - vis.anchorLookup[key]) 
+                  : currentScale(d.mRNA_end_position)
+                let xTransform = vis.margin.left * 3 + ((startPosition + endPosition) / 2)
                 let yTransform =
                   vis.margin.top * 2 +
                   vis.barHeight / 2 +
