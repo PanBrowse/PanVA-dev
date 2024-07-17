@@ -2,7 +2,7 @@ import type { Gene } from "@/apps/geneSet/interfaces/interfaces"
 import type { GroupInfo, SequenceMetrics } from "@/types"
 import * as d3 from 'd3'
 import { round } from "lodash"
-import type { GraphNode } from  "./springSimulationUtils"
+import type { GraphNode, GraphNodeGroup } from  "./springSimulationUtils"
 
 export const updateViewportRangeBounds = (
   inputScale: d3.ScaleLinear<number, number, never>, 
@@ -31,7 +31,7 @@ export const updateViewportRangeBounds = (
   }
 
 
-  export const filterUniquePosition = (genes: GraphNode[]) => {
+  export const filterUniquePosition = (genes: (GraphNode| GraphNodeGroup)[]) => {
     const uniquePositions: number[] = []
     const uniquePositionGenes = genes.filter(d => {
       if(uniquePositions.includes(d.originalPosition)) {return false}
@@ -43,7 +43,7 @@ export const updateViewportRangeBounds = (
 
 
   export const calculateIndividualScales = (
-    genePositionsOnSequence: GraphNode[], 
+    genePositionsOnSequence: (GraphNode[] | GraphNodeGroup[]), 
     newCompressionRangeEdges: [number, number], 
     windowRangeEdges: [number, number]
   ):[d3.ScaleLinear<number, number, never>, d3.ScaleLinear<number, number, never>] => {

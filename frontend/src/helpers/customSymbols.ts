@@ -81,8 +81,8 @@ export const getGeneSymbolType = (d: GroupInfo, currentGeneToWindow: d3.ScaleLin
 }
 
 export const getGeneSymbolSize = (d: GroupInfo, currentGeneToWindow: d3.ScaleLinear<number, number, never>, barHeight: number, showBars:boolean = true) => {
-  const geneSize = currentGeneToWindow(d.mRNA_end_position) - currentGeneToWindow(d.mRNA_start_position)
-  return (geneSize > barHeight && showBars)  
+  const geneSize = (d.mRNA_end_position - d.mRNA_start_position) / 100000 /// currentGeneToWindow(d.mRNA_end_position) - currentGeneToWindow(d.mRNA_start_position)
+  return ((geneSize > barHeight) && showBars)  
     ? geneSize
     : barHeight * 4
 }
