@@ -600,14 +600,14 @@ export default {
               .attr('class', 'bar-chr-context')
               .attr('d', (d) => {
                 const key:string = `${d.genome_number}_${d.sequence_number}`
-                const position = d.mRNA_start_position //< compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : d.mRNA_start_position
+                const position = d.mRNA_end_position 
               
                 const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
                 const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 const currentGeneToCompressionScale = geneToCompressionScales.value[key]
-                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.mRNA_start_position) 
+                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, position) 
                 const defaultConnectionThickness = 8
 
                 const x0 = this.geneToWindowScales[key](position)
@@ -628,7 +628,7 @@ export default {
                 const y5 = y3
                 const y6 = y0
 
-                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.mRNA_start_position)  /globalCompressionFactor.value
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, position) / globalCompressionFactor.value
                 const beta = Math.min(Math.sqrt(compressionFactor)/10, 1)
                 const lineUpper: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x0, y0], [x1controlStart,y0], [x1,y1],  [x1controlEnd,y0], [x2, y2]])  ?? ''
                 const lineConnect = d3.line()([[x6, y6], [x2, y2], [x3, y3], [x5, y5],  [x6, y6]])
@@ -654,7 +654,8 @@ export default {
               .duration(this.transitionTime)              
               .attr('d', (d) => {
                 const key:string = `${d.genome_number}_${d.sequence_number}`
-                const genePositionCompression = geneToCompressionScales.value[key](d.mRNA_start_position) 
+                const position = d.mRNA_end_position
+                const genePositionCompression = geneToCompressionScales.value[key](position) 
                 const compressionPosition = genePositionCompression 
                 const genePosition = geneToCompressionScales.value[key].invert(compressionPosition)
                 
@@ -663,7 +664,7 @@ export default {
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 const currentGeneToCompressionScale = geneToCompressionScales.value[key]
-                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.mRNA_start_position) 
+                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, position) 
                 const defaultConnectionThickness = 2
                 const x0 = this.geneToWindowScales[key](genePosition)
                 const x1controlStart = x0 + (width *3/7)
@@ -684,7 +685,7 @@ export default {
                 const y6 = y0
 
 
-                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.mRNA_start_position) / globalCompressionFactor.value
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, position) / globalCompressionFactor.value
                 if(compressionFactor < 1) {
                   const yTopMod = ypos + Math.min((1- compressionFactor), 1) * (defaultConnectionThickness / 2)
                   const yBottomMod = y3 - Math.min((1 - compressionFactor), 1)  * (defaultConnectionThickness / 2)

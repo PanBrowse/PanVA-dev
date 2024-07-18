@@ -1,7 +1,4 @@
-import type { Gene } from "@/apps/geneSet/interfaces/interfaces"
-import type { GroupInfo, SequenceMetrics } from "@/types"
 import * as d3 from 'd3'
-import { round } from "lodash"
 import type { GraphNode, GraphNodeGroup } from  "./springSimulationUtils"
 
 export const updateViewportRangeBounds = (
@@ -51,8 +48,8 @@ export const updateViewportRangeBounds = (
     const uniqueGenePositions = filterUniquePosition(genePositionsOnSequence)
 
     //create scale from gene coordinates to compressed coordinates
-    const compressionRange = uniqueGenePositions.map(d => d.position )
-    const geneRangeInner = uniqueGenePositions.map(d => d.originalPosition )
+    const compressionRange = uniqueGenePositions.flatMap(d => [d.position, d.endPosition] )
+    const geneRangeInner = uniqueGenePositions.flatMap(d => [d.originalPosition, d.originalPosition + d.width] )
     const geneToCompressionScale = d3.scaleLinear().domain(geneRangeInner).range(compressionRange)
     
     // create scale from gene coordinates to viewPort (window) coordinates

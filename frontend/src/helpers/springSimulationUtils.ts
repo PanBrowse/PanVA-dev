@@ -52,7 +52,6 @@ export class GraphNode {
     public set lastMove(newMove: number) {this._lastMove = newMove}
     public set localTempScaling(newScale: number) {this._localTempScaling = Math.abs(newScale)}
   }
-
   
   export class GraphNodeGroup {
     private _nodes: GraphNode[]
@@ -338,7 +337,7 @@ export const minDistanceConstraintShift = (currentSequenceNodes: (GraphNode | Gr
       newUpdatedNodes.push(updatedNode)
       largestStep = Math.abs(deltaPosConstrained) > largestStep ? Math.abs(deltaPosConstrained) : largestStep
     }
-    if(Math.abs(largestStep) < 1) { terminate = true }
+    if(Math.abs(largestStep) < 10) { terminate = true }
     // enforce minimum distance
     const newNodes: (GraphNodeGroup)[] = []
     const uniqueSequences: string[] = []

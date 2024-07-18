@@ -18,7 +18,7 @@ export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode
 
   export const evaluateForces = (currentNode:GraphNode|GraphNodeGroup, connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[], connectedYNodes:(GraphNode|GraphNodeGroup)[], heat: number, excludedHomologyGroup?: number): [number, number] => {
     // tune force contributions
-    const scalePartialForceY = 10000
+    const scalePartialForceY = 100000
     const scalePartialForceX = 10
     const scalePartialForceGravity = scalePartialForceX * 100000
     const scaleRepelling = 10
