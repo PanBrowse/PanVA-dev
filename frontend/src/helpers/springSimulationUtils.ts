@@ -328,7 +328,6 @@ export const minDistanceConstraintShift = (currentSequenceNodes: (GraphNode | Gr
       const deltaPosConstrained: number =  applyOrderConstraint(group, connectedXNodes, deltaPos, heat)
       const newPositionConstrained = group.position + deltaPosConstrained
       group.position = newPositionConstrained
-  
       const updatedNode = new GraphNodeGroup(group.nodes, group.originalRange, group.id)
       updatedNode.connectionsX = group.connectionsX
       updatedNode.connectionsY = group.connectionsY
@@ -348,7 +347,7 @@ export const minDistanceConstraintShift = (currentSequenceNodes: (GraphNode | Gr
     uniqueSequences.forEach( sequence => {
       const currentSequence = sequence
       const nodesOnSequence = newUpdatedNodes.filter(d => d.sequenceId === currentSequence) 
-      const spreadNodes = applyMinimumdistance(nodesOnSequence, 1_00) as GraphNodeGroup[]
+      const spreadNodes = applyMinimumdistance(nodesOnSequence, 1_000) as GraphNodeGroup[]
       // const addedNewNodes = spreadNodes
       newNodes.push(...spreadNodes)
     })

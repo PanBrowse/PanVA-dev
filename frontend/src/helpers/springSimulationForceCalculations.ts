@@ -7,7 +7,7 @@ export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode
 
     // Calculate contribution for all in the same homology group
     connectedYNodes.forEach(connectedNode => {
-      const partialForce = calculateAttractingForceY(connectedNode.position - currentNode.position)
+      const partialForce = calculateAttractingForceY((connectedNode.endPosition + connectedNode.position)/2  - (currentNode.endPosition + currentNode.position)/2)
       if(currentNode.homologyGroup === excludedHomologyGroup) { force = force; console.log('excluded') }
       else { force = force + (partialForce * scalePartialForceY ) }
     })
@@ -18,11 +18,11 @@ export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode
 
   export const evaluateForces = (currentNode:GraphNode|GraphNodeGroup, connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[], connectedYNodes:(GraphNode|GraphNodeGroup)[], heat: number, excludedHomologyGroup?: number): [number, number] => {
     // tune force contributions
-    const scalePartialForceY = 100000
-    const scalePartialForceX = 10
-    const scalePartialForceGravity = scalePartialForceX * 100000
-    const scaleRepelling = 10
-    const touchingDistance = 100
+    const scalePartialForceY = 1000
+    const scalePartialForceX = 100
+    const scalePartialForceGravity = scalePartialForceY * 10
+    const scaleRepelling = 100
+    const touchingDistance = 1000
 
     let forceOnNode:number = 0
     // Calculate contribution for all in the same homology group
@@ -71,7 +71,6 @@ export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode
     + (scalePartialForceGravity * gravityTotal) 
     + (scaleRepelling * repellingTotal)
     + (scalePartialForceY * homologyGroupTotal)
-
     let forceWithNormal = forceOnNode
     nodesAreTouching.forEach((neighbourIsTooClose, i) => {
     const neighbourDirection = i === 0 ? -1 : 1
@@ -91,7 +90,7 @@ export const calculateAttractingForce = (distanceToNeighbour: number, expectedDi
     const force = (abs(differenceToExpectedDistance)/abs(expectedDistance) )
     const direction = Math.sign(expectedDistance)
     if(force <= 1) { return force * direction  }
-    return Math.log2(force) * direction / 100000
+    return Math.log2(force) * direction / 1000
 }
     
 const calculateAttractingForceY = (distanceToNeighbour: number) => {

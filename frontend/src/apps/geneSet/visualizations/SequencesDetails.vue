@@ -628,7 +628,7 @@ export default {
                 const y5 = y3
                 const y6 = y0
 
-                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, position) / globalCompressionFactor.value
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, position) // globalCompressionFactor.value
                 const beta = Math.min(Math.sqrt(compressionFactor)/10, 1)
                 const lineUpper: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x0, y0], [x1controlStart,y0], [x1,y1],  [x1controlEnd,y0], [x2, y2]])  ?? ''
                 const lineConnect = d3.line()([[x6, y6], [x2, y2], [x3, y3], [x5, y5],  [x6, y6]])
