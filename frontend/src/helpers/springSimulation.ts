@@ -12,8 +12,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
  
     //genes to nodes
     genes.forEach((gene, index) => {
-      // add index to get unique id
-      const uId = gene.gene_id + '_' + index.toString()
+      const uId = gene.gene_id + '_' + index.toString()  // add index to get unique id
       nodes.push(new GraphNode(uId, gene.mRNA_start_position, gene.mRNA_end_position, gene.homology_id, gene.sequence_number, `${gene.genome_number}_${gene.sequence_number}` ))
     })
     nodes.sort((d,b) => d.position - b.position)
@@ -66,17 +65,23 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
       })
     }
 
-    nodeGroups = nodes.map(node => new GraphNodeGroup([node]))
-    nodeGroups.forEach(group => {
-      const sortedNodes = group.nodes.sort((a,b) => a.originalPosition - b.originalPosition)
-      const leftNodeConnection = sortedNodes[0].connectionsX.left
-      const rightNodeConnection = sortedNodes[sortedNodes.length -1].connectionsX.right
+    // Form grous of overlappiung nodes
+    nodeGroups = createNodeGroups(nodes)
+    
+    // add x connections
+    const sortedNodeGroups = nodeGroups.sort((a,b) => a.position-b.position)
+    sortedNodeGroups.forEach((currentGroup, i) => {
+      const nodesOnSameSequence = sortedNodeGroups.filter(d => d.sequenceId === currentGroup.sequenceId)
+      const currentGroupIndex = nodesOnSameSequence.findIndex(d => d.id === currentGroup.id)
+      const leftGroupConnection = currentGroupIndex === 0 ? undefined : nodesOnSameSequence[currentGroupIndex - 1]
+      const rightGroupConnection = currentGroupIndex > nodesOnSameSequence.length - 2 ? undefined : nodesOnSameSequence[currentGroupIndex +1]
 
-      const leftConnection: [string, number] | undefined = leftNodeConnection === undefined ? undefined : [ nodeGroups.find(group => group.nodeIds.includes(leftNodeConnection[0]))!.id,  leftNodeConnection[1]]
-      const rightConnection:  [string, number] | undefined = rightNodeConnection === undefined ? undefined : [ nodeGroups.find(group => group.nodeIds.includes(rightNodeConnection[0]))!.id, rightNodeConnection[1]]
-      group.connectionsX = {left: leftConnection, right: rightConnection}
+      const leftConnection: [string, number] | undefined = leftGroupConnection === undefined ? undefined : [ leftGroupConnection.id,  leftGroupConnection.endPosition - currentGroup.position]
+      const rightConnection:  [string, number] | undefined = rightGroupConnection === undefined ? undefined : [ rightGroupConnection.id, rightGroupConnection.position - currentGroup.endPosition]
+      currentGroup.connectionsX = {left: leftConnection, right: rightConnection}
     })
 
+    // addy connections
     nodeGroups.forEach(group => {
       const yConnections = group.nodes.flatMap(node => node.connectionsY)
       const yConnectionsGroup: string[] = []
@@ -123,85 +128,6 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
     }
   }
 
-  export const updateNodes = (nodes: GraphNode[], heat: number, excludedHomologyGroup:number=0): [GraphNode[], boolean, number] => {
-    const newUpdatedNodes:GraphNode[] = []
-    let terminate = false
-    let largestStep = 0
-    const touchingDistance = 1000
-
-    for(const node of nodes) {
-      const leftNode = node.connectionsX.left ? nodes.find(d => d.id === node.connectionsX.left![0]) : undefined
-      const rightNode = node.connectionsX.right ? nodes.find(d => d.id === node.connectionsX.right![0]) : undefined
-      const connectedXNodes = [leftNode, rightNode]
-      const connectedYNodes = nodes.filter(d => node.connectionsY.includes(d.id))        
-      let [force, dummy] = evaluateForcesNode(node, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup)
-
-      // normal force from the right
-      if(rightNode && abs(rightNode.position - node.position) <= touchingDistance) {
-        const rightLeftNode = rightNode.connectionsX.left ? nodes.find(d => d.id === rightNode.connectionsX.left![0]) : undefined
-        const rightRightNode = rightNode.connectionsX.right ? nodes.find(d => d.id === rightNode.connectionsX.right![0]) : undefined
-        const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
-        const rightConnectedYNodes = nodes.filter(d => rightNode.connectionsY.includes(d.id))        
-
-        const [dummy, forcesOnRightNeighbour] = evaluateForcesNode(rightNode, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
-        force = force + Math.min(forcesOnRightNeighbour, 0)
-      }
-      // normal force from the left
-      if(leftNode && abs(leftNode.position - node.position) <= touchingDistance) {
-        const rightLeftNode = leftNode.connectionsX.left ? nodes.find(d => d.id === leftNode.connectionsX.left![0]) : undefined
-        const rightRightNode = leftNode.connectionsX.right ? nodes.find(d => d.id === leftNode.connectionsX.right![0]) : undefined
-        const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
-        const rightConnectedYNodes = nodes.filter(d => leftNode.connectionsY.includes(d.id))        
-
-        const [dummy, forcesOnLeftNeighbour] = evaluateForcesNode(leftNode, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
-        force = force + Math.max(forcesOnLeftNeighbour, 0)
-
-      }
-      // local temperature change to reduce oscilation() (Frick et al.)
-      if(Math.sign(node.lastMove) !== Math.sign(force) ) {node.localTempScaling = node.localTempScaling * 0.9}
-      else {node.localTempScaling = node.localTempScaling * 1.1}
-      
-      const deltaPos = force * node.localTempScaling
-      const deltaPosConstrained =  applyOrderConstraint(node, connectedXNodes, deltaPos, heat)
-      const newPositionConstrained = node.position + deltaPosConstrained
-      const newEndPosition = newPositionConstrained + node.width
-      const updatedNode = new GraphNode(
-        node.id, 
-        newPositionConstrained, 
-        newEndPosition, 
-        node.homologyGroup, 
-        node.sequence, 
-        node.sequenceId, 
-        node.originalPosition
-      )
-      updatedNode.connectionsX = node.connectionsX
-      updatedNode.connectionsY = node.connectionsY
-      updatedNode.lastMove = deltaPosConstrained
-      updatedNode.localTempScaling = node.localTempScaling
-
-      newUpdatedNodes.push(updatedNode)
-      largestStep = Math.abs(deltaPosConstrained) > largestStep ? Math.abs(deltaPosConstrained) : largestStep
-    }
-    if(Math.abs(largestStep) < 10) { terminate = true }
-    // enforce minimum distance
-    const newNodes: GraphNode[] = []
-    const uniqueSequences: number[] = []
-    newUpdatedNodes.map(d => d.sequence).forEach(d => {
-      if(uniqueSequences.includes(d)) { return }
-      uniqueSequences.push(d)
-    })
-    uniqueSequences.forEach( sequence => {
-      const currentSequence = sequence
-      const nodesOnSequence = newUpdatedNodes.filter(d => d.sequence === currentSequence) 
-      const spreadNodes = applyMinimumdistance(nodesOnSequence, 1_00) as GraphNode[]
-      newNodes.push(...spreadNodes)
-    })
-
-    // check for order changes
-    checkNodeOrder(newNodes)
-    return [newNodes, terminate, largestStep]
-  }
-
 const checkNodeOrder = (newNodes: GraphNode[]) => {
   newNodes.forEach((node, i) => {
     [node.connectionsX.left, node.connectionsX.right].forEach((connection, index) => {
@@ -230,7 +156,7 @@ export const updateNodeGroups = (nodeGroups: GraphNodeGroup[], heat: number, exc
     let [force, dummy] = evaluateForcesNode(group, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup)
     // if(group.id === 'C88_C05H1G005050_148group') {console.log(force, group.position, connectedXNodes.map(d => d?.position), connectedXNodes.map(d => d?.id), group.connectionsX.left, group.connectionsX.right, connectedYNodes, heat, excludedHomologyGroup)}
     // normal force from the right
-    if(rightNodeGroup && abs(rightNodeGroup.position - group.position) <= touchingDistance) {
+    if(rightNodeGroup && abs(rightNodeGroup.position - group.endPosition) <= touchingDistance) {
       const rightLeftNode = rightNodeGroup.connectionsX.left ? nodeGroups.find(d => d.id === rightNodeGroup.connectionsX.left![0]) : undefined
       const rightRightNode = rightNodeGroup.connectionsX.right ? nodeGroups.find(d => d.id === rightNodeGroup.connectionsX.right![0]) : undefined
       const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
@@ -240,7 +166,7 @@ export const updateNodeGroups = (nodeGroups: GraphNodeGroup[], heat: number, exc
       force = force + Math.min(forcesOnRightNeighbour, 0)
     }
     // normal force from the left
-    if(leftNodeGroup && abs(leftNodeGroup.position - group.position) <= touchingDistance) {
+    if(leftNodeGroup && abs(leftNodeGroup.endPosition - group.position) <= touchingDistance) {
       const rightLeftNode = leftNodeGroup.connectionsX.left ? nodeGroups.find(d => d.id === leftNodeGroup.connectionsX.left![0]) : undefined
       const rightRightNode = leftNodeGroup.connectionsX.right ? nodeGroups.find(d => d.id === leftNodeGroup.connectionsX.right![0]) : undefined
       const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
@@ -285,4 +211,39 @@ export const updateNodeGroups = (nodeGroups: GraphNodeGroup[], heat: number, exc
   // check for order changes
   // checkNodeOrder(newNodes)
   return [newNodes, terminate, largestStep]
+}
+
+const createNodeGroups = (nodes: GraphNode[]): GraphNodeGroup[] => {
+  const uniqueSequences: number[] = []
+    nodes.map(d => d.sequence).forEach(d => {
+      if(uniqueSequences.includes(d)) { return }
+      uniqueSequences.push(d)
+    })
+
+  const groups: GraphNodeGroup[] = []
+  uniqueSequences.forEach(currentSequence => {
+    const groupsInSequence: GraphNodeGroup[] = []
+    const nodesInSequence: GraphNode[] = nodes.filter(node => node.sequence === currentSequence)
+    // let currentNodeGroup:GraphNode[] = []
+    if(nodesInSequence.length === 0 ) {return []}
+
+    nodesInSequence.forEach(node => {
+      if(groupsInSequence.length === 0 ) {groupsInSequence.push(new GraphNodeGroup([node]))}
+      else if(rangesOverlap(node.range,  groupsInSequence[groupsInSequence.length - 1].range)) {
+        groupsInSequence[groupsInSequence.length - 1].addNode(node)
+      }
+      else {
+        groupsInSequence.push(new GraphNodeGroup([node]))
+      }
+    })
+    groups.push(...groupsInSequence)
+  })
+  return groups
+}
+
+const rangesOverlap = (range1: [number, number], range2:[number, number]): boolean => {
+  let overlaps = true
+  if(range1[1] < range2[0]) { return false }
+  if( range2[1] < range1[0]) { return false}
+  return overlaps
 }

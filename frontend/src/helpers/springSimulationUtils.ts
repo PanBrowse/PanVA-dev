@@ -41,6 +41,7 @@ export class GraphNode {
     public get lastMove() {return this._lastMove}
     public get localTempScaling() {return this._localTempScaling}
     public get width() {return this._width }
+    public get range() {return [this.position, this.position + this.width] as [number, number]}
   
     public set connectionsX(connections: xConnections) {this._connectionsX = connections}
     public set connectionsY(connections: string[]) {this._connectionsY = connections}
@@ -112,8 +113,7 @@ export const evaluateForces = (currentNode:GraphNode|GraphNodeGroup, connectedXN
     connectedXNodes.forEach((connectedNode, i) => {
       if(connectedNode === undefined) {return}
       const side = i === 0 ? 'left' : 'right'
-      // const neighbourDistance = side === "left" ? connectedNode.endPosition - currentNode.position : connectedNode.position - currentNode.endPosition
-      const neighbourDistance = connectedNode.position - currentNode.position
+      const neighbourDistance = side === "left" ? connectedNode.endPosition - currentNode.position : connectedNode.position - currentNode.endPosition
       const connection = currentNode.connectionsX[side]
       const expectedNeighbourDistance = connection ? connection[1] : i * (-1)
       if(abs(neighbourDistance) <= touchingDistance ) {
@@ -165,8 +165,8 @@ export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, co
     //calculate bounds
     const connectedRight = connectedXNodes[1]
     const connectedLeft = connectedXNodes[0]
-    const previousDistanceRight = connectedRight ? connectedRight.position - currentNode.position : maxMove
-    const previousDistanceLeft = connectedLeft ? connectedLeft.position - currentNode.position : -maxMove
+    const previousDistanceRight = connectedRight ? connectedRight.position - currentNode.endPosition : maxMove
+    const previousDistanceLeft = connectedLeft ? connectedLeft.endPosition - currentNode.position : -maxMove
 
     bounds[0] = Math.max(previousDistanceLeft * 3 / 7, -maxMove)
     bounds[1] = Math.min(previousDistanceRight * 3 / 7,maxMove)
@@ -177,7 +177,6 @@ export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, co
     else {
       deltaPos = Math.min(deltaPos, bounds[1])
     }
-
     return deltaPos
   }
   
@@ -190,7 +189,7 @@ export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, co
     uniquePositionNodes.forEach((currentNode) => {
       const precedingNode = currentNode.connectionsX.left ? currentSequenceNodes.find(d => d.id === currentNode.connectionsX.left![0]) : undefined
       if(precedingNode === undefined) { return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
-      const distanceToPreceding = precedingNode.position - currentNode.position
+      const distanceToPreceding = precedingNode.endPosition - currentNode.position
       const minimumDistance = -minimumAbsoluteDistance
       
       if(distanceToPreceding > 0) {console.log('wrong order of neighbours'); return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
@@ -288,6 +287,10 @@ export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, co
     public set connectionsY(newConnections: string[]) {this._yConnections = newConnections}
     public set lastMove(newMove: number) {this._lastMove = newMove}
     public set localTempScaling(newScale: number) {this._localTempScaling = Math.abs(newScale)}
+
+    public addNode(newNode: GraphNode) {
+      this._nodes.push(newNode)
+    }
   }
 
 
