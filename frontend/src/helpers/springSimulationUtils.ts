@@ -1,6 +1,8 @@
 import type { Dictionary } from "lodash"
 import { abs } from "./math"
 import { filterUniquePosition } from "./axisStretch"
+import type { GroupInfo } from "@/types"
+import { evaluateForces } from "./springSimulationForceCalculations"
 
 export interface xConnections {
   left: [id:string, distance: number] | undefined,
@@ -51,185 +53,9 @@ export class GraphNode {
     public set localTempScaling(newScale: number) {this._localTempScaling = Math.abs(newScale)}
   }
 
-export const calculateAttractingForce = (distanceToNeighbour: number, expectedDistance: number, touchingDistance:number=1) => {
-    const differenceToExpectedDistance = distanceToNeighbour - expectedDistance
-    if(abs(differenceToExpectedDistance) < 10) {return differenceToExpectedDistance}
-    if(expectedDistance === 0 ) {console.log('nodes should not be included'); return 0}
-    const force = (abs(differenceToExpectedDistance)/abs(expectedDistance) )
-    const direction = Math.sign(expectedDistance)
-    if(force <= 1) { return force * direction  }
-    return Math.log2(force) * direction / 100000
-  }
   
-  const calculateAttractingForceY = (distanceToNeighbour: number) => {
-    if(abs(distanceToNeighbour) < 1 ) { return distanceToNeighbour }
-    const force = Math.log2(abs(distanceToNeighbour)) * 100
-    const direction = Math.sign(distanceToNeighbour)
-    return  force * direction
-  }
-  
-  const calculateRepellingForce = (distanceToNeighbour: number, expectedDistance: number) => {
-    if(expectedDistance === 0) {console.log('two identical included'); return 0}
-    const percentageCompressed = 1 - (abs(distanceToNeighbour - expectedDistance) / abs(expectedDistance))
-    const force = percentageCompressed * 100000
-    const direction = -1 *  Math.sign(distanceToNeighbour)
-    return  force * direction
-}
-  
-  const calculateGravityForce = (distanceToNeighbour: number, minimumDistance:number=1) => {
-    if(abs(distanceToNeighbour) === 0 ) { return 0 }
-    const force = Math.sqrt(abs(distanceToNeighbour))
-    const direction = Math.sign(distanceToNeighbour)
-    return force * direction
-  }
-  
-  const calculateNaturalRepellingForce = (distanceToNeighbour: number) => {
-    if(distanceToNeighbour === 0 ) { return 0 }
-    return -1/Math.pow(abs(distanceToNeighbour), 1/10) * Math.sign(distanceToNeighbour)
-  }
-  
-export const evaluateForces = (currentNode:GraphNode|GraphNodeGroup, connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[], connectedYNodes:(GraphNode|GraphNodeGroup)[], heat: number, excludedHomologyGroup?: number): [number, number] => {
-  // tune force contributions
-    const scalePartialForceY = 10000
-    const scalePartialForceX = 10
-    const scalePartialForceGravity = scalePartialForceX * 100000
-    const scaleRepelling = 10
-    const touchingDistance = 100
-
-    let forceOnNode:number = 0
-    // Calculate contribution for all in the same homology group
-    let homologyGroupTotal = 0
-    connectedYNodes.forEach(connectedNode => {
-      const partialForce = calculateAttractingForceY(connectedNode.position - currentNode.position)
-       { homologyGroupTotal = homologyGroupTotal + partialForce}
-    })
-  
-    // calculate contribution from adjacent nodes
-    let partialForce = 0
-    let gravityTotal = 0
-    let repellingTotal = 0
-    let dnaStringTotal = 0
-    const nodesAreTouching = [false, false]
-    connectedXNodes.forEach((connectedNode, i) => {
-      if(connectedNode === undefined) {return}
-      const side = i === 0 ? 'left' : 'right'
-      const neighbourDistance = side === "left" ? connectedNode.endPosition - currentNode.position : connectedNode.position - currentNode.endPosition
-      const connection = currentNode.connectionsX[side]
-      const expectedNeighbourDistance = connection ? connection[1] : i * (-1)
-      if(abs(neighbourDistance) <= touchingDistance ) {
-        nodesAreTouching[i] = true
-      }
-      if(Math.sign(expectedNeighbourDistance) !== Math.sign(neighbourDistance)) {
-            // if different signs: order flipped,  this should never happen
-          partialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance)
-          console.log('order flipped', expectedNeighbourDistance, neighbourDistance, heat)
-        }
-      else if(abs(neighbourDistance) < abs(expectedNeighbourDistance)) {
-        partialForce = calculateRepellingForce(neighbourDistance, expectedNeighbourDistance) 
-      } else {
-        partialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance, touchingDistance) 
-      }
-      dnaStringTotal = dnaStringTotal + partialForce
-  
-      const gravityForce = calculateGravityForce(neighbourDistance, touchingDistance)
-      gravityTotal = gravityTotal + gravityForce
-
-      const repellingForce = calculateNaturalRepellingForce(neighbourDistance)
-      repellingTotal = repellingTotal + repellingForce
-    })
-
-    forceOnNode = 
-      (scalePartialForceX * dnaStringTotal) 
-      + (scalePartialForceGravity * gravityTotal) 
-      + (scaleRepelling * repellingTotal)
-      + (scalePartialForceY * homologyGroupTotal)
-
-    let forceWithNormal = forceOnNode
-    nodesAreTouching.forEach((neighbourIsTooClose, i) => {
-      const neighbourDirection = i === 0 ? -1 : 1
-      const forceDirection = Math.sign(forceWithNormal)
-
-      if(neighbourIsTooClose && (neighbourDirection === forceDirection) ) {
-        forceWithNormal = 0
-      }
-    })
-    return [forceWithNormal, forceOnNode]
-  }
-  
-export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, connectedXNodes: (GraphNode|GraphNodeGroup|undefined)[], deltaPosIn: number, heat: number) => {
-    // maximum allowed move depends on the heat (Davidson and Harel)
-    const maxMove = 1000 * heat
-    let bounds = [-maxMove, maxMove]
-    let deltaPos: number = deltaPosIn
-  
-    //calculate bounds
-    const connectedRight = connectedXNodes[1]
-    const connectedLeft = connectedXNodes[0]
-    const previousDistanceRight = connectedRight ? connectedRight.position - currentNode.endPosition : maxMove
-    const previousDistanceLeft = connectedLeft ? connectedLeft.endPosition - currentNode.position : -maxMove
-
-    bounds[0] = Math.max(previousDistanceLeft * 3 / 7, -maxMove)
-    bounds[1] = Math.min(previousDistanceRight * 3 / 7,maxMove)
-    //apply bounds
-    if(deltaPos < 0) {
-      deltaPos = Math.max(deltaPos, bounds[0])
-    }
-    else {
-      deltaPos = Math.min(deltaPos, bounds[1])
-    }
-    return deltaPos
-  }
-  
-  export const minDistanceConstraintShift = (currentSequenceNodes: (GraphNode | GraphNodeGroup)[] , minimumAbsoluteDistance: number): Dictionary<number> => {
-    let accumulatedShift = 0
-    //don't apply to nodes in the same position
-    const uniquePositionNodes = filterUniquePosition(currentSequenceNodes)
-
-    const shiftCoefficients: Dictionary<number> = {}
-    uniquePositionNodes.forEach((currentNode) => {
-      const precedingNode = currentNode.connectionsX.left ? currentSequenceNodes.find(d => d.id === currentNode.connectionsX.left![0]) : undefined
-      if(precedingNode === undefined) { return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
-      const distanceToPreceding = precedingNode.endPosition - currentNode.position
-      const minimumDistance = -minimumAbsoluteDistance
-      
-      if(distanceToPreceding > 0) {console.log('wrong order of neighbours'); return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
-      if(precedingNode.originalPosition === currentNode.originalPosition) { console.log('positions are not unique'); return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
-      const differenceToMinDistance = distanceToPreceding - minimumDistance
-      // Shift only if differene to min diff is bigger than 0, which means it is too close
-      const shift =  Math.max(0, differenceToMinDistance)
-      accumulatedShift = accumulatedShift + shift
-      shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift 
-    })
-    return shiftCoefficients
-  }
-
-  export const applyMinimumdistance = (nodesOnSequence: (GraphNode|GraphNodeGroup)[], minimumAbsDistance: number) => {
-    const deltaPosCorrection = minDistanceConstraintShift(nodesOnSequence, minimumAbsDistance)
-    nodesOnSequence.sort((a,b) => a.position - b.position).forEach(node => {
-      const newPosition = node.position + deltaPosCorrection[`${node.originalPosition}`]
-      node.position = newPosition
-    })
-    return nodesOnSequence
-  }
-
-  export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode[], heat: number, excludedHomologyGroup?: number) => {
-    let force = 0
-    const scalePartialForceY = 1000
-
-    // Calculate contribution for all in the same homology group
-    connectedYNodes.forEach(connectedNode => {
-      const partialForce = calculateAttractingForceY(connectedNode.position - currentNode.position)
-      if(currentNode.homologyGroup === excludedHomologyGroup) { force = force; console.log('excluded') }
-      else { force = force + (partialForce * scalePartialForceY ) }
-    })
-  
-    return force
-  }
-
   export class GraphNodeGroup {
     private _nodes: GraphNode[]
-    // private _homologyGroups: number[]
-    // private _range: [number, number]
     private _originalRange: [number, number]
     private _xConnections: xConnections = {left: undefined, right: undefined} 
     private _yConnections: string[] = []
@@ -275,7 +101,6 @@ export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, co
       const oldEnd = this.endPosition
       const oldStart = this.position
       const newStart = newPosition
-      const newEnd = newPosition + oldEnd - oldStart
 
       // update nodes as well
       this._nodes.forEach(node => {
@@ -293,9 +118,243 @@ export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, co
     }
   }
 
+  
+export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, connectedXNodes: (GraphNode|GraphNodeGroup|undefined)[], deltaPosIn: number, heat: number) => {
+  // maximum allowed move depends on the heat (Davidson and Harel)
+  const maxMove = 1000 * heat
+  let bounds = [-maxMove, maxMove]
+  let deltaPos: number = deltaPosIn
+
+  //calculate bounds
+  const connectedRight = connectedXNodes[1]
+  const connectedLeft = connectedXNodes[0]
+  const previousDistanceRight = connectedRight ? connectedRight.position - currentNode.endPosition : maxMove
+  const previousDistanceLeft = connectedLeft ? connectedLeft.endPosition - currentNode.position : -maxMove
+
+  bounds[0] = Math.max(previousDistanceLeft * 3 / 7, -maxMove)
+  bounds[1] = Math.min(previousDistanceRight * 3 / 7,maxMove)
+  //apply bounds
+  if(deltaPos < 0) {
+    deltaPos = Math.max(deltaPos, bounds[0])
+  }
+  else {
+    deltaPos = Math.min(deltaPos, bounds[1])
+  }
+  return deltaPos
+}
+  
+export const minDistanceConstraintShift = (currentSequenceNodes: (GraphNode | GraphNodeGroup)[] , minimumAbsoluteDistance: number): Dictionary<number> => {
+  let accumulatedShift = 0
+  //don't apply to nodes in the same position
+  const uniquePositionNodes = filterUniquePosition(currentSequenceNodes)
+
+  const shiftCoefficients: Dictionary<number> = {}
+  uniquePositionNodes.forEach((currentNode) => {
+    const precedingNode = currentNode.connectionsX.left ? currentSequenceNodes.find(d => d.id === currentNode.connectionsX.left![0]) : undefined
+    if(precedingNode === undefined) { return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
+    const distanceToPreceding = precedingNode.endPosition - currentNode.position
+    const minimumDistance = -minimumAbsoluteDistance
+    
+    if(distanceToPreceding > 0) {console.log('wrong order of neighbours'); return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
+    if(precedingNode.originalPosition === currentNode.originalPosition) { console.log('positions are not unique'); return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
+    const differenceToMinDistance = distanceToPreceding - minimumDistance
+    // Shift only if differene to min diff is bigger than 0, which means it is too close
+    const shift =  Math.max(0, differenceToMinDistance)
+    accumulatedShift = accumulatedShift + shift
+    shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift 
+  })
+  return shiftCoefficients
+}
+
+  export const applyMinimumdistance = (nodesOnSequence: (GraphNode|GraphNodeGroup)[], minimumAbsDistance: number) => {
+    const deltaPosCorrection = minDistanceConstraintShift(nodesOnSequence, minimumAbsDistance)
+    nodesOnSequence.sort((a,b) => a.position - b.position).forEach(node => {
+      const newPosition = node.position + deltaPosCorrection[`${node.originalPosition}`]
+      node.position = newPosition
+    })
+    return nodesOnSequence
+  }
+
+
+
 
   const calculateRange = (nodes: GraphNode[]) => {
     if(nodes.length === 0) { return [0, 0] as [number, number]}
     const positions = nodes.flatMap(node => [node.position, node.endPosition]).sort((a,b) => a - b)
     return [positions[0], positions[positions.length - 1]] as [number, number]
+  }
+
+  export const rangesOverlap = (range1: [number, number], range2:[number, number]): boolean => {
+    let overlaps = true
+    if(range1[1] < range2[0]) { return false }
+    if( range2[1] < range1[0]) { return false}
+    return overlaps
+  }
+
+
+  export const createNodeGroups = (nodes: GraphNode[]): GraphNodeGroup[] => {
+    const uniqueSequences: number[] = []
+      nodes.map(d => d.sequence).forEach(d => {
+        if(uniqueSequences.includes(d)) { return }
+        uniqueSequences.push(d)
+      })
+  
+    const groups: GraphNodeGroup[] = []
+    uniqueSequences.forEach(currentSequence => {
+      const groupsInSequence: GraphNodeGroup[] = []
+      const nodesInSequence: GraphNode[] = nodes.filter(node => node.sequence === currentSequence)
+      // let currentNodeGroup:GraphNode[] = []
+      if(nodesInSequence.length === 0 ) {return []}
+  
+      nodesInSequence.forEach(node => {
+        if(groupsInSequence.length === 0 ) {groupsInSequence.push(new GraphNodeGroup([node]))}
+        else if(rangesOverlap(node.range,  groupsInSequence[groupsInSequence.length - 1].range)) {
+          groupsInSequence[groupsInSequence.length - 1].addNode(node)
+        }
+        else {
+          groupsInSequence.push(new GraphNodeGroup([node]))
+        }
+      })
+      groups.push(...groupsInSequence)
+    })
+
+    addXConnections(groups)
+    addYConnections(groups)
+    return groups
+  }
+  
+  export const addXConnections = (nodeGroups: (GraphNodeGroup | GraphNode)[]) => {
+    const sortedNodeGroups = nodeGroups.sort((a,b) => a.position-b.position)
+    sortedNodeGroups.forEach((currentGroup, i) => {
+      const nodesOnSameSequence = sortedNodeGroups.filter(d => d.sequenceId === currentGroup.sequenceId)
+      const currentGroupIndex = nodesOnSameSequence.findIndex(d => d.id === currentGroup.id)
+      const leftGroupConnection = currentGroupIndex === 0 ? undefined : nodesOnSameSequence[currentGroupIndex - 1]
+      const rightGroupConnection = currentGroupIndex > nodesOnSameSequence.length - 2 ? undefined : nodesOnSameSequence[currentGroupIndex +1]
+
+      const leftConnection: [string, number] | undefined = leftGroupConnection === undefined ? undefined : [ leftGroupConnection.id,  leftGroupConnection.endPosition - currentGroup.position]
+      const rightConnection:  [string, number] | undefined = rightGroupConnection === undefined ? undefined : [ rightGroupConnection.id, rightGroupConnection.position - currentGroup.endPosition]
+      currentGroup.connectionsX = {left: leftConnection, right: rightConnection}
+    })
+    return sortedNodeGroups
+  }
+
+  export const addYConnections = (nodeGroups: GraphNodeGroup[]) => {
+    nodeGroups.forEach(group => {
+      const yConnections = group.nodes.flatMap(node => node.connectionsY)
+      const yConnectionsGroup: string[] = []
+      yConnections.forEach(d => {
+        const neighbour = nodeGroups.find(group => group.nodeIds.includes(d))
+        if(neighbour !== undefined) { 
+          yConnectionsGroup.push(neighbour.id)
+        }
+      })
+      group.connectionsY = yConnectionsGroup
+    })
+
+    return nodeGroups
+  }
+
+
+  export const genesToNodes = (genes: GroupInfo[]) => {
+    // Convert genes to graphNodes
+    let nodes: GraphNode[] = []
+    genes.forEach((gene, index) => {
+      const uId = gene.gene_id + '_' + index.toString()  // add index to get unique id
+      nodes.push(new GraphNode(uId, gene.mRNA_start_position, gene.mRNA_end_position, gene.homology_id, gene.sequence_number, `${gene.genome_number}_${gene.sequence_number}` ))
+    })
+    nodes.sort((d,b) => d.position - b.position)
+
+    // assign connections
+    addXConnections(nodes)
+    nodes.forEach(currentGroup => {
+      const yConnections = nodes.filter(d => d.homologyGroup === currentGroup.homologyGroup ).map(d => d.id)
+      currentGroup.connectionsY = yConnections
+    })
+    return nodes
+  }
+
+  export const checkNodeOrder = (newNodes: GraphNode[]) => {
+    newNodes.forEach((node, i) => {
+      [node.connectionsX.left, node.connectionsX.right].forEach((connection, index) => {
+        if(connection === undefined){return}
+        const connectionNode = newNodes.find(node => node.id === connection[0])
+        if(connectionNode === undefined) { return }
+  
+        const currentDistance = connectionNode.position - node.position
+        const expectedDistance = connection[1]
+        if(Math.sign(currentDistance) !== Math.sign(expectedDistance)) { console.log('unordered', i, index) }
+      })
+    })
+  }
+
+
+  export const updateNodeGroups = (nodeGroups: GraphNodeGroup[], heat: number, excludedHomologyGroup:number=0): [GraphNodeGroup[], boolean, number] => {
+    const newUpdatedNodes:GraphNodeGroup[] = []
+    let terminate = false
+    let largestStep = 0
+    const touchingDistance = 1000
+  
+    for(const group of nodeGroups) {
+      const leftNodeGroup = group.connectionsX.left ? nodeGroups.find(d => d.id === group.connectionsX.left![0]) : undefined
+      const rightNodeGroup = group.connectionsX.right ? nodeGroups.find(d => d.id === group.connectionsX.right![0]) : undefined
+      const connectedXNodes = [leftNodeGroup, rightNodeGroup]
+      const connectedYNodes = nodeGroups.filter(d => group.connectionsY.includes(d.id))        
+      let [force, dummy] = evaluateForces(group, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup)
+      // if(group.id === 'C88_C05H1G005050_148group') {console.log(force, group.position, connectedXNodes.map(d => d?.position), connectedXNodes.map(d => d?.id), group.connectionsX.left, group.connectionsX.right, connectedYNodes, heat, excludedHomologyGroup)}
+      // normal force from the right
+      if(rightNodeGroup && abs(rightNodeGroup.position - group.endPosition) <= touchingDistance) {
+        const rightLeftNode = rightNodeGroup.connectionsX.left ? nodeGroups.find(d => d.id === rightNodeGroup.connectionsX.left![0]) : undefined
+        const rightRightNode = rightNodeGroup.connectionsX.right ? nodeGroups.find(d => d.id === rightNodeGroup.connectionsX.right![0]) : undefined
+        const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
+        const rightConnectedYNodes = nodeGroups.filter(d => rightNodeGroup.connectionsY.includes(d.id))        
+  
+        const [dummy, forcesOnRightNeighbour] = evaluateForces(rightNodeGroup, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
+        force = force + Math.min(forcesOnRightNeighbour, 0)
+      }
+      // normal force from the left
+      if(leftNodeGroup && abs(leftNodeGroup.endPosition - group.position) <= touchingDistance) {
+        const rightLeftNode = leftNodeGroup.connectionsX.left ? nodeGroups.find(d => d.id === leftNodeGroup.connectionsX.left![0]) : undefined
+        const rightRightNode = leftNodeGroup.connectionsX.right ? nodeGroups.find(d => d.id === leftNodeGroup.connectionsX.right![0]) : undefined
+        const rigthConnectedXNodes = [rightLeftNode, rightRightNode]
+        const rightConnectedYNodes = nodeGroups.filter(d => leftNodeGroup.connectionsY.includes(d.id))        
+  
+        const [dummy, forcesOnLeftNeighbour] = evaluateForces(leftNodeGroup, rigthConnectedXNodes, rightConnectedYNodes, heat, excludedHomologyGroup)
+        force = force + Math.max(forcesOnLeftNeighbour, 0)
+  
+      }
+      // local temperature change to reduce oscilation() (Frick et al.)
+      if(Math.sign(group.lastMove) !== Math.sign(force) ) {group.localTempScaling = group.localTempScaling * 0.9}
+      else {group.localTempScaling = group.localTempScaling * 1.1}
+      const deltaPos = force * group.localTempScaling
+      const deltaPosConstrained: number =  applyOrderConstraint(group, connectedXNodes, deltaPos, heat)
+      const newPositionConstrained = group.position + deltaPosConstrained
+      group.position = newPositionConstrained
+  
+      const updatedNode = new GraphNodeGroup(group.nodes, group.originalRange, group.id)
+      updatedNode.connectionsX = group.connectionsX
+      updatedNode.connectionsY = group.connectionsY
+      updatedNode.lastMove = deltaPosConstrained
+      updatedNode.localTempScaling = group.localTempScaling
+      newUpdatedNodes.push(updatedNode)
+      largestStep = Math.abs(deltaPosConstrained) > largestStep ? Math.abs(deltaPosConstrained) : largestStep
+    }
+    if(Math.abs(largestStep) < 1) { terminate = true }
+    // enforce minimum distance
+    const newNodes: (GraphNodeGroup)[] = []
+    const uniqueSequences: string[] = []
+    newUpdatedNodes.map(d => d.sequenceId).forEach(d => {
+      if(uniqueSequences.includes(d)) { return }
+      uniqueSequences.push(d)
+    })
+    uniqueSequences.forEach( sequence => {
+      const currentSequence = sequence
+      const nodesOnSequence = newUpdatedNodes.filter(d => d.sequenceId === currentSequence) 
+      const spreadNodes = applyMinimumdistance(nodesOnSequence, 1_00) as GraphNodeGroup[]
+      // const addedNewNodes = spreadNodes
+      newNodes.push(...spreadNodes)
+    })
+  
+    // check for order changes
+    // checkNodeOrder(newNodes)
+    return [newNodes, terminate, largestStep]
   }
