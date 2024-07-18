@@ -1,5 +1,5 @@
 import type { GroupInfo, SequenceMetrics } from "@/types"
-import { GraphNode, applyMinimumdistance,  GraphNodeGroup, createNodeGroups, genesToNodes, updateNodeGroups } from "./springSimulationUtils"
+import { GraphNode, applyMinimumdistanceOnSequence,  GraphNodeGroup, createNodeGroups, genesToNodes, updateNodeGroups } from "./springSimulationUtils"
 
 export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetrics[], fromHeat:number = 1000, toHeat: number = 0.1, initializeOnHomologygroup?:number) => {
   // simulates forces applied to all nodes in the graph
@@ -8,6 +8,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
   let nodeGroups: GraphNodeGroup[] = []
   let nodes: GraphNode[] = genesToNodes(genes)
   let excludedHomologyGroup = 0 // 232290464
+  const touchingDistance = 1000
 
   // initalize with centering on a specific homologygroup
   if(initializeOnHomologygroup !== undefined) {
@@ -31,7 +32,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
   let largestStep = 0
   let currentHeatNIterations = 0
   while(true) {
-    [nodeGroups, terminate, largestStep] = updateNodeGroups(nodeGroups, heat)
+    [nodeGroups, terminate, largestStep] = updateNodeGroups(nodeGroups, heat, touchingDistance)
 
     nIterations = nIterations + 1
     currentHeatNIterations = currentHeatNIterations + 1
@@ -57,7 +58,8 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
       // }
 
       console.log(nIterations, 'iterations in simulation')
-      return nodeGroups.flatMap(nodeGroup => nodeGroup.nodes) }
+      return [nodeGroups.flatMap(nodeGroup => nodeGroup.nodes), nodeGroups] as [GraphNode[], GraphNodeGroup[]]
+    }
   }
 }
 

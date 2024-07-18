@@ -120,3 +120,57 @@ const calculateNaturalRepellingForce = (distanceToNeighbour: number) => {
     return -1/Math.pow(abs(distanceToNeighbour), 1/10) * Math.sign(distanceToNeighbour)
 }
     
+export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGroup[], touchingDistance: number = 1000) => {
+
+    const touchingLeft = findTouchingNeighboursLeft(group, allGroups, touchingDistance)
+    const touchingRight = findTouchingNeighboursRight(group, allGroups, touchingDistance)
+
+    // For right nodes
+    let totalRightForce = 0
+    touchingRight.sort((a,b) => b.position - a.position).forEach(neighbourGroup => {
+      const connectedXNodes = findNeighgourNodes(neighbourGroup, allGroups)
+      const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id))      
+      const [forceContribution, dummy] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1)
+      const updatedTotalRight = totalRightForce + forceContribution
+      totalRightForce = Math.min(updatedTotalRight, 0)
+    })
+    // For left nodes
+    let totalLeftForce = 0
+    touchingLeft.sort((a,b) => a.position - b.position).forEach(neighbourGroup => {
+      const connectedXNodes = findNeighgourNodes(neighbourGroup, allGroups)
+      const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id))      
+      const [forceContribution, dummy] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1)
+      const updatedTotalLeft = totalLeftForce + forceContribution
+      totalLeftForce = Math.max(updatedTotalLeft, 0)
+    })
+
+    return [totalLeftForce, totalRightForce]
+  }
+
+const findTouchingNeighboursLeft = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[], touchingDistance:number =1000): GraphNodeGroup[] => {
+  const [leftNeighbour, rightNeighbour] = findNeighgourNodes(group, nodeGroups)
+  if(leftNeighbour === undefined) { return [] }
+  if(group.position - leftNeighbour?.endPosition > touchingDistance) { return [] }
+  else {
+    return [group, ...findTouchingNeighboursLeft(leftNeighbour, nodeGroups)]
+  }
+}
+
+const findTouchingNeighboursRight = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[], touchingDistance:number =1000): GraphNodeGroup[] => {
+  const [leftNeighbour, rightNeighbour] = findNeighgourNodes(group, nodeGroups)
+  if(rightNeighbour === undefined) { return [] }
+  if( rightNeighbour?.position - group.endPosition > touchingDistance) { return [] }
+  else {
+    return [group, ...findTouchingNeighboursLeft(rightNeighbour, nodeGroups)]
+  }
+}
+
+export const findNeighgourNodes = (group:GraphNodeGroup, nodeGroups: GraphNodeGroup[]) => {
+    const leftNeighbourId = group.connectionsX.left ? group.connectionsX.left[0] : undefined
+    const rightNeighbourId = group.connectionsX.right ? group.connectionsX.right[0] : undefined 
+
+    const leftNeighbour = leftNeighbourId ? nodeGroups.find(d => d.id === leftNeighbourId) : undefined
+    const rightNeighbour = rightNeighbourId ? nodeGroups.find(d => d.id === rightNeighbourId) : undefined
+    const connectedXNodes = [leftNeighbour, rightNeighbour]
+    return connectedXNodes
+  }

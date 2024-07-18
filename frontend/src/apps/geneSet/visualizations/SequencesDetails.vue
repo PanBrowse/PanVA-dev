@@ -34,7 +34,7 @@ import { calculateCompressionFactor, calculateIndividualScales , calculateWidth,
 import { runForceSimulation } from '@/helpers/springSimulation'
 import {  ref } from 'vue'
 
-import type { GraphNode } from  "@/helpers/springSimulationUtils"
+import type { GraphNode, GraphNodeGroup } from  "@/helpers/springSimulationUtils"
 import { crossDetection } from '@/helpers/crossDetection'
 import { getGeneSymbolType, getGeneSymbolSize } from '@/helpers/customSymbols'
 
@@ -1211,7 +1211,7 @@ export default {
 
      // Create individual scales 
     ///    
-    let newGenePositions: GraphNode[] = runForceSimulation(this.dataGenes?? [], this.data ?? [], currentHeat.value, 0.5, 232273529)
+    let [newGenePositions, nodeGroups]: [GraphNode[] , GraphNodeGroup[] ]= runForceSimulation(this.dataGenes?? [], this.data ?? [], currentHeat.value, 0.5, 232273529)
 
     crossingHomologyGroups.value = crossDetection(newGenePositions)
 
