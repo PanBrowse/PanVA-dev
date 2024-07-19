@@ -31,7 +31,7 @@ import { groupInfoDensity } from '@/helpers/chromosome'
 import { useGeneSetStore } from '@/stores/geneSet'
 import type { GroupInfo, SequenceMetrics } from '@/types'
 import { calculateCompressionFactor, calculateIndividualScales , calculateWidth, updateViewportRangeBounds } from '@/helpers/axisStretch'
-import { runForceSimulation } from '@/helpers/springSimulation'
+import { runSpringSimulation } from '@/helpers/springSimulation'
 import {  ref } from 'vue'
 
 import type { GraphNode, GraphNodeGroup } from  "@/helpers/springSimulationUtils"
@@ -1211,7 +1211,7 @@ export default {
 
      // Create individual scales 
     ///    
-    let [newGenePositions, nodeGroups]: [GraphNode[] , GraphNodeGroup[] ]= runForceSimulation(this.dataGenes?? [], this.data ?? [], currentHeat.value, 0.5, 232273529)
+    let [newGenePositions, nodeGroups]: [GraphNode[] , GraphNodeGroup[] ]= runSpringSimulation(this.dataGenes?? [], this.data ?? [], currentHeat.value, 0.5, 232273529)
 
     crossingHomologyGroups.value = crossDetection(newGenePositions)
 

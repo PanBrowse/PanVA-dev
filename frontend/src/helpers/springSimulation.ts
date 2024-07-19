@@ -1,7 +1,7 @@
 import type { GroupInfo, SequenceMetrics } from "@/types"
 import { GraphNode, applyMinimumdistanceOnSequence,  GraphNodeGroup, createNodeGroups, genesToNodes, updateNodeGroups } from "./springSimulationUtils"
 
-export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetrics[], fromHeat:number = 1000, toHeat: number = 0.1, initializeOnHomologygroup?:number) => {
+export const runSpringSimulation = ( genes: GroupInfo[], sequences: SequenceMetrics[], fromHeat:number = 1000, toHeat: number = 0.1, initializeOnHomologygroup?:number) => {
   // simulates forces applied to all nodes in the graph
   // if tuning of the evaluateForces function is bad it can result in strange behaviour (ugly layout)  
   let heat = fromHeat
@@ -32,7 +32,7 @@ export const runForceSimulation = ( genes: GroupInfo[], sequences: SequenceMetri
   let largestStep = 0
   let currentHeatNIterations = 0
   while(true) {
-    [nodeGroups, terminate, largestStep] = updateNodeGroups(nodeGroups, heat, touchingDistance)
+    [nodeGroups, terminate] = updateNodeGroups(nodeGroups, heat, touchingDistance)
 
     nIterations = nIterations + 1
     currentHeatNIterations = currentHeatNIterations + 1

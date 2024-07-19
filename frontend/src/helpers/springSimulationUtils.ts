@@ -147,16 +147,14 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
   let accumulatedShift = 0
   //don't apply to nodes in the same position
   const uniquePositionNodes = filterUniquePosition(currentSequenceNodes)
-
   const shiftCoefficients: Dictionary<number> = {}
+
   uniquePositionNodes.forEach((currentNode) => {
     const precedingNode = currentNode.connectionsX.left ? currentSequenceNodes.find(d => d.id === currentNode.connectionsX.left![0]) : undefined
     if(precedingNode === undefined) { return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
     const distanceToPreceding = precedingNode.endPosition - currentNode.position
     const minimumDistance = -minimumAbsoluteDistance
     
-    if(distanceToPreceding > 0) {console.log('wrong order of neighbours'); return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
-    if(precedingNode.originalPosition === currentNode.originalPosition) { console.log('positions are not unique'); return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
     const differenceToMinDistance = distanceToPreceding - minimumDistance
     // Shift only if differene to min diff is bigger than 0, which means it is too close
     const shift =  Math.max(0, differenceToMinDistance)
@@ -167,12 +165,13 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
 }
 
   export const applyMinimumdistanceOnSequence = (nodesOnSequence: (GraphNode|GraphNodeGroup)[], minimumAbsDistance: number) => {
-    const deltaPosCorrection = calculateShiftMinDist(nodesOnSequence, minimumAbsDistance)
-    nodesOnSequence.sort((a,b) => a.position - b.position).forEach(node => {
+    const sorted = nodesOnSequence.sort((a,b) => a.originalPosition - b.originalPosition)
+    const deltaPosCorrection = calculateShiftMinDist(sorted, minimumAbsDistance)
+    sorted.forEach(node => {
       const newPosition = node.position + deltaPosCorrection[`${node.originalPosition}`]
       node.position = newPosition
     })
-    return nodesOnSequence
+    return sorted
   }
 
 
@@ -270,22 +269,21 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
     return nodes
   }
 
-  export const checkNodeOrder = (newNodes: GraphNode[]) => {
+  export const checkNodeOrder = (newNodes: GraphNodeGroup[]) => {
     newNodes.forEach((node, i) => {
       [node.connectionsX.left, node.connectionsX.right].forEach((connection, index) => {
         if(connection === undefined){return}
         const connectionNode = newNodes.find(node => node.id === connection[0])
         if(connectionNode === undefined) { return }
   
-        const currentDistance = connectionNode.position - node.position
+        const currentDistance = connectionNode.endPosition - node.position
         const expectedDistance = connection[1]
         if(Math.sign(currentDistance) !== Math.sign(expectedDistance)) { console.log('unordered', i, index) }
       })
     })
   }
 
-
-  export const updateNodeGroups = (nodeGroups: GraphNodeGroup[], heat: number, excludedHomologyGroup:number=0, touchingDistance:number=1000): [GraphNodeGroup[], boolean, number] => {
+  export const updateNodeGroups = (nodeGroups: GraphNodeGroup[], heat: number, excludedHomologyGroup:number=0, touchingDistance:number=1000): [GraphNodeGroup[], boolean] => {
     const newUpdatedNodes:GraphNodeGroup[] = []
     let terminate = false
     let largestStep = 0 // used for the termination condition
@@ -320,10 +318,10 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
 
     if(Math.abs(largestStep) < 10) { terminate = true }
     const newNodes = enforceMinimumDistance(newUpdatedNodes, touchingDistance)
-  
+    // iteration = iteration + 1
     // check for order changes
-    // checkNodeOrder(newNodes)
-    return [newNodes, terminate, largestStep]
+    checkNodeOrder(newNodes)
+    return [newNodes, terminate]
   }
 
 const enforceMinimumDistance = (inputNodes: GraphNodeGroup[], minimumDistance: number) => {    

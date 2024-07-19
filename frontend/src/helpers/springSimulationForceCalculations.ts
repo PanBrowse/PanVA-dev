@@ -18,7 +18,7 @@ export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode
 
   export const evaluateForces = (currentNode:GraphNode|GraphNodeGroup, connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[], connectedYNodes:(GraphNode|GraphNodeGroup)[], heat: number, excludedHomologyGroup?: number): [number, number] => {
     // tune force contributions
-    const scalePartialForceY = 1000
+    const scalePartialForceY = 10
     const scalePartialForceX = 100
     const scalePartialForceGravity = scalePartialForceY * 10
     const scaleRepelling = 100
@@ -33,52 +33,52 @@ export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode
     })
 
     // calculate contribution from adjacent nodes
-    let partialForce = 0
+    let dnaStringPartialForce = 0
     let gravityTotal = 0
     let repellingTotal = 0
     let dnaStringTotal = 0
     const nodesAreTouching = [false, false]
+
     connectedXNodes.forEach((connectedNode, i) => {
-    if(connectedNode === undefined) {return}
-    const side = i === 0 ? 'left' : 'right'
-    const neighbourDistance = side === "left" ? connectedNode.endPosition - currentNode.position : connectedNode.position - currentNode.endPosition
-    const connection = currentNode.connectionsX[side]
-    const expectedNeighbourDistance = connection ? connection[1] : i * (-1)
-    if(abs(neighbourDistance) <= touchingDistance ) {
-        nodesAreTouching[i] = true
-    }
-    if(Math.sign(expectedNeighbourDistance) !== Math.sign(neighbourDistance)) {
-            // if different signs: order flipped,  this should never happen
-        partialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance)
-        console.log('order flipped', expectedNeighbourDistance, neighbourDistance, heat)
+        if(connectedNode === undefined) {return}
+        const side = i === 0 ? 'left' : 'right'
+        const neighbourDistance = side === "left" ? connectedNode.endPosition - currentNode.position : connectedNode.position - currentNode.endPosition
+        const connection = currentNode.connectionsX[side]
+        const expectedNeighbourDistance = connection ? connection[1] : i * (-1)
+        if(abs(neighbourDistance) <= touchingDistance ) {
+            nodesAreTouching[i] = true
         }
-    else if(abs(neighbourDistance) < abs(expectedNeighbourDistance)) {
-        partialForce = calculateRepellingForce(neighbourDistance, expectedNeighbourDistance) 
-    } else {
-        partialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance, touchingDistance) 
-    }
-    dnaStringTotal = dnaStringTotal + partialForce
+        if(Math.sign(expectedNeighbourDistance) !== Math.sign(neighbourDistance)) {
+                // if different signs: order flipped,  this should never happen
+            dnaStringPartialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance)
+            console.log('order flipped', expectedNeighbourDistance, neighbourDistance)
+            }
+        else if(abs(neighbourDistance) < abs(expectedNeighbourDistance)) {
+            dnaStringPartialForce = calculateRepellingForce(neighbourDistance, expectedNeighbourDistance) 
+        } else {
+            dnaStringPartialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance, touchingDistance) 
+        }
+        dnaStringTotal = dnaStringTotal + dnaStringPartialForce
 
-    const gravityForce = calculateGravityForce(neighbourDistance, touchingDistance)
-    gravityTotal = gravityTotal + gravityForce
+        const gravityForce = calculateGravityForce(neighbourDistance, touchingDistance)
+        gravityTotal = gravityTotal + gravityForce
 
-    const repellingForce = calculateNaturalRepellingForce(neighbourDistance)
-    repellingTotal = repellingTotal + repellingForce
-    })
+        const repellingForce = calculateNaturalRepellingForce(neighbourDistance)
+        repellingTotal = repellingTotal + repellingForce
+        })
 
-    forceOnNode = 
-    (scalePartialForceX * dnaStringTotal) 
-    + (scalePartialForceGravity * gravityTotal) 
-    + (scaleRepelling * repellingTotal)
-    + (scalePartialForceY * homologyGroupTotal)
-    let forceWithNormal = forceOnNode
-    nodesAreTouching.forEach((neighbourIsTooClose, i) => {
-    const neighbourDirection = i === 0 ? -1 : 1
-    const forceDirection = Math.sign(forceWithNormal)
-
-    if(neighbourIsTooClose && (neighbourDirection === forceDirection) ) {
-        forceWithNormal = 0
-    }
+        forceOnNode = 
+        (scalePartialForceX * dnaStringTotal) 
+        + (scalePartialForceGravity * gravityTotal) 
+        + (scaleRepelling * repellingTotal)
+        + (scalePartialForceY * homologyGroupTotal)
+        let forceWithNormal = forceOnNode
+        nodesAreTouching.forEach((neighbourIsTooClose, i) => {
+        const neighbourDirection = i === 0 ? -1 : 1
+        const forceDirection = Math.sign(forceWithNormal)
+        if(neighbourIsTooClose && (neighbourDirection === forceDirection) ) {
+            forceWithNormal = 0
+        }
     })
     return [forceWithNormal, forceOnNode]
 }
@@ -102,8 +102,8 @@ const calculateAttractingForceY = (distanceToNeighbour: number) => {
     
 const calculateRepellingForce = (distanceToNeighbour: number, expectedDistance: number) => {
     if(expectedDistance === 0) {console.log('two identical included'); return 0}
-    const percentageCompressed = 1 - (abs(distanceToNeighbour - expectedDistance) / abs(expectedDistance))
-    const force = percentageCompressed * 100000
+    const percentageCompressed = (abs(distanceToNeighbour - expectedDistance) / abs(expectedDistance))
+    const force = percentageCompressed * 1000 / Math.log2(abs(distanceToNeighbour))
     const direction = -1 *  Math.sign(distanceToNeighbour)
     return  force * direction
 }
@@ -130,7 +130,7 @@ export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGrou
     touchingRight.sort((a,b) => b.position - a.position).forEach(neighbourGroup => {
       const connectedXNodes = findNeighgourNodes(neighbourGroup, allGroups)
       const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id))      
-      const [forceContribution, dummy] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1)
+      const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1)
       const updatedTotalRight = totalRightForce + forceContribution
       totalRightForce = Math.min(updatedTotalRight, 0)
     })
@@ -139,7 +139,7 @@ export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGrou
     touchingLeft.sort((a,b) => a.position - b.position).forEach(neighbourGroup => {
       const connectedXNodes = findNeighgourNodes(neighbourGroup, allGroups)
       const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id))      
-      const [forceContribution, dummy] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1)
+      const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1)
       const updatedTotalLeft = totalLeftForce + forceContribution
       totalLeftForce = Math.max(updatedTotalLeft, 0)
     })
