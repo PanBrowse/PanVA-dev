@@ -153,13 +153,13 @@ export const fetchGroupInfo = async () => {
 }
 
 export const fetchClusteringOrder = async (
-  method,
-  proteinScore,
-  orderScore,
-  orientationScore,
-  sizeScore,
-  locationScore,
-  jaccardScore
+  method: number,
+  proteinScore: number,
+  orderScore: number,
+  orientationScore: number,
+  sizeScore: number,
+  locationScore: number,
+  jaccardScore: number
 ) => {
   const config = useConfigStore()
 

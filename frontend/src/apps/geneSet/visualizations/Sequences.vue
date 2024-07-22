@@ -40,7 +40,7 @@ import type { SequenceMetrics } from '@/types'
 export default {
   name: 'Sequences',
   props: {
-    chromosomeNr: Number,
+    chromosomeNr: Number | 'unphased',
     name: String,
     data: Array,
     dataGenes: Array,
