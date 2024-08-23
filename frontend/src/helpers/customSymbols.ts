@@ -73,10 +73,44 @@ export  const geneTriangleReverse: d3.SymbolType =  {
   }
 }
 
+export const geneTriangleRectForward: d3.SymbolType = {
+  draw(context, size) {
+    const sqrt3 = Math.sqrt(3)
+    const geneHeight = 2
+    const triangleSize = geneHeight * 8
+    const x = Math.sqrt(triangleSize / (sqrt3 * 3));
+
+    context.moveTo(-size/2, -1);
+    context.lineTo(size/2, -1 )
+    context.lineTo(size/2, 1)
+    context.lineTo(-size/2, 1)
+    context.lineTo(-size/2 - x, 0)
+    context.lineTo(-size/2 , -1)
+    context.closePath();
+  }
+}
+
+export const geneTriangleRectReverse: d3.SymbolType = {
+  draw(context, size) {
+    const sqrt3 = Math.sqrt(3)
+    const geneHeight = 2
+    const triangleSize = geneHeight * 8
+    const x = Math.sqrt(triangleSize / (sqrt3 * 3));
+
+    context.moveTo(-size/2, -1);
+    context.lineTo(size/2, -1 )
+    context.lineTo(size/2 + x, 0)
+    context.lineTo(size/2, 1)
+    context.lineTo(-size/2, 1)
+    context.lineTo(-size/2 , -1)
+    context.closePath();
+  }
+}
+
 export const getGeneSymbolType = (d: GroupInfo, currentGeneToWindow: d3.ScaleLinear<number, number, never>, barHeight: number, showBars: boolean = true) => {
   const geneSize = currentGeneToWindow(d.mRNA_end_position) - currentGeneToWindow(d.mRNA_start_position)
   return (geneSize > barHeight && showBars)  
-  ? geneRect 
+  ? d.strand === '+' ? geneTriangleRectForward : geneTriangleRectReverse
   : d.strand === '+' ? geneTriangleForward : geneTriangleReverse
 }
 

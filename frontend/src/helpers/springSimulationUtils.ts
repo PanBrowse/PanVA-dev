@@ -316,7 +316,7 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
       largestStep = Math.abs(deltaPosConstrained) > largestStep ? Math.abs(deltaPosConstrained) : largestStep
     }
 
-    if(Math.abs(largestStep) < 10) { terminate = true }
+    if(Math.abs(largestStep) < 1000) { terminate = true }
     const newNodes = enforceMinimumDistance(newUpdatedNodes, touchingDistance)
     // iteration = iteration + 1
     // check for order changes
