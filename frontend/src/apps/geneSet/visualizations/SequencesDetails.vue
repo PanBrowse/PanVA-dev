@@ -25,23 +25,35 @@ import { CloseCircleOutlined, ConsoleSqlOutlined } from '@ant-design/icons-vue'
 import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 // import * as d3Fisheye from 'd3-fisheye'
-import { range } from 'lodash'
+// import * as d3Fisheye from 'd3-fisheye'
+import type {  Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 
 import { groupInfoDensity } from '@/helpers/chromosome'
-import { asterisk, cross, plus } from '@/helpers/customSymbols'
 // import * as fisheye from '@/helpers/fisheye'
 import { useGeneSetStore } from '@/stores/geneSet'
-import { useGlobalStore } from '@/stores/global'
 import type { GroupInfo, SequenceMetrics } from '@/types'
+import { calculateCompressionFactor, calculateIndividualScales , calculateWidth, updateViewportRangeBounds } from '@/helpers/axisStretch'
+import { runForceSimulation } from '@/helpers/springSimulation'
+import {  ref } from 'vue'
+
+import type { GraphNode } from  "@/helpers/springSimulationUtils"
+import { crossDetection } from '@/helpers/crossDetection'
+
+// states
+const compressionViewWindowRange = ref<[number, number]>([0,1])
+const geneToCompressionScales = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
+const globalCompressionFactor = ref<number>(1)
+const currentHeat = ref<number>(1000)
+const crossingHomologyGroups = ref<number[]>([])
 
 export default {
   name: 'SequencesDetails',
   props: {
-    chromosomeNr: Number || 'unphased',
+    chromosomeNr:{type: String, required: true},
     name: String,
-    data: Array,
-    dataGenes: {type: Array},
+    data: Array<SequenceMetrics>,
+    dataGenes: {type: Array<GroupInfo>}  ,
     dataMin: { type: Number, required: true },
     dataMax: { type: Number, required: true },
     nrColumns: Number,
@@ -93,7 +105,7 @@ export default {
       'showNotificationsDetail',
       'homologyFocus',
       'anchor',
-      'colorGenes',
+      // 'colorGenes',
       'showLinks',
     ]),
     cardName() {
@@ -109,24 +121,13 @@ export default {
     visHeight() {
       return this.svgHeight
     },
-    // xScale() {
-    //   return (
-    //     d3
-    //       .scaleLinear()
-    //       // .domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
-    //       .domain([-this.anchorMax, this.anchorMax])
-    //       .nice()
-    //       .rangeRound([
-    //         0,
-    //         this.visWidth - this.margin.yAxis + this.margin.left * 4,
-    //       ])
-    //   )
-    // },
+    windowRange(): [number, number] {
+      return [ this.margin.left, this.visWidth - this.margin.left ]
+    },
     xScale() {
       return this.anchor
         ? d3
             .scaleLinear()
-            // .domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
             .domain([-this.anchorMax, this.anchorMax])
             .nice()
             .rangeRound([
@@ -136,53 +137,13 @@ export default {
         : d3
             .scaleLinear()
             .domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
-            
-            // .domain([-this.anchorMax, this.anchorMax])
             .nice()
             .rangeRound([
               0,
               this.visWidth - this.margin.yAxis + this.margin.left * 4,
             ])
     },
-    // xScale() {
-    //   return this.anchor
-    //     ? d3
-    //         .scaleLinear()
-    //         // .domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
-    //         .domain([-this.anchorMax, this.anchorMax])
-    //         .nice()
-    //         .rangeRound([
-    //           0,
-    //           this.visWidth - this.margin.yAxis + this.margin.left * 4,
-    //         ])
-    //     : d3
-    //         .scaleLinear()
-    //         .domain([this.dataMin > 0 ? 0 : this.dataMin, this.dataMax])
-    //         // .domain([-this.anchorMax, this.anchorMax])
-    //         .nice()
-    //         .rangeRound([
-    //           0,
-    //           this.visWidth - this.margin.yAxis + this.margin.left * 4,
-    //         ])
-    // },
-    // ticksXdomain() {
-    //   const stepFactor = this.dataMax / 1000000
-    //   const stepSize = Math.ceil(stepFactor) * this.numberOfChromosomes * 100000
-    //   const ticks = range(stepSize, this.dataMax, stepSize).concat([
-    //     this.dataMax,
-    //   ])
-    //   ticks.unshift(0)
-
-    //   // If the last "rounded" tick and the "geneLength" tick are too close together.
-    //   const [beforeLast, last] = ticks.slice(-2)
-    //   if (last - beforeLast < stepSize * 0.5) {
-    //     // Remove the last "rounded" tick and keep the "geneLength" tick.
-    //     ticks.splice(-2, 1)
-    //   }
-
-    //   return ticks
-    // },
-    colorScale() {
+    colorScale():  d3.ScaleOrdinal<string, unknown, never> {
       return d3
         .scaleOrdinal()
         .domain(this.homologyGroups.map(toString))
@@ -194,9 +155,20 @@ export default {
         .domain([this.minGC ?? 0, this.maxGC ?? 1 ])
         .interpolator(d3.interpolateGreys)
     },
-    colorScaleGenome() {
+    colorScaleGenome(): d3.ScaleOrdinal<string, unknown, never> {
       return d3.scaleOrdinal().domain(['1','2','3','4','5']).range(d3.schemeCategory10)
-      // .interpolator(d3.interpolateViridis)
+    },
+    colorGenes(){
+      let nGenesTotal = 0
+      let nOfGenomes = 0
+      for( const [key, value] of Object.entries(this.geneToWindowScales)){
+        nGenesTotal = nGenesTotal + value.domain().length - 2
+        nOfGenomes = nOfGenomes + 1
+      }
+      if( nGenesTotal / nOfGenomes < 10) {
+        return true
+      }
+      return false
     },
     shapeGenerator() {
       const shapes = [
@@ -217,6 +189,13 @@ export default {
       )
       return obj
     },
+    geneToWindowScales() {
+      let newScales: Dictionary<d3.ScaleLinear<number, number, never>> = {}
+      Object.entries(geneToCompressionScales.value).forEach((scaleEntry) => {
+        newScales[scaleEntry[0]] = updateViewportRangeBounds(scaleEntry[1], compressionViewWindowRange.value , scaleEntry[1], this.windowRange )
+      });
+      return newScales
+    }
   },
   methods: {
     ...mapActions(useGeneSetStore, ['deleteChromosome']),
@@ -259,22 +238,32 @@ export default {
         .attr('x', 0)
         .attr('y', 0)
     },
-    updateChart({ selection }): NodeJS.Timeout | undefined {
+
+    ///////////////////////////////////////////////////////////////////////////////Update chart////////////////////////////////////
+    updateChartBrushing({ selection }): NodeJS.Timeout | undefined {
       console.log('brush selection', selection)
 
       // If no selection, back to initial coordinate. Otherwise, update X axis domain
       if (!selection) {return} 
       console.log(
         'range',
-
         this.xScale.invert(selection[0] - (this.margin.left *3)),
         this.xScale.invert(selection[1] - (this.margin.left *3)),
-
       )
+
       this.xScale.domain([
         this.xScale.invert(selection[0] - (this.margin.left *3)),
         this.xScale.invert(selection[1] - (this.margin.left *3)),
       ])
+      const globalRangeWidth = compressionViewWindowRange.value[1] - compressionViewWindowRange.value[0]
+      const currentGlobalRangeBounds: [number, number] = compressionViewWindowRange.value
+      const rangeWidth = this.windowRange[1] - this.windowRange[0]
+      const selectionPercentages = [(selection[0]  - this.margin.yAxis )/rangeWidth, (selection[1] - this.margin.yAxis )/rangeWidth]
+      const newRangeBoundsGlobal: [number, number] = [
+        currentGlobalRangeBounds[0] + (selectionPercentages[0] * globalRangeWidth),
+        currentGlobalRangeBounds[0] + (selectionPercentages[1] * globalRangeWidth) 
+      ]
+      compressionViewWindowRange.value = newRangeBoundsGlobal
 
       this.svg().select('.brush').call(this.brush.move, null) // This remove the grey brush area as soon as the selection has been done
       this.svg()
@@ -292,6 +281,7 @@ export default {
       this.svg().selectAll('text.density-value-focus').remove()
       this.draw()
     },
+    /////////////////////////////////////////////////////////////////////////////// Reset zoom ////////////////////////////////////
     resetZoom() {
       let vis = this
       this.svg().on('dblclick', function () {
@@ -332,101 +322,80 @@ export default {
         }
       })
     },
+    
+    ///////////////////////////////////////////////////////////////////////////////Pan ////////////////////////////////////
     pan() {
       let vis = this
       // Add event listener on keydown
       document.addEventListener('keydown', (event) => {
-        var name = event.key
-        var code = event.code
+        let name = event.key
+        let code = event.code
         // Alert the key name and key code on keydown
         console.log('key', name, code)
+        const prevDomainGlobal = compressionViewWindowRange.value 
+        console.log('previous domain', prevDomainGlobal)
+        const rangeDomain = prevDomainGlobal[1] - prevDomainGlobal[0]
+        console.log('range domain', rangeDomain)
+
+        // update global domain
+        let newDomain: [number, number]
         if (event.key === 'ArrowLeft') {
-          const prevDomain = vis.xScale.domain()
-          console.log('previous domain', prevDomain)
-          const rangeDomain = 100000
-          console.log('range domain', rangeDomain)
-
-          // console.log('anchor?', vis.anchor)
-
-          var newDomain
-
-          if (vis.anchor) {
             newDomain = [
-              prevDomain[0] - rangeDomain,
-              prevDomain[1] - rangeDomain,
+              prevDomainGlobal[0] - rangeDomain/4,
+              prevDomainGlobal[1] - rangeDomain/4,
             ]
-          } else {
-            newDomain = [
-              prevDomain[0] - rangeDomain < 0 ? 0 : prevDomain[0] - rangeDomain,
-              prevDomain[1] - rangeDomain,
+        }
+        else if (event.key === 'ArrowRight') {
+          newDomain = [
+              prevDomainGlobal[0] + rangeDomain/4,
+              prevDomainGlobal[1] + rangeDomain/4,
             ]
-          }
-
-          console.log('new domain', newDomain, vis.xScale.domain())
-
-          vis.xScale
-            .domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]])
-            .nice()
-
-          vis
-            .svg()
-            .select('.x-axis')
-            .call(d3.axisTop(vis.xScale))
-            .call((g) => g.select('.domain').remove())
-            .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
-            .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
-
-          vis.svg().selectAll('circle.density').remove()
-          vis.svg().selectAll('text.density-value-focus').remove()
-          vis.draw()
         }
-        if (event.key === 'ArrowRight') {
-          const prevDomain = vis.xScale.domain()
-          console.log('previous domain', prevDomain)
-          const rangeDomain = 100000
-          console.log('range domain', rangeDomain)
+        else { return }
+        compressionViewWindowRange.value = newDomain
 
-          const newDomain = [
-            prevDomain[0] + rangeDomain,
-            prevDomain[1] + rangeDomain > vis.dataMax
-              ? vis.dataMax
-              : prevDomain[1] + rangeDomain,
-          ]
-          console.log('new domain', newDomain, vis.xScale.domain())
+        vis.xScale
+          .domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]])
+          .nice()
 
-          vis.xScale
-            .domain([vis.dataMin < 0 ? 0 : newDomain[0], newDomain[1]])
-            .nice()
+        vis
+          .svg()
+          .select('.x-axis')
+          .call(d3.axisTop(vis.xScale))
+          .call((g) => g.select('.domain').remove())
+          .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
+          .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
 
-          vis
-            .svg()
-            .select('.x-axis')
-            .call(d3.axisTop(vis.xScale))
-            .call((g) => g.select('.domain').remove())
-            .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
-            .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
-
-          vis.svg().selectAll('circle.density').remove()
-          vis.svg().selectAll('text.density-value-focus').remove()
-          vis.draw()
-        }
+        vis.svg().selectAll('circle.density').remove()
+        vis.svg().selectAll('text.density-value-focus').remove()
+        vis.draw()
       })
     },
     idled() {
       this.idleTimeout = null
     },
-    updateZoom( zoomEvent ) {
-      // console.log('zoom event', zoomEvent)
-
-      // If no zoom, back to initial coordinate. Otherwise, update X axis domain
+    
+    ///////////////////////////////////////////////////////////////////////////////update zoom ////////////////////////////////////
+    updateZoom( zoomEvent) {
       if (!zoomEvent) { return; }
       if (zoomEvent.sourceEvent.type !== 'wheel') { return; }
 
-      const regionLength = Math.abs( this.xScale.domain()[1] - this.xScale.domain()[0])
-      this.xScale.domain([
-        this.xScale.domain()[0] - (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001),
-        this.xScale.domain()[1] +  (zoomEvent.sourceEvent.wheelDelta * regionLength * 0.001)
-      ])
+      // calculate new bounds for the range
+      const zoomCenterX = zoomEvent.sourceEvent.pageX
+      const percentageZoomLeft = (zoomCenterX - this.windowRange[0] - this.margin.yAxis - (this.margin.left * 3)  )/(this.windowRange[1] - this.windowRange[0] )
+      const currentRangeBounds: [number, number] = [this.xScale.range()[0] , this.xScale.range()[this.xScale.range().length - 1 ]]
+      const rangeWidth = Math.abs((this.xScale.range()[this.xScale.range().length -1] -  this.xScale.range()[0]))
+      const newRangeBounds = [
+        currentRangeBounds[0] - (zoomEvent.sourceEvent.wheelDelta * rangeWidth  * 0.001 * percentageZoomLeft),
+        currentRangeBounds[1] + (zoomEvent.sourceEvent.wheelDelta * rangeWidth * 0.001 * (1-percentageZoomLeft)) 
+      ]
+      const globalRangeWidth = compressionViewWindowRange.value[1] - compressionViewWindowRange.value[0]
+      const newGlobalRangeBounds: [number, number] = [
+      compressionViewWindowRange.value[0] - (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth  * 0.001 * percentageZoomLeft),
+        compressionViewWindowRange.value[1] + (zoomEvent.sourceEvent.wheelDelta * globalRangeWidth * 0.001 * (1-percentageZoomLeft)) 
+      ]
+      compressionViewWindowRange.value = newGlobalRangeBounds
+      this.xScale.domain(newRangeBounds)
 
       this.svg()
         .select('.x-axis')
@@ -434,7 +403,6 @@ export default {
         .duration(300)
         .call(
           d3.axisTop(this.xScale)
-
         )
         .call((g) => g.select('.domain').remove())
         .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
@@ -444,13 +412,12 @@ export default {
       this.svg().selectAll('text.density-value-focus').remove()
       this.draw()
     },
+    ///////////////////////////////////////////////////////////////////////////////Draw bars ////////////////////////////////////
     drawBars() {
       let vis = this
-
-      console.log('data sequence details', this.data)
       this.svg()
         .selectAll('rect.bar-chr')
-        .data(this.data, (d) => d.sequence_id)
+        .data(this.data ?? [], (d:any) => d.sequence_id)
         .join(
           (enter) =>
             enter
@@ -460,31 +427,24 @@ export default {
                 `translate(${this.margin.left * 3},${this.margin.top * 2})`
               )
               .attr('class', 'bar-chr')
-              // .attr('x', this.xScale(0))
-              .attr('x', this.anchor ? this.xScale(-35000000) : this.xScale(0))
+              .attr('x', this.xScale(0))
               .attr(
                 'y',
                 (d, i) =>
                   this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
                   (this.barHeight + 10)
               )
-              // .attr('width', function (d) {
-              //   return vis.xScale(d.sequence_length)
-              // })
               .attr('width', (d) =>
-                this.anchor
-                  ? this.xScale(70000000)
-                  : vis.xScale(d.sequence_length)
+                vis.xScale(d.sequence_length) - vis.xScale(0)
               )
               .attr('height', this.barHeight)
 
-              .attr('fill', function (d) {
-                let color
+              .attr('fill',  (d) => {
+                let color: any
                 if (vis.colorGenomes == true) {
-                  color = vis.colorScaleGenome(parseInt(d.genome_number))
+                  color = vis.colorScaleGenome(String(d.genome_number))
                 } else {
                   color = '#f0f2f5'
-                  // color = '#fff'
                 }
                 return color
               })
@@ -502,11 +462,11 @@ export default {
             update
               .transition()
               .duration(this.transitionTime)
-              .attr('x', this.anchor ? this.xScale(-35000000) : this.xScale(0))
-              .attr('fill', function (d) {
-                let color
+              .attr('x', this.xScale(0))
+              .attr('fill',  (d)  => {
+                let color:any
                 if (vis.colorGenomes == true) {
-                  color = vis.colorScaleGenome(parseInt(d.genome_number))
+                  color = vis.colorScaleGenome(String(d.genome_number))
                 } else {
                   color = '#f0f2f5'
                   // color = '#fff'
@@ -528,24 +488,20 @@ export default {
                   this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
                   (this.barHeight + 10)
               )
-              // .attr('width', function (d) {
-              //   return vis.xScale(d.sequence_length)
-              // }),
               .attr('width', (d) =>
-                this.anchor
-                  ? this.xScale(70000000)
-                  : vis.xScale(d.sequence_length)
+                vis.xScale(d.sequence_length) - vis.xScale(0)
               ),
 
           (exit) => exit.remove()
         )
     },
+    ///////////////////////////////////////////////////////////////////////////////Draw context bars ////////////////////////////////////
     drawContextBars() {
       let vis = this
-
+      if( this.data === undefined) {return}
       this.svg()
         .selectAll('rect.bar-chr-context')
-        .data(this.data, (d) => d.sequence_id)
+        .data(this.data, (d:any) => d.sequence_id)
         .join(
           (enter) =>
             enter
@@ -627,10 +583,147 @@ export default {
           (exit) => exit.remove()
         )
     },
+    drawSquishBars() {
+      let vis = this
+      if( vis.dataGenes === undefined) { return }
+      this.svg()
+        .selectAll('path.bar-chr-context')
+        .data(vis.dataGenes ?? [])
+        .join(
+          (enter) =>
+            enter
+              .append('path')
+              .attr(
+                'transform',
+                `translate(${this.margin.left * 3},${this.margin.top * 2})`
+              )
+              .attr('class', 'bar-chr-context')
+              .attr('d', (d) => {
+                const key:string = `${d.genome_number}_${d.sequence_number}`
+                const position = d.gene_start_position //< compressionViewWindowRange.value[0] ? compressionViewWindowRange.value[0] : d.gene_start_position
+              
+                const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
+                const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
+
+                const currentGeneToWindowScale = this.geneToWindowScales[key]
+                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
+                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position) 
+                const defaultConnectionThickness = 2
+
+                const x0 = this.geneToWindowScales[key](position)
+                const x1controlStart = x0 + (width *3/7)
+                const x1controlEnd = x0 + (width *4/7)
+                const x1 = x0 + (width/2)
+                const x2 = x0 + width
+                const x3 = x2
+                const x4 = x1
+                const x5 = x0
+                const x6 = x0
+
+                const y0 = ypos + this.barHeight / 2 - defaultConnectionThickness / 2
+                const y1 = y0 - 10
+                const y2 = y0
+                const y3 = ypos + this.barHeight / 2 + defaultConnectionThickness / 2
+                const y4 = y3 + 10
+                const y5 = y3
+                const y6 = y0
+
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.gene_start_position)  /globalCompressionFactor.value
+                const beta = Math.min(Math.sqrt(compressionFactor)/10, 1)
+                const lineUpper: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x0, y0], [x1controlStart,y0], [x1,y1],  [x1controlEnd,y0], [x2, y2]])  ?? ''
+                const lineConnect = d3.line()([[x6, y6], [x2, y2], [x3, y3], [x5, y5],  [x6, y6]])
+                const lineLower: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x3, y3], [x1controlEnd,y3], [x4,y4],  [x1controlStart,y3], [x5, y5]]) ?? ''
+
+                const line = lineUpper  + lineLower + lineConnect
+                return line
+              })
+              .attr('fill', (d) => {
+                if (vis.colorGenomes == true) {
+                  return vis.colorScaleGenome(String(d.genome_number)) as string 
+                } 
+                return 'lightgray' 
+              })
+              .attr('opacity', () => {
+                if (vis.colorGenomes == true) { return 0.5 } 
+                return 1
+              })
+              .attr('clip-path', 'url(#clipDetails)'),
+          (update) =>
+            update
+              .transition()
+              .duration(this.transitionTime)              
+              .attr('d', (d) => {
+                const key:string = `${d.genome_number}_${d.sequence_number}`
+                const genePositionCompression = geneToCompressionScales.value[key](d.gene_start_position) 
+                const compressionPosition = genePositionCompression 
+                const genePosition = geneToCompressionScales.value[key].invert(compressionPosition)
+                
+                const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
+                const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
+
+                const currentGeneToWindowScale = this.geneToWindowScales[key]
+                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
+                const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, d.gene_start_position) 
+                const defaultConnectionThickness = 2
+                const x0 = this.geneToWindowScales[key](genePosition)
+                const x1controlStart = x0 + (width *3/7)
+                const x1controlEnd = x0 + (width *4/7)
+                const x1 = x0 + (width/2)
+                const x2 = x0 + width
+                const x3 = x2
+                const x4 = x1
+                const x5 = x0
+                const x6 = x0
+
+                const y0 = ypos + this.barHeight / 2 - defaultConnectionThickness / 2
+                const y1 = y0 - 10
+                const y2 = y0
+                const y3 = ypos + this.barHeight / 2 + defaultConnectionThickness / 2
+                const y4 = y3 + 10
+                const y5 = y3
+                const y6 = y0
+
+
+                const compressionFactor = calculateCompressionFactor(currentGeneToCompressionScale, d.gene_start_position) / globalCompressionFactor.value
+                if(compressionFactor < 1) {
+                  const yTopMod = ypos - Math.max((1- compressionFactor), 0.2) + this.barHeight /2
+                  const yBottomMod = ypos + Math.max((1 - compressionFactor), 0.2) + this.barHeight /2
+
+                  const lineConnect = d3.line()([[x6, yTopMod], [x2, yTopMod], [x3, yBottomMod], [x5, yBottomMod],  [x6, yTopMod]])
+                  
+                  return lineConnect
+                }
+                const beta = Math.min(Math.sqrt(compressionFactor)/10, 1)
+                const lineUpper: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x0, y0], [x1controlStart,y0], [x1,y1],  [x1controlEnd,y0], [x2, y2]])  ?? ''
+                const lineConnect = d3.line()([[x6, y6], [x2, y2], [x3, y3], [x5, y5],  [x6, y6]])
+                const lineLower: string =  d3.line().curve(d3.curveBundle.beta(beta))([[x3, y3], [x1controlEnd,y3], [x4,y4],  [x1controlStart,y3], [x5, y5]]) ?? ''
+                // const lineConnectStart = d3.line()([ [x6, y6]])
+
+                const line = lineUpper  + lineLower + lineConnect
+
+                return line //lineUpper + d3.line()([[x2,y2], [x3,y3]]) + lineLower + d3.line()([[x5,y5], [x6,y6]]) // + lineConnect //+ lineConnectStart
+              })
+              .attr('fill', (d) => {
+                if (vis.colorGenomes == true) {
+                  return vis.colorScaleGenome(String(d.genome_number)) as string 
+                } 
+                return 'lightgray' 
+              })
+              .attr('opacity', () => {
+                if (vis.colorGenomes == true) { return 0.5 } 
+                return 1
+              }),
+          (exit) => exit.remove()
+        )
+    },
+    // Drawing specification starts here ///////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////Draw ////////////////////////////////////
     draw() {
       if (this.chromosomeNr !== 'unphased') {
-        this.drawBars()
-        this.drawContextBars()
+        // this.drawBars()
+        // this.drawContextBars()
+        this.drawSquishBars()
         this.addLabels()
         this.drawGenes()
 
@@ -643,11 +736,13 @@ export default {
       this.svg().selectAll('circle.density').remove()
       this.svg().selectAll('text.density-value-focus').remove()
     },
+    ///////////////////////////////////////////////////////////////////////////////add labels ////////////////////////////////////
     addLabels() {
-      let vis = this
+      let vis = this      
+      if( this.data === undefined) {return}
       this.svg()
         .selectAll('text.label-chr')
-        .data(this.data, (d) => d.sequence_id)
+        .data(this.data, (d:any) => d.sequence_id)
         .join(
           (enter) =>
             enter
@@ -677,12 +772,6 @@ export default {
             update
               .transition()
               .duration(this.transitionTime)
-              // .attr(
-              //   'y',
-              //   (d, i) =>
-              //     this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
-              //     (this.barHeight + 10)
-              // ),
               .attr('y', function (d, i) {
                 return (
                   vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i] *
@@ -693,10 +782,12 @@ export default {
         )
 
     },
+    /////////////////////////////////////////////////////////////////////////////// Add values ////////////////////////////////////
     addValues() {
+      if( this.data === undefined) {return}
       this.svg()
         .selectAll('text.value-chr')
-        .data(this.data, (d) => d.sequence_id)
+        .data(this.data, (d:any) => d.sequence_id)
         .join(
           (enter) =>
             enter
@@ -725,12 +816,13 @@ export default {
               .attr(
                 'y',
                 (d, i) =>
-                  this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
+                  this.sortedChromosomeSequenceIndices[this.chromosomeNr?? 0][i] *
                   (this.barHeight + 10)
               ),
           (exit) => exit.remove()
         )
     },
+    ///////////////////////////////////////////////////////////////////////////////Draw x-axis ////////////////////////////////////
     drawXAxis() {
       this.svg().select('g.x-axis').remove() //needed because otherwise draws twice in some cases. To-do: fix side effect
 
@@ -752,12 +844,12 @@ export default {
         .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
     },
 
+    ///////////////////////////////////////////////////////////////////////////// Draw genes ////////////////////////////////////////////////
     drawGenes() {
       let vis = this
-      console.log('this.dataGenes', this.dataGenes)
 
       if (this.dataGenes === undefined) { return }
-      const genes = this.dataGenes as GroupInfo[]
+      const genes: GroupInfo[] = this.dataGenes
         /// connection lines
       if (this.showLinks) {
         this.svg().selectAll('path.connection').remove()
@@ -766,14 +858,10 @@ export default {
             (d) => d.homology_id == homology//this.homologyFocus
           )
 
-          // console.log('path focus', path_focus)
-          const newPathFocus = path_focus.map((v: GroupInfo) => (
-            {
-              ...v,
-              sequence_id: `${v.genome_number}_${v.sequence_number}`,
+          const newPathFocus = path_focus.map((v) => ({
+            ...v,
+            sequence_id: `${v.genome_number}_${v.sequence_number}`,
           }))
-          console.log('newPathFocus', newPathFocus)
-          console.log(Object.keys(this.sequenceIdLookup[this.chromosomeNr]))
 
           let sortOrder = Object.keys(
             this.sequenceIdLookup[this.chromosomeNr]
@@ -795,7 +883,7 @@ export default {
             .attr('fill', 'none')
             .attr(
               'stroke',
-              vis.colorGenomes ? 'black' : vis.colorScale(homology)
+              vis.colorGenomes ? 'black' : vis.colorScale(String(homology)) as string
             )
             .attr('stroke-width', 1.5)
             .attr(
@@ -807,23 +895,75 @@ export default {
                   let anchorStart = vis.anchorLookup[key]
                   return (
                     vis.margin.left * 3 +
-                    vis.xScale(d.mRNA_start_position - anchorStart)
+                    vis.geneToWindowScales[key](d.mRNA_start_position - anchorStart)
                   )
                 })
                 .y(function (d, i) {
                   return (
                     vis.margin.top * 2 +
                     vis.barHeight / 2 +
-                    // vis.sortedMrnaIndices[vis.chromosomeNr][i] *
                     vis.sequenceIdLookup[vis.chromosomeNr][d.sequence_id] *
                       (vis.barHeight + 10)
-                    // i * (vis.barHeight + 10)
                   )
                 })
             )
         })
       } else {
         this.svg().selectAll('path.connection').remove()
+        this.homologyGroups.filter(d => crossingHomologyGroups.value.includes(d)).forEach((homology) => {
+          const path_focus = genes.filter(
+            (d) => d.homology_id == homology //this.homologyFocus
+          )
+
+          const newPathFocus = path_focus.map((v) => ({
+            ...v,
+            sequence_id: `${v.genome_number}_${v.sequence_number}`,
+          }))
+
+          let sortOrder = Object.keys(
+            this.sequenceIdLookup[this.chromosomeNr]
+          )
+
+          let sortedPath = [...newPathFocus].sort(function (a, b) {
+            return (
+              sortOrder.indexOf(a.sequence_id) -
+              sortOrder.indexOf(b.sequence_id)
+            )
+          })
+
+          // Add the line
+          this.svg()
+            .append('path')
+            .datum(sortedPath)
+            .attr('class', 'connection')
+            .attr('fill', 'none')
+            .attr(
+              'stroke',
+              vis.colorGenomes ? 'black' : vis.colorScale(String(homology)) as string
+            )
+            .attr('stroke-width', 1.5)
+            .attr(
+              'd',
+              d3
+                .line()
+                .x(function (d) {
+                  const key = `${d.genome_number}_${d.sequence_number}`
+                  let anchorStart = vis.anchorLookup[key]
+                  return (
+                    vis.margin.left * 3 +
+                    vis.geneToWindowScales[key](d.mRNA_start_position - anchorStart)
+                  )
+                })
+                .y(function (d, i) {
+                  return (
+                    vis.margin.top * 2 +
+                    vis.barHeight / 2 +
+                    vis.sequenceIdLookup[vis.chromosomeNr][d.sequence_id] *
+                      (vis.barHeight + 10)
+                  )
+                })
+            )
+        })
       }
 
       this.svg()
@@ -839,77 +979,48 @@ export default {
                   .symbol()
                   .size(this.barHeight * 4)
                   .type(d3.symbolTriangle)
-                  .type((d) => vis.shapeGenerator[d.homology_id])
+                  // .type((d) => vis.shapeGenerator[d.homology_id])
                 // .type(d3.symbolTriangle)
               )
               .attr('transform', function (d, i) {
                 const key = `${d.genome_number}_${d.sequence_number}`
-                let rotation
-
+                const shortKey = `${d.genome_number}`
+                let transform
+                let xTransform = 0
+                let yTransform = 0
+                const currentScale = vis.geneToWindowScales[key]
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
-                  // console.log('anchorStart', anchorStart)
-
-                  if (d.strand === '+') {
-                    rotation = `translate(${
+                    xTransform = 
                       vis.margin.left * 3 +
-                      vis.xScale(d.mRNA_start_position - anchorStart)
-                    },${
+                      currentScale(d.mRNA_start_position - anchorStart)
+                    yTransform =
                       vis.margin.top * 2 +
                       vis.barHeight / 2 +
                       vis.sortedMrnaIndices[vis.chromosomeNr][i] *
                         (vis.barHeight + 10)
-                    }
-                  )`
-                  } else {
-                    return `translate(${
-                      vis.margin.left * 3 +
-                      vis.xScale(d.mRNA_start_position - anchorStart)
-                    },${
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                    }
-                  )`
-                  }
 
-                  return rotation
                 } else {
-                  if (d.strand === '+') {
-                    rotation = `translate(${
-                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                    },${
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                    }
-                  )`
-                  } else {
-                    return `translate(${
-                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                    },${
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                    }
-                  )`
-                  }
 
-                  return rotation
+                    xTransform = 
+                      vis.margin.left * 3 + currentScale(d.gene_start_position)
+                    yTransform =
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
+                  // }
                 }
+                transform = `translate(${xTransform},${yTransform})`
+                return transform
               })
-              // .attr('transform', function (d, i) {
-              //   const key = `${d.genome_number}_${d.sequence_number}`
               .attr('class', 'gene')
-              .attr('hg', (d) => d.homology_id)
+              .attr('hg', (d: GroupInfo) => d.homology_id ?? 0)
               .attr('z-index', 100)
-              .attr('stroke', (d) =>
+              .attr('stroke', (d): string =>
                 vis.colorGenes
                   ? vis.upstreamHomologies.includes(d.homology_id)
-                    ? vis.colorScale(d.homology_id)
+                    ? this.colorScale(String(d.homology_id)) as string
                     : ''
                   : ''
               )
@@ -917,8 +1028,10 @@ export default {
                 vis.upstreamHomologies.includes(d.homology_id) ? '3px' : ''
               )
               .attr('fill', (d) =>
-                vis.colorGenes ? vis.colorScale(d.homology_id) : 'black'
-              )
+              {
+              return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
+              }
+            )     
               .attr('opacity', 0.8),
 
           (update) =>
@@ -926,76 +1039,60 @@ export default {
               .transition()
               .duration(this.transitionTime)
               .attr('fill', (d) =>
-                vis.colorGenes ? vis.colorScale(d.homology_id) : 'black'
+              {
+              return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
+              }
               )
               .attr('stroke-width', (d) =>
-                vis.upstreamHomologies.includes(d.homology_id) ? '3px' : ''
+                vis.upstreamHomologies.includes(d.homology_id ?? 0) ? '3px' : ''
               )
               .attr('stroke', (d) =>
                 vis.colorGenes
-                  ? vis.upstreamHomologies.includes(d.homology_id)
-                    ? vis.colorScale(d.homology_id)
+                  ? vis.upstreamHomologies.includes(d.homology_id ?? 0)
+                    ? vis.colorScale(String(d.homology_id))
                     : ''
                   : ''
               )
               .attr('transform', function (d, i) {
                 const key = `${d.genome_number}_${d.sequence_number}`
-                let rotation
+                const shortKey = `${d.genome_number}`
+                let transform
+                let xTransform = 0
+                let yTransform = 0
+                const currentScale = vis.geneToWindowScales[key]
+                let rotation = '' 
+                if(d.strand === '+') {
+                  rotation = 'rotate(90)'
+                }
+                else if(d.strand === '-') {
+                  rotation =  'rotate(-90)'
+                }
 
                 if (vis.anchor) {
                   let anchorStart = vis.anchorLookup[key]
-                  // console.log('anchorStart', anchorStart)
-
-                  if (d.strand === '+') {
-                    rotation = `translate(${
+                    xTransform = 
                       vis.margin.left * 3 +
-                      vis.xScale(d.mRNA_start_position - anchorStart)
-                    },${
+                      currentScale(d.mRNA_start_position - anchorStart)
+                    yTransform =
                       vis.margin.top * 2 +
                       vis.barHeight / 2 +
                       vis.sortedMrnaIndices[vis.chromosomeNr][i] *
                         (vis.barHeight + 10)
-                    }
-                  )` // rotate(-270)`
-                  } else {
-                    return `translate(${
-                      vis.margin.left * 3 +
-                      vis.xScale(d.mRNA_start_position - anchorStart)
-                    },${
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                    }
-                  )` //rotate(-450)`
-                  }
 
-                  return rotation
                 } else {
-                  if (d.strand === '+') {
-                    rotation = `translate(${
-                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                    },${
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                    }
-                  )` //rotate(-270)`
-                  } else {
-                    return `translate(${
-                      vis.margin.left * 3 + vis.xScale(d.gene_start_position)
-                    },${
-                      vis.margin.top * 2 +
-                      vis.barHeight / 2 +
-                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                        (vis.barHeight + 10)
-                    }
-                  )`
-                  }
 
-                  return rotation
+                    xTransform = 
+                      vis.margin.left * 3 + currentScale(d.gene_start_position)
+                    yTransform =
+                      vis.margin.top * 2 +
+                      vis.barHeight / 2 +
+                      vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+                        (vis.barHeight + 10)
+                  // }
                 }
+                transform = `translate(${xTransform},${yTransform})${rotation}`
+                return transform
+             
               }),
 
 
@@ -1003,6 +1100,8 @@ export default {
         )
       
     },
+
+    //////////////////////////////////////////////////////////////////// Draw notifications //////////////////////////////////////
     drawNotifications() {
       let vis = this
       const genes = this.dataGenes
@@ -1113,11 +1212,6 @@ export default {
                 )
                 .attr('dy', -4)
                 .attr('y', (d, i) => {
-                  console.log(
-                    d.sequence_id,
-                    i,
-                    this.sequenceIdLookup[5][d.sequence_id]
-                  )
                   return (
                     (this.sequenceIdLookup[this.chromosomeNr][d.sequence_id] -
                       1) *
@@ -1162,40 +1256,21 @@ export default {
       this.sortedChromosomeSequenceIndices[12].length * (this.barHeight + 10) +
         this.margin.top * 2
     } else {
-      // this.svgHeight =
-      //   this.sortedChromosomeSequenceIndices[this.chromosomeNr].length *
-      //     (this.barHeight + 10) +
-      //   this.margin.top * 2
       this.svgHeight = document.getElementById('contentChr').offsetHeight
-      console.log('this.svgHeight', this.svgHeight)
     }
-
-    // const containerHeight = document.getElementById('contentChr').offsetHeight
-    // console.log('containerHeight', containerHeight)
-    // const barHeightScaled =
-    //   (this.svgHeight -
-    //     2 * this.margin.top -
-    //     2 * this.margin.bottom -
-    //     2 * this.margin.yAxis -
-    //     40) /
-    //   this.sortedChromosomeSequenceIndices[this.chromosomeNr].length
-
-    // this.barHeight = barHeightScaled - 12
 
     // Anchor
     ////
     //1.find all cdf 1
-    const homologyAnchor = this.dataGenes.filter(
+    const homologyAnchor = this.dataGenes?.filter(
       (gene) => gene.homology_id === this.homologyFocus
     )
-    console.log('geneSet', this.dataGenes, homologyAnchor)
 
-    let anchorLookup = {}
-    homologyAnchor.forEach((item) => {
+    let anchorLookup: Dictionary<number> = {}
+    homologyAnchor?.forEach((item) => {
       const key = `${item.genome_number}_${item.sequence_number}`
-      anchorLookup[key] = item.mRNA_start_position
+      anchorLookup[key] = 0 //item.mRNA_start_position
     })
-    console.log('anchorLookup', anchorLookup)
     this.anchorLookup = anchorLookup
 
     const divergentScale = this.dataGenes.map((item) => {
@@ -1205,23 +1280,57 @@ export default {
     })
 
     let anchorMin = d3.min(divergentScale)
-    this.anchorMin = anchorMin
+    this.anchorMin = anchorMin ?? 0
 
     let anchorMax = d3.max(divergentScale)
-    this.anchorMax = anchorMax
+    this.anchorMax = anchorMax ?? 0
+
+
+     // Create individual scales 
+    ///    
+    let newGenePositions: GraphNode[] = runForceSimulation(this.dataGenes?? [], this.data ?? [], currentHeat.value, 0.5, 232273529)
+
+    crossingHomologyGroups.value = crossDetection(newGenePositions)
+
+    let xScaleGeneToWindowInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
+    let xScaleGeneToCompressionInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
+    //determine global ranges'
+    const sortedCompressionRangeGlobal = (newGenePositions.map(d => d.position)).sort((a,b) => a-b)
+    const edgesOfNewRangeGlobal: [number, number] = [sortedCompressionRangeGlobal[0],  sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length -1]]
+    const oldRanges = newGenePositions.map(d => d.originalPosition).sort((a,b) => a-b)
+    const edgesOfOldRange = [oldRanges[0], oldRanges[oldRanges.length -1 ]]
+    const overallCompressionFactor = (edgesOfOldRange[1] - edgesOfOldRange[0]) / (edgesOfNewRangeGlobal[1] - edgesOfNewRangeGlobal[0])
+    globalCompressionFactor.value = overallCompressionFactor
+    compressionViewWindowRange.value = edgesOfNewRangeGlobal
+    
+    this.data?.forEach(sequence => {
+      const key = sequence.sequence_id
+      const genePositionsOnSequence = newGenePositions
+        .filter(d => String(d.sequenceId) === key)
+        .sort(d => d.originalPosition)
+  
+      const [geneToCompression, scaleGeneToWindow] = calculateIndividualScales(
+        genePositionsOnSequence, 
+        edgesOfNewRangeGlobal, 
+        this.windowRange
+      )
+      xScaleGeneToCompressionInit[key] = geneToCompression
+      xScaleGeneToWindowInit[key] = scaleGeneToWindow
+    })
+    //assign scale dictionaries
+    geneToCompressionScales.value = xScaleGeneToCompressionInit
 
     this.drawXAxis() // draw axis once
-
     this.draw()
 
     // Add brushing
     var brush = d3
       .brushX() // Add the brush feature using the d3.brush function
       .extent([
-        [this.margin.left * 3, 0],
-        [this.visWidth - (this.margin.left * 3), this.visHeight],
+        [this.windowRange[0] +  this.margin.yAxis + (this.margin.left * 3), 0],
+        [this.windowRange[1] +  this.margin.yAxis + (this.margin.left * 3), this.visHeight],
       ])
-      .on('end', this.updateChart)
+      .on('end', this.updateChartBrushing)
 
     this.brush = brush
 
@@ -1334,7 +1443,7 @@ export default {
       this.drawXAxis() // redraw
       this.draw()
     },
-  },
+  }
 }
 </script>
 
