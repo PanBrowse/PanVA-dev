@@ -854,8 +854,8 @@ export default {
       if (this.showLinks) {
         this.svg().selectAll('path.connection').remove()
         this.homologyGroups.forEach((homology) => {
-          const path_focus = genes.filter(
-            (d) => d.homology_id == homology //this.homologyFocus
+          const path_focus: GroupInfo[] = genes.filter(
+            (d) => d.homology_id == homology//this.homologyFocus
           )
 
           const newPathFocus = path_focus.map((v) => ({
