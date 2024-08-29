@@ -16,16 +16,17 @@ export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode
   }
 
 
-  export const evaluateForces = (currentNode:GraphNode|GraphNodeGroup, connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[], connectedYNodes:(GraphNode|GraphNodeGroup)[], heat: number, excludedHomologyGroup?: number): [number, number] => {
+  export const evaluateForces = (currentNode:GraphNode|GraphNodeGroup, connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[], connectedYNodes:(GraphNode|GraphNodeGroup)[], heat: number, excludedHomologyGroup?: number, touchingDistance:number=1000, print:boolean=false): [number, number] => {
+    /* Returns [forcesWithNormal, forces] */
+    
     // tune force contributions
-    const scalePartialForceY = 10
-    const scalePartialForceX = 100
-    const scalePartialForceGravity = scalePartialForceY * 10
-    const scaleRepelling = 100
-    const touchingDistance = 1000
+    const scalePartialForceY = 1 //connectedYNodes.length > 0 ? 1/connectedYNodes.length : 100
+    const scalePartialForceX = 100 
+    const scalePartialForceGravity =  100
+    const scaleRepelling = 100 
 
     let forceOnNode:number = 0
-    // Calculate contribution for all in the same homology group
+    // Calculate contribution for all nodes in the same homology group
     let homologyGroupTotal = 0
     connectedYNodes.forEach(connectedNode => {
     const partialForce = calculateAttractingForceY(connectedNode.position - currentNode.position)
@@ -50,7 +51,7 @@ export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode
         }
         if(Math.sign(expectedNeighbourDistance) !== Math.sign(neighbourDistance)) {
                 // if different signs: order flipped,  this should never happen
-            dnaStringPartialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance)
+            dnaStringPartialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance, touchingDistance)
             console.log('order flipped', expectedNeighbourDistance, neighbourDistance)
             }
         else if(abs(neighbourDistance) < abs(expectedNeighbourDistance)) {
@@ -72,18 +73,26 @@ export const evaluateForcesY = (currentNode:GraphNode, connectedYNodes:GraphNode
         + (scalePartialForceGravity * gravityTotal) 
         + (scaleRepelling * repellingTotal)
         + (scalePartialForceY * homologyGroupTotal)
+        if(print){
+        console.log('force parts', )
+        console.log('x',  (scalePartialForceX * dnaStringTotal) )
+        console.log(
+        'gravity', (scalePartialForceGravity * gravityTotal) 
+        , 'repell', (scaleRepelling * repellingTotal)
+        ,'y' , (scalePartialForceY * homologyGroupTotal))}
+
         let forceWithNormal = forceOnNode
-        nodesAreTouching.forEach((neighbourIsTooClose, i) => {
+        nodesAreTouching.forEach((nodesAreTouching, i) => {
         const neighbourDirection = i === 0 ? -1 : 1
         const forceDirection = Math.sign(forceWithNormal)
-        if(neighbourIsTooClose && (neighbourDirection === forceDirection) ) {
+        if(nodesAreTouching && (neighbourDirection === forceDirection) ) {
             forceWithNormal = 0
         }
     })
     return [forceWithNormal, forceOnNode]
 }
 
-export const calculateAttractingForce = (distanceToNeighbour: number, expectedDistance: number, touchingDistance:number=1) => {
+export const calculateAttractingForce = (distanceToNeighbour: number, expectedDistance: number, touchingDistance:number=1000) => {
     const differenceToExpectedDistance = distanceToNeighbour - expectedDistance
     if(abs(differenceToExpectedDistance) < 10) {return differenceToExpectedDistance}
     if(expectedDistance === 0 ) {console.log('nodes should not be included'); return 0}
@@ -103,7 +112,7 @@ const calculateAttractingForceY = (distanceToNeighbour: number) => {
 const calculateRepellingForce = (distanceToNeighbour: number, expectedDistance: number) => {
     if(expectedDistance === 0) {console.log('two identical included'); return 0}
     const percentageCompressed = (abs(distanceToNeighbour - expectedDistance) / abs(expectedDistance))
-    const force = percentageCompressed * 1000 / Math.log2(abs(distanceToNeighbour))
+    const force = percentageCompressed * 10 / Math.log2(Math.ceil(abs(distanceToNeighbour/100))+1)
     const direction = -1 *  Math.sign(distanceToNeighbour)
     return  force * direction
 }
@@ -147,10 +156,10 @@ export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGrou
     return [totalLeftForce, totalRightForce]
   }
 
-const findTouchingNeighboursLeft = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[], touchingDistance:number =1000): GraphNodeGroup[] => {
+const findTouchingNeighboursLeft = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[], touchingDistance:number = 1000): GraphNodeGroup[] => {
   const [leftNeighbour, rightNeighbour] = findNeighgourNodes(group, nodeGroups)
   if(leftNeighbour === undefined) { return [] }
-  if(group.position - leftNeighbour?.endPosition > touchingDistance) { return [] }
+  if(group.position - leftNeighbour.endPosition > touchingDistance) { return [] }
   else {
     return [group, ...findTouchingNeighboursLeft(leftNeighbour, nodeGroups)]
   }
@@ -159,13 +168,14 @@ const findTouchingNeighboursLeft = (group: GraphNodeGroup, nodeGroups: GraphNode
 const findTouchingNeighboursRight = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[], touchingDistance:number =1000): GraphNodeGroup[] => {
   const [leftNeighbour, rightNeighbour] = findNeighgourNodes(group, nodeGroups)
   if(rightNeighbour === undefined) { return [] }
-  if( rightNeighbour?.position - group.endPosition > touchingDistance) { return [] }
+  if( rightNeighbour.position - group.endPosition > touchingDistance) { return [] }
   else {
-    return [group, ...findTouchingNeighboursLeft(rightNeighbour, nodeGroups)]
+    return [group, ...findTouchingNeighboursRight(rightNeighbour, nodeGroups)]
   }
 }
 
 export const findNeighgourNodes = (group:GraphNodeGroup, nodeGroups: GraphNodeGroup[]) => {
+  if(group.connectionsX === undefined) {return [undefined, undefined]}
     const leftNeighbourId = group.connectionsX.left ? group.connectionsX.left[0] : undefined
     const rightNeighbourId = group.connectionsX.right ? group.connectionsX.right[0] : undefined 
 

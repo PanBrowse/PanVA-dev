@@ -794,7 +794,7 @@ export default {
         console.log('densityData', dataDensity)
 
         const thresholds = this.xScale.ticks(20)
-        console.log('thresholds', thresholds)
+        // console.log('thresholds', thresholds)
 
         let allBins = []
         Object.keys(dataDensity).forEach((key) => {

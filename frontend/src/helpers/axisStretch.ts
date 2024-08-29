@@ -30,9 +30,11 @@ export const updateViewportRangeBounds = (
 
   export const filterUniquePosition = (genes: (GraphNode| GraphNodeGroup)[]) => {
     const uniquePositions: number[] = []
-    const uniquePositionGenes = genes.filter(d => {
+    const uniquePositionGenes: (GraphNode | GraphNodeGroup)[] = []
+    const dummy = genes.filter(d => {
       if(uniquePositions.includes(d.originalPosition)) {return false}
       uniquePositions.push(d.originalPosition)
+      uniquePositionGenes.push(d)
       return true
     })
     return uniquePositionGenes

@@ -1,4 +1,4 @@
-import type { Dictionary } from "lodash"
+import { type Dictionary } from "lodash"
 import { abs } from "./math"
 import { filterUniquePosition } from "./axisStretch"
 import type { GroupInfo } from "@/types"
@@ -121,7 +121,7 @@ export class GraphNode {
   }
 
   
-export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, connectedXNodes: (GraphNode|GraphNodeGroup|undefined)[], deltaPosIn: number, heat: number) => {
+export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, connectedXNodes: (GraphNode|GraphNodeGroup|undefined)[], deltaPosIn: number, heat: number, touchingDistance: number =1000) => {
   // maximum allowed move depends on the heat (Davidson and Harel)
   const maxMove = 1000 * heat
   let bounds = [-maxMove, maxMove]
@@ -131,8 +131,9 @@ export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, co
   const connectedLeft = connectedXNodes[0]
   const previousDistanceRight = connectedRight ? connectedRight.position - currentNode.endPosition : maxMove
   const previousDistanceLeft = connectedLeft ? connectedLeft.endPosition - currentNode.position : -maxMove
-  bounds[0] = Math.max(previousDistanceLeft * 3 / 7, -maxMove)
-  bounds[1] = Math.min(previousDistanceRight * 3 / 7,maxMove)
+  bounds[0] = Math.max(previousDistanceLeft + touchingDistance, -maxMove)
+  bounds[1] = Math.min(previousDistanceRight - touchingDistance, maxMove)
+
   //apply bounds
   if(deltaPos < 0) {
     deltaPos = Math.max(deltaPos, bounds[0])
@@ -151,7 +152,9 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
 
   uniquePositionNodes.forEach((currentNode) => {
     const precedingNode = currentNode.connectionsX.left ? currentSequenceNodes.find(d => d.id === currentNode.connectionsX.left![0]) : undefined
-    if(precedingNode === undefined) { return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift }
+    if(precedingNode === undefined) { 
+      return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift 
+    }
     const distanceToPreceding = precedingNode.endPosition - currentNode.position
     const minimumDistance = -minimumAbsoluteDistance
     
@@ -165,8 +168,9 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
 }
 
   export const applyMinimumdistanceOnSequence = (nodesOnSequence: (GraphNode|GraphNodeGroup)[], minimumAbsDistance: number) => {
-    const sorted = nodesOnSequence.sort((a,b) => a.originalPosition - b.originalPosition)
+    const sorted = nodesOnSequence.sort((a,b) => a.originalPosition - b.originalPosition)    
     const deltaPosCorrection = calculateShiftMinDist(sorted, minimumAbsDistance)
+
     sorted.forEach(node => {
       const newPosition = node.position + deltaPosCorrection[`${node.originalPosition}`]
       node.position = newPosition
@@ -283,48 +287,8 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
     })
   }
 
-  export const updateNodeGroups = (nodeGroups: GraphNodeGroup[], heat: number, excludedHomologyGroup:number=0, touchingDistance:number=1000): [GraphNodeGroup[], boolean] => {
-    const newUpdatedNodes:GraphNodeGroup[] = []
-    let terminate = false
-    let largestStep = 0 // used for the termination condition
-  
-    // apply forces
-    for(const group of nodeGroups) {
-      // calculate direct forces
-      const connectedXNodes = findNeighgourNodes(group, nodeGroups)
-      const connectedYNodes = nodeGroups.filter(d => group.connectionsY.includes(d.id))        
-      let [force, dummy] = evaluateForces(group, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup)
-
-      // calculate forces through other blocks "touching"
-      const [forceFromLeft, forceFromRight ] = findNormalForces(group, nodeGroups, touchingDistance)
-      force = force + forceFromLeft + forceFromRight
-
-      // local temperature changes to reduce oscilations (Frick et al.)
-      if(Math.sign(group.lastMove) !== Math.sign(force) ) {group.localTempScaling = group.localTempScaling * 0.9}
-      else {group.localTempScaling = group.localTempScaling * 1.1}
-
-      // calculate new position
-      const deltaPos = force * group.localTempScaling
-      const deltaPosConstrained: number =  applyOrderConstraint(group, connectedXNodes, deltaPos, heat)
-      const newPositionConstrained = group.position + deltaPosConstrained
-      group.position = newPositionConstrained
-
-      // create new updated node
-      const updatedNode = new GraphNodeGroup(group.nodes, group.originalRange, group.id, group.connectionsX, group.connectionsY, deltaPosConstrained, group.localTempScaling)
-      newUpdatedNodes.push(updatedNode)
-
-      largestStep = Math.abs(deltaPosConstrained) > largestStep ? Math.abs(deltaPosConstrained) : largestStep
-    }
-
-    if(Math.abs(largestStep) < 1000) { terminate = true }
-    const newNodes = enforceMinimumDistance(newUpdatedNodes, touchingDistance)
-    // iteration = iteration + 1
-    // check for order changes
-    checkNodeOrder(newNodes)
-    return [newNodes, terminate]
-  }
-
 const enforceMinimumDistance = (inputNodes: GraphNodeGroup[], minimumDistance: number) => {    
+  
   const newNodes: (GraphNodeGroup)[] = []
   const uniqueSequences: string[] = []
   inputNodes.map(d => d.sequenceId).forEach(d => {
@@ -338,4 +302,81 @@ const enforceMinimumDistance = (inputNodes: GraphNodeGroup[], minimumDistance: n
     newNodes.push(...spreadNodes)
   })
   return newNodes
+}
+
+export const updateHighStressNodeGroup = (
+  nodeGroups: GraphNodeGroup[], 
+  heat: number, 
+  excludedHomologyGroup:number=0, 
+  touchingDistance:number=1000
+): [GraphNodeGroup[], boolean] => {
+
+  let terminate = false
+  let largestStep = 0 // used for the termination condition
+  let highestForceNode = undefined
+  let highestDeltaPosNodeIndex = -1
+  let highestDeltaPosConstrained = 0
+  let currentIndex = -1
+  let nodeGroupRange = [Math.min(...nodeGroups.map(d => d.position)), Math.max(...nodeGroups.map(d => d.endPosition))]
+  let nodeGroupSpread = nodeGroupRange[1] - nodeGroupRange[0]
+  // find node that moves the most 
+  for(const group of nodeGroups) {
+    currentIndex = currentIndex + 1
+    // calculate direct forces
+    const connectedXNodes = findNeighgourNodes(group, nodeGroups)
+    const connectedYNodes = nodeGroups.filter(d => group.connectionsY.includes(d.id))        
+    let [force, forceWithoutNormal] = evaluateForces(group, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup, touchingDistance)
+    // calculate forces through other blocks "touching"
+    const [forceFromLeft, forceFromRight ] = findNormalForces(group, nodeGroups, touchingDistance)
+    force = force + forceFromLeft + forceFromRight
+
+    // calculate new position
+    const deltaPos = force * group.localTempScaling
+    const deltaPosConstrained: number =  applyOrderConstraint(group, connectedXNodes, deltaPos, heat, touchingDistance)
+
+    if(abs(deltaPosConstrained) < abs(highestDeltaPosConstrained)){ continue; }
+    highestDeltaPosConstrained = deltaPosConstrained
+    highestDeltaPosNodeIndex = currentIndex
+  }
+  if(highestDeltaPosNodeIndex === -1) {
+    terminate = true; 
+    console.log('terminating because no movement, heat: ', heat)
+    return [nodeGroups, terminate]
+  }
+  const group = nodeGroups[highestDeltaPosNodeIndex]
+
+    // calculate new position
+  const deltaPosConstrained: number = highestDeltaPosConstrained 
+  const newPositionConstrained = group.position + deltaPosConstrained
+  group.position = newPositionConstrained
+
+  // local temperature changes to reduce oscilations (Frick et al.)
+  if(Math.sign(group.lastMove) !== Math.sign(deltaPosConstrained) ) {
+  
+    group.localTempScaling = group.localTempScaling * 0.5
+  }
+  else {
+    group.localTempScaling = group.localTempScaling * 1.5
+  }
+
+    // replace old node
+  highestForceNode = new GraphNodeGroup(group.nodes, group.originalRange, group.id, group.connectionsX, group.connectionsY, deltaPosConstrained, group.localTempScaling)
+  if(highestForceNode !== undefined) {
+    nodeGroups.splice(highestDeltaPosNodeIndex, 1, highestForceNode) 
+  }
+  const newNodes = enforceMinimumDistance(nodeGroups, touchingDistance)
+
+  // check for order changes
+  checkNodeOrder(newNodes)
+  // check termination criteria
+  if(Math.abs(highestDeltaPosConstrained) < 10 || ((Math.abs(highestDeltaPosConstrained) / nodeGroupSpread) < 0.001)) {
+    console.log('terminating highest delta pos too low.', 'heat: ', heat, 'highest delta pos: ', highestDeltaPosConstrained), 
+    terminate = true 
+  }
+  if(heat < 1) { 
+    console.log('terminating heat too low.', 'heat: ', heat, 'highest delta pos: ', highestDeltaPosConstrained), 
+    terminate = true 
+  }
+
+  return [newNodes, terminate]
 }
