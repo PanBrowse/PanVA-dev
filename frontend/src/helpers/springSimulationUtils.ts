@@ -369,7 +369,7 @@ export const updateHighStressNodeGroup = (
   // check for order changes
   checkNodeOrder(newNodes)
   // check termination criteria
-  if(Math.abs(highestDeltaPosConstrained) < 10 || ((Math.abs(highestDeltaPosConstrained) / nodeGroupSpread) < 0.001)) {
+  if(Math.abs(highestDeltaPosConstrained) < 10 || ((Math.abs(highestDeltaPosConstrained) / nodeGroupSpread) < 0.005)) {
     console.log('terminating highest delta pos too low.', 'heat: ', heat, 'highest delta pos: ', highestDeltaPosConstrained), 
     terminate = true 
   }

@@ -76,16 +76,16 @@ export  const geneTriangleReverse: d3.SymbolType =  {
 export const geneTriangleRectForward: d3.SymbolType = {
   draw(context, size) {
     const sqrt3 = Math.sqrt(3)
-    const geneHeight = 2
+    const geneHeight = 3
     const triangleSize = geneHeight * 8
     const x = Math.sqrt(triangleSize / (sqrt3 * 3));
 
-    context.moveTo(-size/2, -1);
-    context.lineTo(size/2, -1 )
-    context.lineTo(size/2, 1)
-    context.lineTo(-size/2, 1)
-    context.lineTo(-size/2 - x, 0)
-    context.lineTo(-size/2 , -1)
+    context.moveTo(-size/2, -geneHeight/2);
+    context.lineTo(size/2, -geneHeight/2 )
+    context.lineTo(size/2 + x, 0)
+    context.lineTo(size/2, geneHeight/2)
+    context.lineTo(-size/2, geneHeight/2)
+    context.lineTo(-size/2 , -geneHeight/2)
     context.closePath();
   }
 }
@@ -93,16 +93,16 @@ export const geneTriangleRectForward: d3.SymbolType = {
 export const geneTriangleRectReverse: d3.SymbolType = {
   draw(context, size) {
     const sqrt3 = Math.sqrt(3)
-    const geneHeight = 2
+    const geneHeight = 3
     const triangleSize = geneHeight * 8
     const x = Math.sqrt(triangleSize / (sqrt3 * 3));
 
-    context.moveTo(-size/2, -1);
-    context.lineTo(size/2, -1 )
-    context.lineTo(size/2 + x, 0)
-    context.lineTo(size/2, 1)
-    context.lineTo(-size/2, 1)
-    context.lineTo(-size/2 , -1)
+    context.moveTo(-size/2, -geneHeight/2);
+    context.lineTo(size/2, -geneHeight/2 )
+    context.lineTo(size/2, geneHeight/2)
+    context.lineTo(-size/2, geneHeight/2)
+    context.lineTo(-size/2 - x, 0)
+    context.lineTo(-size/2 , -geneHeight/2)
     context.closePath();
   }
 }

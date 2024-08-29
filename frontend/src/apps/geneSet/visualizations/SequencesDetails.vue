@@ -33,6 +33,7 @@ import type { GroupInfo, SequenceMetrics } from '@/types'
 import { calculateCompressionFactor, calculateIndividualScales , calculateWidth, updateViewportRangeBounds } from '@/helpers/axisStretch'
 import { runSpringSimulation } from '@/helpers/springSimulation'
 import {  ref } from 'vue'
+import colors from '@/assets/colors.module.scss'
 
 import type { GraphNode, GraphNodeGroup } from  "@/helpers/springSimulationUtils"
 import { crossDetection } from '@/helpers/crossDetection'
@@ -165,7 +166,7 @@ export default {
         nGenesTotal = nGenesTotal + value.domain().length - 2
         nOfGenomes = nOfGenomes + 1
       }
-      if( nGenesTotal / nOfGenomes < 10) {
+      if( nGenesTotal / nOfGenomes < 15) {
         return true
       }
       return false
@@ -911,18 +912,20 @@ export default {
         }
 
         // Add the line
-        this.svg()
-          .append('path')
-          .datum(sortedPath)
-          .attr('class', 'connection')
-          .attr('fill', 'none')
-          .attr(
-            'stroke',
-            vis.colorGenomes ? 'black' : vis.colorScale(String(homology)) as string
-          )
-          .attr('stroke-width', 1.5)
-          .attr(
-            'd',  d => connectionsLine(d).toString())
+        if(vis.colorGenes !== true) {
+          this.svg()
+            .append('path')
+            .datum(sortedPath)
+            .attr('class', 'connection')
+            .attr('fill', 'none')
+            .attr(
+              'stroke', d =>
+              vis.colorGenes ? vis.colorScale(String(homology)) as string :  colors['gray-7']
+            )
+            .attr('stroke-width', 1.5)
+            .attr(
+              'd',  d => connectionsLine(d).toString())
+          }
         }
       )
 
@@ -931,14 +934,14 @@ export default {
         .size((d:GroupInfo) => {
           const key = `${d.genome_number}_${d.sequence_number}`
           const currentGeneToWindow = this.geneToWindowScales[key]
-          const size = getGeneSymbolSize(d, currentGeneToWindow, this.barHeight, showGeneBars.value)
+          const size = getGeneSymbolSize(d, currentGeneToWindow, vis.barHeight, showGeneBars.value)
           if(currentGeneToWindow(d.mRNA_start_position) > this.windowRange[1]  || currentGeneToWindow(d.mRNA_end_position) < this.windowRange[0]) {return 0}
           return size
         })
         .type((d) => {
           const key = `${d.genome_number}_${d.sequence_number}`
           const currentGeneToWindow = this.geneToWindowScales[key]
-          return getGeneSymbolType(d, currentGeneToWindow, this.barHeight, showGeneBars.value)
+          return getGeneSymbolType(d, currentGeneToWindow, vis.barHeight, showGeneBars.value)
         })
 
       this.svg()
@@ -976,13 +979,11 @@ export default {
                   : ''
               )
               .attr('stroke-width', (d) =>
-                vis.upstreamHomologies.includes(d.homology_id) ? '3px' : ''
+                 '3px' 
               )
-              .attr('fill', (d) =>
-              {
-              return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
-              }
-            )     
+              .attr('fill', (d) =>{
+                return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string :colors['gray-7']
+              })     
               .attr('opacity', 0.8),
 
           (update) =>
@@ -1007,12 +1008,15 @@ export default {
               })
               .attr('d', geneSymbol)
               .attr('fill', (d) =>{
-                return vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : 'black'
+                return vis.colorGenes 
+                ? vis.colorScale(String(d.homology_id)) as string 
+                : colors['gray-7']
               })
               .attr('stroke-width', (d) =>
-                vis.upstreamHomologies.includes(d.homology_id ?? 0) ? '3px' : ''
+                '3px'
               )
-              .attr('stroke', (d) =>  vis.colorScale(String(d.homology_id))),
+              .attr('stroke', (d) =>  
+                vis.colorGenes ? vis.colorScale(String(d.homology_id)) as string : colors['gray-7']),
               //   vis.colorGenes
               //     ? vis.upstreamHomologies.includes(d.homology_id ?? 0)
               //       ? vis.colorScale(String(d.homology_id))
