@@ -1,12 +1,12 @@
 import type { GroupInfo, SequenceMetrics } from "@/types"
 import { GraphNode, applyMinimumdistanceOnSequence,  GraphNodeGroup, createNodeGroups, genesToNodes,  updateHighStressNodeGroup } from "./springSimulationUtils"
 
-export const runSpringSimulation = ( genes: GroupInfo[], sequences: SequenceMetrics[], fromHeat:number = 1000, toHeat: number = 0.1, initializeOnHomologygroup?:number) => {
+export const runSpringSimulation = ( nodes: GraphNode[], sequences: SequenceMetrics[], fromHeat:number = 1000, toHeat: number = 0.1, initializeOnHomologygroup?:number): [GraphNode[], GraphNodeGroup[], number] => {
   // simulates forces applied to all nodes in the graph
   // if tuning of the evaluateForces function is bad it can result in strange behaviour (ugly layout)  
   let heat = fromHeat
   let nodeGroups: GraphNodeGroup[] = []
-  let nodes: GraphNode[] = genesToNodes(genes)
+
   let excludedHomologyGroup = 0 // 232290464
   const touchingDistance = 100
 
@@ -41,7 +41,7 @@ export const runSpringSimulation = ( genes: GroupInfo[], sequences: SequenceMetr
       heat = heat * 0.99
       currentHeatNIterations = 0
     }
-    if(terminate) {  
+    if(terminate || (heat <= toHeat)) {  
 
       // uncomment to center final nodes on the initializeHomologygroup
       // if(initializeOnHomologygroup !== undefined) {
@@ -58,7 +58,7 @@ export const runSpringSimulation = ( genes: GroupInfo[], sequences: SequenceMetr
       // }
 
       console.log(nIterations, 'iterations in simulation')
-      return [nodeGroups.flatMap(nodeGroup => nodeGroup.nodes), nodeGroups] as [GraphNode[], GraphNodeGroup[]]
+      return [nodeGroups.flatMap(nodeGroup => nodeGroup.nodes), nodeGroups, heat] as [GraphNode[], GraphNodeGroup[], number]
     }
   }
 }

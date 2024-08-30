@@ -35,18 +35,18 @@ import { runSpringSimulation } from '@/helpers/springSimulation'
 import {  ref } from 'vue'
 import colors from '@/assets/colors.module.scss'
 
-import type { GraphNode, GraphNodeGroup } from  "@/helpers/springSimulationUtils"
+import { genesToNodes, type GraphNode, type GraphNodeGroup } from  "@/helpers/springSimulationUtils"
 import { crossDetection } from '@/helpers/crossDetection'
 import { getGeneSymbolType, getGeneSymbolSize } from '@/helpers/customSymbols'
-
+import { createCompressionScale } from './compressibleScale'
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0,1])
-const geneToCompressionScales = ref<Dictionary<d3.ScaleLinear<number, number, never>>>({})
 const globalCompressionFactor = ref<number>(1)
 const currentHeat = ref<number>(1000)
 const crossingHomologyGroups = ref<number[]>([])
 const showGeneBars = ref<boolean>(true)
+const currentGraphNodeGroups = ref<GraphNodeGroup[]>()
 
 export default {
   name: 'SequencesDetails',
@@ -190,12 +190,24 @@ export default {
       )
       return obj
     },
+    geneToCompressionScales() {
+      const nodes: GraphNode[] = this.currentGraphNodes 
+      const [newscale, compressionFactor, newEdges] = createCompressionScale(nodes, this.data ?? [], this.windowRange)
+      globalCompressionFactor.value = compressionFactor
+      compressionViewWindowRange.value = newEdges
+      return newscale
+    },
     geneToWindowScales() {
       let newScales: Dictionary<d3.ScaleLinear<number, number, never>> = {}
-      Object.entries(geneToCompressionScales.value).forEach((scaleEntry) => {
+      Object.entries(this.geneToCompressionScales).forEach((scaleEntry) => {
         newScales[scaleEntry[0]] = updateViewportRangeBounds(scaleEntry[1], compressionViewWindowRange.value , scaleEntry[1], this.windowRange )
       });
       return newScales
+    },
+    currentGraphNodes() {
+      const graphNodeGroups = currentGraphNodeGroups.value ?? []
+      const graphNodes = graphNodeGroups.flatMap(d => d.nodes)
+      return graphNodes
     }
   },
   methods: {
@@ -607,7 +619,7 @@ export default {
                 const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
-                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
+                const currentGeneToCompressionScale = this.geneToCompressionScales[key]
                 const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, position) 
                 const defaultConnectionThickness = 8
 
@@ -656,15 +668,15 @@ export default {
               .attr('d', (d) => {
                 const key:string = `${d.genome_number}_${d.sequence_number}`
                 const position = d.mRNA_end_position
-                const genePositionCompression = geneToCompressionScales.value[key](position) 
+                const genePositionCompression = vis.geneToCompressionScales[key](position) 
                 const compressionPosition = genePositionCompression 
-                const genePosition = geneToCompressionScales.value[key].invert(compressionPosition)
+                const genePosition = vis.geneToCompressionScales[key].invert(compressionPosition)
                 
                 const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
                 const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
-                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
+                const currentGeneToCompressionScale = vis.geneToCompressionScales[key]
                 const width = calculateWidth(currentGeneToCompressionScale, currentGeneToWindowScale, this.windowRange, position) 
                 const defaultConnectionThickness = 2
                 const x0 = this.geneToWindowScales[key](genePosition)
@@ -849,7 +861,7 @@ export default {
     drawGenes() {
       let vis = this
 
-      if (this.dataGenes === undefined) { return }
+      if (this.dataGenes === undefined) { console.log('no genes yet'); return;  }
       const genes: GroupInfo[] = this.dataGenes
         /// connection lines
       this.svg().selectAll('path.connection').remove()
@@ -1215,37 +1227,15 @@ export default {
 
      // Create individual scales 
     ///    
-    let [newGenePositions, nodeGroups]: [GraphNode[] , GraphNodeGroup[] ]= runSpringSimulation(this.dataGenes?? [], this.data ?? [], currentHeat.value, 0.5, 232273529)
+    let newGenePositions: GraphNode[] = genesToNodes(this.dataGenes ?? [])
+    let nodeGroups:GraphNodeGroup[] = []
+    let heat: number = 0;
 
+    [newGenePositions, nodeGroups, heat] = runSpringSimulation(newGenePositions, this.data ?? [], 1000, 100, 232273529)
+    currentHeat.value = heat
     crossingHomologyGroups.value = crossDetection(newGenePositions)
 
-    let xScaleGeneToWindowInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
-    let xScaleGeneToCompressionInit:Dictionary<d3.ScaleLinear<number, number, never>> = {}
-    //determine global ranges'
-    const sortedCompressionRangeGlobal = (newGenePositions.map(d => d.position)).sort((a,b) => a-b)
-    const edgesOfNewRangeGlobal: [number, number] = [sortedCompressionRangeGlobal[0],  sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length -1]]
-    const oldRanges = newGenePositions.map(d => d.originalPosition).sort((a,b) => a-b)
-    const edgesOfOldRange = [oldRanges[0], oldRanges[oldRanges.length -1 ]]
-    const overallCompressionFactor = (edgesOfOldRange[1] - edgesOfOldRange[0]) / (edgesOfNewRangeGlobal[1] - edgesOfNewRangeGlobal[0])
-    globalCompressionFactor.value = overallCompressionFactor
-    compressionViewWindowRange.value = edgesOfNewRangeGlobal
-    
-    this.data?.forEach(sequence => {
-      const key = sequence.sequence_id
-      const genePositionsOnSequence = newGenePositions
-        .filter(d => String(d.sequenceId) === key)
-        .sort(d => d.originalPosition)
-  
-      const [geneToCompression, scaleGeneToWindow] = calculateIndividualScales(
-        genePositionsOnSequence, 
-        edgesOfNewRangeGlobal, 
-        this.windowRange
-      )
-      xScaleGeneToCompressionInit[key] = geneToCompression
-      xScaleGeneToWindowInit[key] = scaleGeneToWindow
-    })
-    //assign scale dictionaries
-    geneToCompressionScales.value = xScaleGeneToCompressionInit
+    currentGraphNodeGroups.value = nodeGroups
 
     this.drawXAxis() // draw axis once
     this.draw()
@@ -1326,14 +1316,8 @@ export default {
       },
     }
 
-    // const fisheye = fisheyeO.circular().radius(100).distortion(5)
-
-    // console.log('fisheye', fisheye)
-    // debugger
   },
-  // unmounted() {
-  //   this.resizeObserver?.disconnect()
-  // },
+
   watch: {
     colorGenes() {
       this.drawGenes()
@@ -1370,7 +1354,7 @@ export default {
       this.drawXAxis() // redraw
       this.draw()
     },
-  }
+  },
 }
 </script>
 

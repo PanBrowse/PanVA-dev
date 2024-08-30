@@ -82,9 +82,15 @@ export const geneTriangleRectForward: d3.SymbolType = {
 
     context.moveTo(-size/2, -geneHeight/2);
     context.lineTo(size/2, -geneHeight/2 )
+    // add small tick
+    // context.lineTo(size/2, -geneHeight/2 - 2)
+    // context.lineTo(size/2-0.5, -geneHeight/2 - 2)
+
+    context.lineTo(size/2, -geneHeight/2 )
     context.lineTo(size/2 + x, 0)
     context.lineTo(size/2, geneHeight/2)
     context.lineTo(-size/2, geneHeight/2)
+    
     context.lineTo(-size/2 , -geneHeight/2)
     context.closePath();
   }
@@ -102,6 +108,11 @@ export const geneTriangleRectReverse: d3.SymbolType = {
     context.lineTo(size/2, geneHeight/2)
     context.lineTo(-size/2, geneHeight/2)
     context.lineTo(-size/2 - x, 0)
+    context.lineTo(-size/2 , -geneHeight/2)
+    // add small tick 
+    // context.lineTo(-size/2 , -geneHeight/2-2)
+    // context.lineTo(-size/2 + 0.5, -geneHeight/2-2)
+
     context.lineTo(-size/2 , -geneHeight/2)
     context.closePath();
   }
