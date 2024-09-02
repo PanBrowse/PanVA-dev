@@ -76,7 +76,7 @@ export  const geneTriangleReverse: d3.SymbolType =  {
 export const geneTriangleRectForward: d3.SymbolType = {
   draw(context, size) {
     const sqrt3 = Math.sqrt(3)
-    const geneHeight = 3
+    const geneHeight = 2
     const triangleSize = geneHeight * 8
     const x = Math.sqrt(triangleSize / (sqrt3 * 3));
 
@@ -99,7 +99,7 @@ export const geneTriangleRectForward: d3.SymbolType = {
 export const geneTriangleRectReverse: d3.SymbolType = {
   draw(context, size) {
     const sqrt3 = Math.sqrt(3)
-    const geneHeight = 3
+    const geneHeight = 2
     const triangleSize = geneHeight * 8
     const x = Math.sqrt(triangleSize / (sqrt3 * 3));
 

@@ -208,7 +208,29 @@ export default {
       const graphNodeGroups = currentGraphNodeGroups.value ?? []
       const graphNodes = graphNodeGroups.flatMap(d => d.nodes)
       return graphNodes
-    }
+    },
+    mRNARows() {
+      const graphNodes = this.currentGraphNodes
+      const newDict: Dictionary<number> = Object.fromEntries(graphNodes.map(d => [d.id, d.row]))
+      return newDict
+    },
+  sortedSequencesNRows () {
+      const graphNodes: GraphNode[] = this.currentGraphNodes ?? []
+      const sequenceOrder: number[] =  this.sortedChromosomeSequenceIndices[this.chromosomeNr]
+      const maxNRows: number[] = []
+      const cumulatedMaxRows: Dictionary<number> = {}  
+      const sortedSequenceIds = Array(sequenceOrder.length-1)
+      this.data?.forEach((d, i) => sortedSequenceIds[sequenceOrder[i]] = d.sequence_id)
+      sortedSequenceIds.forEach((sequenceId, i) => {
+        console.log('seqid', sequenceId)
+        const currentNodes = graphNodes.filter(d => (d.sequenceId === sequenceId) )
+        const maxNRowsCurrentSequence = currentNodes.length > 0 ? Math.max(...currentNodes.map(d => d.row)) - 1 : 0
+        cumulatedMaxRows[sequenceId] =  maxNRows.slice(0, i).reduce((partial, a) => partial + a, 0)
+        maxNRows.push(maxNRowsCurrentSequence)
+      })
+
+      return maxNRows; //cumulatedMaxRows 
+    },
   },
   methods: {
     ...mapActions(useGeneSetStore, ['deleteChromosome']),
@@ -425,177 +447,6 @@ export default {
       this.svg().selectAll('text.density-value-focus').remove()
       this.draw()
     },
-    ///////////////////////////////////////////////////////////////////////////////Draw bars ////////////////////////////////////
-    drawBars() {
-      let vis = this
-      this.svg()
-        .selectAll('rect.bar-chr')
-        .data(this.data ?? [], (d:any) => d.sequence_id)
-        .join(
-          (enter) =>
-            enter
-              .append('rect')
-              .attr(
-                'transform',
-                `translate(${this.margin.left * 3},${this.margin.top * 2})`
-              )
-              .attr('class', 'bar-chr')
-              .attr('x', this.xScale(0))
-              .attr(
-                'y',
-                (d, i) =>
-                  this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
-                  (this.barHeight + 10)
-              )
-              .attr('width', (d) =>
-                vis.xScale(d.sequence_length) - vis.xScale(0)
-              )
-              .attr('height', this.barHeight)
-
-              .attr('fill',  (d) => {
-                let color: any
-                if (vis.colorGenomes == true) {
-                  color = vis.colorScaleGenome(String(d.genome_number))
-                } else {
-                  color = '#f0f2f5'
-                }
-                return color
-              })
-              .attr('opacity', function (d) {
-                let color
-                if (vis.colorGenomes == true) {
-                  color = 0.5
-                } else {
-                  color = 1
-                }
-                return color
-              })
-              .attr('clip-path', 'url(#clipDetails)'),
-          (update) =>
-            update
-              .transition()
-              .duration(this.transitionTime)
-              .attr('x', this.xScale(0))
-              .attr('fill',  (d)  => {
-                let color:any
-                if (vis.colorGenomes == true) {
-                  color = vis.colorScaleGenome(String(d.genome_number))
-                } else {
-                  color = '#f0f2f5'
-                  // color = '#fff'
-                }
-                return color
-              })
-              .attr('opacity', function (d) {
-                let color
-                if (vis.colorGenomes == true) {
-                  color = 0.5
-                } else {
-                  color = 1
-                }
-                return color
-              })
-              .attr(
-                'y',
-                (d, i) =>
-                  this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
-                  (this.barHeight + 10)
-              )
-              .attr('width', (d) =>
-                vis.xScale(d.sequence_length) - vis.xScale(0)
-              ),
-
-          (exit) => exit.remove()
-        )
-    },
-    ///////////////////////////////////////////////////////////////////////////////Draw context bars ////////////////////////////////////
-    drawContextBars() {
-      let vis = this
-      if( this.data === undefined) {return}
-      this.svg()
-        .selectAll('rect.bar-chr-context')
-        .data(this.data, (d:any) => d.sequence_id)
-        .join(
-          (enter) =>
-            enter
-              .append('rect')
-              .attr(
-                'transform',
-                `translate(${this.margin.left * 3},${this.margin.top * 2})`
-              )
-              .attr('class', 'bar-chr-context')
-              .attr('x', this.anchor ? this.xScale(-35000000) : this.xScale(0))
-              .attr(
-                'y',
-                (d, i) =>
-                  this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
-                  (this.barHeight + 10)
-              )
-              // .attr('width', function (d) {
-              //   return vis.xScale(d.sequence_length)
-              // })
-              .attr('width', (d) =>
-                this.anchor
-                  ? this.xScale(70000000)
-                  : vis.xScale(d.sequence_length)
-              )
-              .attr('height', this.barHeight / 4)
-              .attr('fill', function (d) {
-                let color
-                if (vis.percentageGC == true) {
-                  color = vis.colorScaleGC(d.GC_content_percent)
-                } else {
-                  color = 'transparent'
-                }
-                return color
-              })
-              .attr('opacity', function (d) {
-                let color
-                if (vis.percentageGC == true) {
-                  color = 1
-                } else {
-                  color = 0
-                }
-                return color
-              })
-              .attr('clip-path', 'url(#clipDetails)'),
-          (update) =>
-            update
-              .transition()
-              .duration(this.transitionTime)
-              .attr('x', this.anchor ? this.xScale(-35000000) : this.xScale(0))
-              .attr('fill', function (d) {
-                let color
-                if (vis.percentageGC == true) {
-                  color = vis.colorScaleGC(d.GC_content_percent)
-                } else {
-                  color = 'transparent'
-                }
-                return color
-              })
-              .attr('opacity', function (d) {
-                let color
-                if (vis.percentageGC == true) {
-                  color = 1
-                } else {
-                  color = 0
-                }
-                return color
-              })
-              .attr(
-                'y',
-                (d, i) =>
-                  this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
-                  (this.barHeight + 10)
-              )
-              .attr('width', (d) =>
-                this.anchor
-                  ? this.xScale(70000000)
-                  : vis.xScale(d.sequence_length)
-              ),
-          (exit) => exit.remove()
-        )
-    },
     drawSquishBars() {
       let vis = this
       if( vis.dataGenes === undefined) { return }
@@ -673,7 +524,9 @@ export default {
                 const genePosition = vis.geneToCompressionScales[key].invert(compressionPosition)
                 
                 const index = vis.data?.findIndex(sequence => sequence.sequence_id === key) ?? 0
-                const ypos = vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index] * (this.barHeight + 10)
+                const sequenceIndex =  vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][index]
+                const ypos = sequenceIndex * (this.barHeight + 10) +
+                + vis.sortedSequencesNRows.slice(0, sequenceIndex).reduce((partial, a) => partial + a, 0) * 6 
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 const currentGeneToCompressionScale = vis.geneToCompressionScales[key]
@@ -766,15 +619,13 @@ export default {
               .attr('text-anchor', 'end')
               .attr('x', 5)
               .attr('font-size', 10)
-              .attr(
-                'y',
-                (d, i) =>
-                  this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
-                  (this.barHeight + 10)
-              )
-
+              .attr('y', (d, i) => {
+                  const sequenceIndex =  vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i]
+                  const ypos = sequenceIndex * (this.barHeight + 10) +
+                    vis.sortedSequencesNRows.slice(0, sequenceIndex).reduce((partial, a) => partial + a, 0) * 6 
+                  return ypos
+                })
               .attr('dy', this.barHeight / 3)
-              // .text((d) => d.sequence_id.split('_')),
               .text((d) =>
                 d.phasing_id.includes('unphased')
                   ? d.genome_number + '_' + 'U'
@@ -785,11 +636,11 @@ export default {
             update
               .transition()
               .duration(this.transitionTime)
-              .attr('y', function (d, i) {
-                return (
-                  vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i] *
-                  (vis.barHeight + 10)
-                )
+              .attr('y', (d, i) => {
+                const sequenceIndex =  vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i]
+                const ypos = sequenceIndex * (this.barHeight + 10) +
+                  vis.sortedSequencesNRows.slice(0, sequenceIndex).reduce((partial, a) => partial + a, 0) * 6 
+                return ypos
               }),
           (exit) => exit.remove()
         )
@@ -903,10 +754,11 @@ export default {
               currentGeneToWindow(node.mRNA_start_position) + 
               currentGeneToWindow(node.mRNA_end_position)
             ) / 2
+            const sequenceIndex =  vis.sequenceIdLookup[vis.chromosomeNr][key]
             const y  = vis.margin.top * 2 +
               vis.barHeight / 2 + 
-              vis.sequenceIdLookup[vis.chromosomeNr][key] *
-              (vis.barHeight + 10)
+              sequenceIndex * (this.barHeight + 10) +
+              vis.sortedSequencesNRows.slice(0, sequenceIndex).reduce((partial, a) => partial + a, 0) * 6 
             if( nodePosition < this.windowRange[0] || nodePosition > this.windowRange[1]) {
               previousWasRendered = false
               currentPath.moveTo(nodePosition, y)
@@ -932,7 +784,7 @@ export default {
             .attr('fill', 'none')
             .attr(
               'stroke', d =>
-              vis.colorGenes ? vis.colorScale(String(homology)) as string :  colors['gray-7']
+              vis.colorGenes ? vis.colorScale(String(homology)) as string :  colors['gray-5']
             )
             .attr('stroke-width', 1.5)
             .attr(
@@ -956,6 +808,7 @@ export default {
           return getGeneSymbolType(d, currentGeneToWindow, vis.barHeight, showGeneBars.value)
         })
 
+////////////////////////////////////////draw the genes////////////////////////////////////////////////////////
       this.svg()
         .selectAll('path.gene')
         .data(genes, (d) => d.mRNA_id)
@@ -977,7 +830,7 @@ export default {
                 let yTransform =
                   vis.margin.top * 2 +
                   vis.barHeight / 2 +
-                  vis.sortedMrnaIndices[vis.chromosomeNr][i] * (vis.barHeight + 10)
+                  vis.sortedMrnaIndices[vis.chromosomeNr][i] * (vis.barHeight + 10) 
                 return `translate(${xTransform},${yTransform})`
               })
               .attr('class', 'gene')
@@ -1012,10 +865,13 @@ export default {
                   ? currentScale(d.mRNA_end_position - vis.anchorLookup[key]) 
                   : currentScale(d.mRNA_end_position)
                 let xTransform = vis.margin.left * 3 + ((startPosition + endPosition) / 2)
+                const sequenceIndex:number = vis.sortedMrnaIndices[vis.chromosomeNr][i]
                 let yTransform =
                   vis.margin.top * 2 +
                   vis.barHeight / 2 +
-                  vis.sortedMrnaIndices[vis.chromosomeNr][i] * (vis.barHeight + 10)
+                  sequenceIndex * (vis.barHeight + 10) +
+                    vis.sortedSequencesNRows.slice(0, sequenceIndex).reduce((partial, a) => partial + a, 0) * 6 +
+                    (vis.mRNARows[d.mRNA_id] ) * 6
                 return `translate(${xTransform},${yTransform})`
               })
               .attr('d', geneSymbol)
@@ -1227,7 +1083,8 @@ export default {
 
      // Create individual scales 
     ///    
-    let newGenePositions: GraphNode[] = genesToNodes(this.dataGenes ?? [])
+    const genesOnChromosome = this.dataGenes?.filter(d => String(d.phasing_chromosome) === String(this.chromosomeNr)) ?? []
+    let newGenePositions: GraphNode[] = genesToNodes(genesOnChromosome)
     let nodeGroups:GraphNodeGroup[] = []
     let heat: number = 0;
 

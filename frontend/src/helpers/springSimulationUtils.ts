@@ -20,6 +20,7 @@ export class GraphNode {
     private _lastMove: number = 0
     private _localTempScaling: number = 1
     private _width: number
+    private _row: number = 0
   
     constructor(id:string, position: number, endPosition:number,homologyGroup:number, sequence: number, sequenceId: string, originalPosition?: number) {
       this._id = id,
@@ -44,6 +45,7 @@ export class GraphNode {
     public get localTempScaling() {return this._localTempScaling}
     public get width() {return this._width }
     public get range() {return [this.position, this.position + this.width] as [number, number]}
+    public get row() {return this._row}
   
     public set connectionsX(connections: xConnections) {this._connectionsX = connections}
     public set connectionsY(connections: string[]) {this._connectionsY = connections}
@@ -51,6 +53,7 @@ export class GraphNode {
     public set width(newWidth: number) { this._width = newWidth }
     public set lastMove(newMove: number) {this._lastMove = newMove}
     public set localTempScaling(newScale: number) {this._localTempScaling = Math.abs(newScale)}
+    public set row(newRow: number) {if(newRow >= 0) {this._row = Math.floor(newRow)}}
   }
   
   export class GraphNodeGroup {
@@ -63,22 +66,23 @@ export class GraphNode {
     private _localTempScaling: number
 
     constructor(nodes: GraphNode[], originalRange?: [number, number], id?: string, xConnections?: xConnections, yConnections?: string[], lastMove?:number, localTempScaling?:number) {
-      const newNodes: GraphNode[] = []
-      nodes.forEach(node => {
-        const newNode = new GraphNode(node.id, node.position, node.endPosition, node.homologyGroup, node.sequence, node.sequenceId, node.originalPosition)
-        newNode.connectionsX = node.connectionsX
-        newNode.connectionsY = node.connectionsY
-        newNode.lastMove = node.lastMove
-        newNode.localTempScaling = node.localTempScaling
-        newNodes.push(newNode)
-      })
-      this._nodes = newNodes
+      this._nodes = []
       this._originalRange = originalRange ?? calculateRange(nodes)
       this._id = id ?? nodes[0].id + 'group'
       this._xConnections = xConnections ?? {left: undefined, right: undefined} 
       this._yConnections = yConnections ?? []
       this._lastMove = lastMove ?? 0
       this._localTempScaling = localTempScaling ?? 1
+
+      nodes.forEach(node => {
+        const newNode = new GraphNode(node.id, node.position, node.endPosition, node.homologyGroup, node.sequence, node.sequenceId, node.originalPosition)
+        newNode.connectionsX = node.connectionsX
+        newNode.connectionsY = node.connectionsY
+        newNode.lastMove = node.lastMove
+        newNode.localTempScaling = node.localTempScaling
+
+        this.addNode(newNode)
+      })
     }
 
     public get nodes() {return this._nodes}
@@ -116,6 +120,13 @@ export class GraphNode {
     public set localTempScaling(newScale: number) {this._localTempScaling = Math.abs(newScale)}
 
     public addNode(newNode: GraphNode) {
+      let countOverlapping = 0
+      this._nodes.forEach(node => {
+        if(rangesOverlap(node.range, newNode.range)){
+          countOverlapping = countOverlapping + 1
+        }}
+      )
+      newNode.row = countOverlapping
       this._nodes.push(newNode)
     }
   }
@@ -187,6 +198,8 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
 
   export const rangesOverlap = (range1: [number, number], range2:[number, number]): boolean => {
     let overlaps = true
+    range1.sort((a,b) => a-b)
+    range2.sort((a,b) => a-b)
     if(range1[1] < range2[0]) { return false }
     if( range2[1] < range1[0]) { return false}
     return overlaps
@@ -195,10 +208,10 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
 
   export const createNodeGroups = (nodes: GraphNode[]): GraphNodeGroup[] => {
     const uniqueSequences: number[] = []
-      nodes.map(d => d.sequence).forEach(d => {
-        if(uniqueSequences.includes(d)) { return }
-        uniqueSequences.push(d)
-      })
+    nodes.map(d => d.sequence).forEach(d => {
+      if(uniqueSequences.includes(d)) { return }
+      uniqueSequences.push(d)
+    })
   
     const groups: GraphNodeGroup[] = []
     uniqueSequences.forEach(currentSequence => {
@@ -259,7 +272,7 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
     // Convert genes to graphNodes
     let nodes: GraphNode[] = []
     genes.forEach((gene, index) => {
-      const uId = gene.gene_id + '_' + index.toString()  // add index to get unique id
+      const uId = gene.mRNA_id  // add index to get unique id
       nodes.push(new GraphNode(uId, gene.mRNA_start_position, gene.mRNA_end_position, gene.homology_id, gene.sequence_number, `${gene.genome_number}_${gene.sequence_number}` ))
     })
     nodes.sort((d,b) => d.position - b.position)
@@ -369,11 +382,11 @@ export const updateHighStressNodeGroup = (
   // check for order changes
   checkNodeOrder(newNodes)
   // check termination criteria
-  if(Math.abs(highestDeltaPosConstrained) < 10 || ((Math.abs(highestDeltaPosConstrained) / nodeGroupSpread) < 0.005)) {
+  if(Math.abs(highestDeltaPosConstrained) < 2000 || ((Math.abs(highestDeltaPosConstrained) / nodeGroupSpread) < 0.008)) {
     console.log('terminating highest delta pos too low.', 'heat: ', heat, 'highest delta pos: ', highestDeltaPosConstrained), 
     terminate = true 
   }
-  if(heat < 1) { 
+  if(heat < 100) { 
     console.log('terminating heat too low.', 'heat: ', heat, 'highest delta pos: ', highestDeltaPosConstrained), 
     terminate = true 
   }
