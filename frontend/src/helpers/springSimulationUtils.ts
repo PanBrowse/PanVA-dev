@@ -377,7 +377,7 @@ export const updateHighStressNodeGroup = (
   if(highestForceNode !== undefined) {
     nodeGroups.splice(highestDeltaPosNodeIndex, 1, highestForceNode) 
   }
-  const newNodes = enforceMinimumDistance(nodeGroups, touchingDistance)
+  const newNodes = nodeGroups // enforceMinimumDistance(nodeGroups, touchingDistance)
 
   // check for order changes
   checkNodeOrder(newNodes)
