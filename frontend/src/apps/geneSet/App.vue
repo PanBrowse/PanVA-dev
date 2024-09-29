@@ -4,6 +4,8 @@ import { mapState } from 'pinia'
 
 import Layout from '@/components/Layout.vue'
 import LoadingScreen from '@/components/LoadingScreen.vue'
+// import Homologies from './visualizations/Homologies.vue'
+import PixiCanvas from '@/components/PixiScatter.vue'
 import { useGeneSetStore } from '@/stores/geneSet'
 
 import ContextOptions from './sidebar/ContextOptions.vue'
@@ -16,7 +18,6 @@ import ChromosomeDetails from './visualizations/ChromosomeDetails.vue'
 import ChromosomeOverview from './visualizations/ChromosomeOverview.vue'
 import Density from './visualizations/Density.vue'
 import GroupInfoTable from './visualizations/GroupInfoTable.vue'
-// import Homologies from './visualizations/Homologies.vue'
 
 export default {
   components: {
@@ -34,12 +35,19 @@ export default {
     ARow: Row,
     ACol: Col,
     HomologyOverview,
+    PixiCanvas,
   },
   computed: {
     ...mapState(useGeneSetStore, ['isInitialized', 'showTable', 'showDetails']),
   },
 }
 </script>
+
+<!-- <template>
+  <div>
+    <PixiCanvas />
+  </div>
+</template> -->
 
 <template>
   <Layout v-if="isInitialized">
@@ -51,8 +59,29 @@ export default {
       <ContextOptions />
       <Unphased />
     </template>
-    <ChromosomeOverview />
-    <template v-if="showTable && showDetails">
+
+    <div class="content">
+      <PixiCanvas />
+    </div>
+
+    <!-- <Homologies /> -->
+  </Layout>
+  <LoadingScreen v-else>Loading data, please wait...</LoadingScreen>
+</template>
+
+<!-- <template>
+  <Layout v-if="isInitialized">
+    <template #sidebar>
+      <HomologyOverview />
+      <Filters />
+      <Sorting />
+      <GraphicsOptions />
+      <ContextOptions />
+      <Unphased />
+    </template> -->
+
+<!-- <ChromosomeOverview /> -->
+<!-- <template v-if="showTable && showDetails">
       <ARow type="flex" :gutter="8">
         <ACol :span="12">
           <ChromosomeDetails />
@@ -65,15 +94,26 @@ export default {
     <GroupInfoTable v-if="showTable && showDetails == false"></GroupInfoTable>
     <ChromosomeDetails
       v-if="showTable == false && showDetails"
-    ></ChromosomeDetails>
+    ></ChromosomeDetails> -->
 
-    <!-- <Homologies /> -->
-  </Layout>
-  <LoadingScreen v-else>Loading homologies, please wait...</LoadingScreen>
-</template>
+<!-- <Homologies /> -->
+<!-- </Layout>
+  <LoadingScreen v-else>Loading data, please wait...</LoadingScreen>
+</template> -->
 
 <style>
 .ant-layout-sider {
   background: #fafafa !important;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.pixi-container {
+  width: 100%;
+  height: 100%;
 }
 </style>
