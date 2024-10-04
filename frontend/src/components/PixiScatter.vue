@@ -68,8 +68,11 @@ export default {
         // Create a foreground container for hover texts
         const foregroundContainer = new PIXI.Container()
 
+        const circleContainer = new PIXI.Container()
+
         // Add the foreground container to the stage last
         app.stage.addChild(foregroundContainer)
+        app.stage.addChild(circleContainer)
 
         // // Create a Graphics object
         // const graphics = new PIXI.Graphics()
@@ -211,7 +214,8 @@ export default {
               sequence.sequence_length,
               app,
               circles,
-              foregroundContainer
+              foregroundContainer,
+              circleContainer
             )
           })
 
@@ -336,7 +340,8 @@ export default {
       sequence_length,
       app,
       circles,
-      foregroundContainer
+      foregroundContainer,
+      circleContainer
     ) {
       if (!this.circleTexture) {
         console.error('Circle texture is not created.')
@@ -400,7 +405,9 @@ export default {
       })
 
       // Add the sprite to the Pixi stage
-      app.stage.addChild(circleSprite)
+
+      circleContainer.addChild(circleSprite)
+
       circles.push({
         sprite: circleSprite,
         x: x,
