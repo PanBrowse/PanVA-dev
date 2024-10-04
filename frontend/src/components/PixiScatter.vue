@@ -363,6 +363,7 @@ export default {
           fontSize: 8,
           fill: 0xffffff,
           align: 'left',
+          resolution: window.devicePixelRatio || 1,
         },
       })
       hoverText.visible = false // Hidden initially
