@@ -1,5 +1,8 @@
 <template>
-  <div ref="pixiContainer"></div>
+  <div style="position: relative">
+    <canvas ref="pixi"></canvas>
+    <svg ref="lasso"><g class="lasso"></g></svg>
+  </div>
 </template>
 
 <script>
@@ -9,6 +12,15 @@ import * as PIXI from 'pixi.js'
 
 import { lasso } from '@/components/Lasso.js'
 import { useGeneSetStore } from '@/stores/geneSet'
+
+PIXI.Sprite.prototype.getBoundingClientRect = function () {
+  return {
+    left: this.x - this.width / 2,
+    top: this.y - this.height / 2,
+    width: this.width,
+    height: this.height,
+  }
+}
 
 export default {
   name: 'PixiCanvas',
@@ -48,15 +60,8 @@ export default {
           backgroundColor: 0xffffff,
           resolution: window.devicePixelRatio || 1, // Use device's pixel ratio for high-res screens
           antialias: true,
+          canvas: this.$refs.pixi,
         })
-
-        // Append the canvas to the DOM
-        if (this.$refs.pixiContainer) {
-          this.$refs.pixiContainer.appendChild(app.canvas)
-          console.log('Pixi.js canvas appended successfully.')
-        } else {
-          console.error('Pixi.js container ref is not found.')
-        }
 
         // Check and log canvas size
         const canvas = app.canvas
@@ -83,8 +88,8 @@ export default {
         const chromPadding = 25 // Padding between chromosome grids
 
         // Calculate the number of columns and rows based on container size
-        const containerWidth = this.$refs.pixiContainer.clientWidth
-        const containerHeight = this.$refs.pixiContainer.clientHeight
+        const containerWidth = this.$refs.pixi.clientWidth
+        const containerHeight = this.$refs.pixi.clientHeight
         console.log('containerWidth', containerWidth)
         console.log('containerHeight', containerHeight)
 
@@ -248,20 +253,19 @@ export default {
         )
 
         // --- D3.js Lasso Setup ---
-        // const svg = d3
-        //   .select(this.$refs.pixiContainer)
-        //   .append('svg')
-        //   .attr('width', window.innerWidth)
-        //   .attr('height', window.innerHeight)
-        //   .style('position', 'absolute')
-        //   .style('top', '0')
-        //   .style('left', '0')
-        //   .style('pointer-events', 'none') // Ensure Pixi.js captures pointer events
+        const svg = d3
+          .select(this.$refs.lasso)
+          .attr('width', window.innerWidth)
+          .attr('height', window.innerHeight)
+          .style('position', 'absolute')
+          .style('top', '0')
+          .style('left', '0')
+          .style('pointer-events', 'none') // Ensure Pixi.js captures pointer events
 
-        // // Lasso initialization
-        // const lassoInstance = lasso()
-        //   .targetArea(d3.select(canvas)) // canvas as HTMLCanvasElement
-        //   .closePathDistance(150)
+        // Lasso initialization
+        const lassoInstance = lasso()
+          .targetArea(d3.select(canvas)) // canvas as HTMLCanvasElement
+          .closePathDistance(150)
 
         // // Lasso selection logic
         // lassoInstance.on('start', () => {
@@ -299,11 +303,11 @@ export default {
         // })
 
         // // Attach lasso to Pixi.js objects
-        // lassoInstance.items(app.stage.children)
-        // console.log('lassoItems', app.stage.children)
+        lassoInstance.items(circleContainer.children)
+        console.log('cicrleContainer.children', circleContainer.children)
 
         // // Call lasso on SVG container
-        // svg.select('g.lasso').call(lassoInstance) // d3 code
+        svg.select('g.lasso').call(lassoInstance) // d3 code
 
         app.stage.addChild(foregroundContainer)
 
@@ -449,5 +453,22 @@ div {
 }
 canvas {
   display: block; /* Ensure the canvas is displayed as a block-level element */
+}
+
+:deep(g.lasso path) {
+  stroke: #007bff;
+  stroke-width: 2px;
+}
+:deep(g.lasso .drawn) {
+  fill: #007bff;
+  fill-opacity: 0.2;
+}
+:deep(g.lasso .loop_close) {
+  fill: none;
+  stroke-dasharray: 4, 4;
+}
+:deep(g.lasso .origin) {
+  fill: #007bff;
+  fill-opacity: 0.5;
 }
 </style>
