@@ -1,5 +1,5 @@
 <template>
-  <div style="position: relative">
+  <div class="child-container" ref="view">
     <canvas ref="pixi"></canvas>
     <svg ref="lasso"><g class="lasso"></g></svg>
   </div>
@@ -46,21 +46,22 @@ export default {
       try {
         // // Create a PIXI.Application instance
         const app = new PIXI.Application()
+        this.app = app
 
         // to-do:
         // - use auto detect renderer instead of graphics object
         // - resize listener when menu collapses
-        // - calculate radius based on availabe screen space
-        // - space grid a bit more every 5 columns
+        // - calculate grid and radius based on availabe screen space
 
         // Initialize the application
         await app.init({
           width: window.innerWidth,
           height: window.innerHeight,
           backgroundColor: 0xffffff,
-          resolution: window.devicePixelRatio || 1, // Use device's pixel ratio for high-res screens
+          // resolution: window.devicePixelRatio || 1,
           antialias: true,
           canvas: this.$refs.pixi,
+          resizeTo: this.$refs.view, // or window
         })
 
         // Check and log canvas size
@@ -68,28 +69,25 @@ export default {
         console.log('Initial Canvas Size:', canvas.width, 'x', canvas.height)
 
         // Set the canvas size dynamically
-        this.updateCanvasSize(app)
+        this.resizeWindow(app)
 
         // Create a foreground container for hover texts
         const foregroundContainer = new PIXI.Container()
-
         const circleContainer = new PIXI.Container()
 
         // Add the foreground container to the stage last
         app.stage.addChild(foregroundContainer)
         app.stage.addChild(circleContainer)
 
-        // // Create a Graphics object
-        // const graphics = new PIXI.Graphics()
-
+        const devicePixelRatio = window.devicePixelRatio || 1
+        console.log('devicePixelRatio', devicePixelRatio)
         const padding = 10
-        const circleRadius = 2
-        const circleSpacing = 3 * circleRadius
+        const circleRadius = 5 * devicePixelRatio
+        const circleSpacing = (3 * circleRadius) / devicePixelRatio
         const chromPadding = 25 // Padding between chromosome grids
 
-        // Calculate the number of columns and rows based on container size
-        const containerWidth = this.$refs.pixi.clientWidth
-        const containerHeight = this.$refs.pixi.clientHeight
+        const containerWidth = this.$refs.pixi.clientWidth * devicePixelRatio
+        const containerHeight = this.$refs.pixi.clientHeight * devicePixelRatio
         console.log('containerWidth', containerWidth)
         console.log('containerHeight', containerHeight)
 
@@ -112,8 +110,6 @@ export default {
         console.log('totalGridWidth', totalGridWidth)
         console.log('totalGridHeight', totalGridHeight)
 
-        let tooltip = null
-
         // data
         console.log('sequences', this.sequences)
         const sequences_sorted = this.sequences.sort(
@@ -124,76 +120,6 @@ export default {
         const sequencesGrouped =
           this.groupSequencesByChromosome(sequences_sorted)
         console.log('sequencesGrouped', sequencesGrouped)
-
-        // <---------------------Create graphics circle objects---------------------->
-        // // Loop through the sorted data and draw circles in a grid
-        // const circles = []
-        // sequences_sorted.forEach((item, index) => {
-        //   const row = Math.floor(index / numCols)
-        //   const col = index % numCols
-
-        //   // Position each circle based on the calculated grid and padding
-        //   const x = 10 + col * circleSpacing + circleRadius
-        //   const y = 10 + row * circleSpacing + circleRadius
-        //   // console.log('x', x, 'y', y)
-
-        //   // Create individual circle containers to handle interactivity
-        //   const circle = new PIXI.Graphics()
-        //   // alternatief: new PIXI.Sprite() -- render texture
-
-        //   // Draw the circle
-        //   circle.circle(x, y, circleRadius)
-        //   circle.fill(0xd3d3d3)
-
-        //   // Make the circle interactive
-        //   circle.interactive = true
-        //   circle.buttonMode = true
-
-        //   // // Create the tooltip using PIXI.Text (hidden by default)
-        // if (!tooltip) {
-        //   tooltip = new PIXI.Text({
-        //     text: 'tooltip',
-        //     style: {
-        //       fontSize: 12,
-        //       fill: 0xd62728,
-        //       align: 'left',
-        //     },
-        //   })
-        //   tooltip.visible = false // Hide initially
-        //   app.stage.addChild(tooltip)
-        // }
-
-        // // Hover effect
-        // circle.on('mouseover', (event) => {
-        //   // Change circle color and size on hover
-        //   circle.clear()
-        //   circle.circle(x, y, circleRadius + 2)
-        //   circle.fill(0xd62728)
-
-        //   // Show sequence_length as tooltip
-        //   tooltip.text = `Sequence Length: \n ${
-        //     item.sequence_length.toFixed(2) / 1000000
-        //   } Mb`
-        //   tooltip.x = x + 10
-        //   tooltip.y = y - 10
-        //   tooltip.visible = true
-        // })
-
-        // // Reset on hover out
-        // circle.on('mouseout', () => {
-        //   circle.clear()
-        //   circle.circle(x, y, circleRadius)
-        //   circle.fill(0xd3d3d3)
-
-        //   // Hide the tooltip on mouse out
-        //   tooltip.visible = false
-        // })
-
-        //   // Add the circle to the stage
-        //   app.stage.addChild(circle)
-        //   circles.push(circle)
-        // })
-        // <----------------------------------------------------------->
 
         // <---------------------Create circle sprites ---------------->
         this.createCircleTexture(circleRadius, app)
@@ -209,8 +135,11 @@ export default {
             const row = index % 10
             const col = Math.floor(index / 10)
 
-            const x = currentXOffset + col * circleSpacing + circleRadius
-            const y = padding + row * circleSpacing + circleRadius
+            const x =
+              (currentXOffset + col * circleSpacing + circleRadius) *
+              devicePixelRatio
+            const y =
+              (padding + row * circleSpacing + circleRadius) * devicePixelRatio
 
             this.createSprites(
               x,
@@ -230,33 +159,11 @@ export default {
         console.log('circles', circles)
         app.render()
 
-        // <---------------------Simple grid  ---------------------->
-        // sequences_sorted.forEach((item, index) => {
-        //   const row = Math.floor(index / numCols)
-        //   const col = index % numCols
-
-        //   // Position each circle based on the calculated grid and padding
-        //   const x = 10 + col * circleSpacing + circleRadius
-        //   const y = 10 + row * circleSpacing + circleRadius
-
-        //   this.createSprites(x, y, app, circles)
-        // })
-        // console.log('circles', circles)
-
-        // // Render the Pixi stage initially
-        // app.render()
-        // <-------------------------------------------------------->
-
-        console.log(
-          'html canvas element check',
-          canvas instanceof HTMLCanvasElement
-        )
-
-        // --- D3.js Lasso Setup ---
+        // --- Lasso Setup ---
         const svg = d3
           .select(this.$refs.lasso)
-          .attr('width', window.innerWidth)
-          .attr('height', window.innerHeight)
+          .attr('width', this.$el.parentElement.clientWidth)
+          .attr('height', this.$el.parentElement.clientHeigh)
           .style('position', 'absolute')
           .style('top', '0')
           .style('left', '0')
@@ -266,45 +173,15 @@ export default {
         const lassoInstance = lasso()
           .targetArea(d3.select(canvas)) // canvas as HTMLCanvasElement
           .closePathDistance(150)
-
-        // // Lasso selection logic
-        // lassoInstance.on('start', () => {
-        //   // Remove previous selection effects
-        //   circles.forEach((circle) => {
-        //     circle.clear()
-        //     circle.drawCircle(0, 0, 10)
-        //     circle.fill(0x66ccff) // Default fill color
-        //   })
-        // })
-
-        // lassoInstance.on('draw', () => {
-        //   // Update styles of selected items
-        //   const selectedCircles = lassoInstance.possibleItems()
-
-        //   selectedCircles.each(function (d, i) {
-        //     d.clear()
-        //     d.drawCircle(0, 0, 10)
-        //     d.fill(0xff0000) // Highlight selected circles
-        //   })
-
-        //   app.render() // Re-render the stage after selection
-        // })
-
-        // lassoInstance.on('end', () => {
-        //   // Apply final selection styles
-        //   const selectedCircles = lassoInstance.selectedItems()
-        //   selectedCircles.each(function (d, i) {
-        //     d.clear()
-        //     d.drawCircle(0, 0, 10)
-        //     d.fill(0x00ff00) // Final color for selected circles
-        //   })
-
-        //   app.render() // Re-render the stage
-        // })
+          .on('start', this.lassoStart)
+          .on('draw', this.lassoDraw)
+          .on('end', this.lassoEnd)
 
         // // Attach lasso to Pixi.js objects
         lassoInstance.items(circleContainer.children)
         console.log('cicrleContainer.children', circleContainer.children)
+
+        this.lassoInstance = lassoInstance
 
         // // Call lasso on SVG container
         svg.select('g.lasso').call(lassoInstance) // d3 code
@@ -313,14 +190,8 @@ export default {
 
         // Handle window resizing
         window.addEventListener('resize', () => {
-          this.updateCanvasSize(app)
+          this.resizeWindow(app)
           //   app.renderer.resize(window.innerWidth, window.innerHeight)
-          console.log(
-            'Canvas resized to:',
-            window.innerWidth,
-            'x',
-            window.innerHeight
-          )
         })
       } catch (error) {
         console.error('Error initializing Pixi.js:', error)
@@ -328,12 +199,112 @@ export default {
     })
   },
   methods: {
+    lassoStart() {
+      console.log('Lasso selection started')
+      // console.log('Previous selected sprites:', this.selectedSprites)
+      if (this.selectedSprites) {
+        const previouslySelectedSprites = this.selectedSprites
+        previouslySelectedSprites.forEach((sprite) => {
+          sprite.tint = 0xffffff
+          sprite.tint = 0x7f7f7f // slightly darker to indicate already visited points
+        })
+      }
+    },
+    lassoDraw() {},
+    lassoEnd() {
+      console.log('lasso end')
+
+      // add the drawn path for the lasso
+      const dyn_path = d3
+        .select(this.$refs.lasso)
+        .select('g.lasso')
+        .select('g.lasso')
+        .select('path.drawn')
+
+      // add a closed path
+      const close_path = d3
+        .select(this.$refs.lasso)
+        .select('g.lasso')
+        .select('g.lasso')
+        .select('path.loop_close')
+
+      // add an origin node
+      const origin_node = d3
+        .select(this.$refs.lasso)
+        .select('g.lasso')
+        .select('g.lasso')
+        .select('circle.origin')
+
+      const lassoPath = dyn_path.attr('d') // Get the current lasso path
+      console.log('Lasso path data at end:', lassoPath)
+
+      if (!lassoPath || lassoPath.length < 3) {
+        // A polygon needs at least 3 points
+        // console.warn('Lasso selection is empty or too small.')
+        return // Exit early
+      }
+
+      const polygonPoints = this.getPolygonFromPath(dyn_path.node())
+
+      // Log the points to the console
+      console.log('Polygon Points:', polygonPoints)
+      const selectedSprites = this.lassoInstance.items().filter((sprite) => {
+        const { x, y } = sprite.position
+        // console.log('{ x, y } ', { x, y })
+        return this.isPointInPolygon(x, y, polygonPoints) // Check if sprite is inside the lasso polygon
+      })
+
+      setTimeout(() => {
+        dyn_path.attr('d', null) // Clear the lasso path after a delay if needed
+        close_path.attr('d', null) // Clear the close path after a delay if needed
+      }, 1000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
+      origin_node.attr('display', 'none')
+
+      console.log('Lasso path cleared in drawEnd.')
+
+      // Apply effects to selected sprites
+      selectedSprites.forEach((sprite) => {
+        sprite.tint = 0x007bff // Set sprite color to blue
+      })
+
+      console.log('Selected sprites:', selectedSprites)
+      this.selectedSprites = selectedSprites
+    },
+    getPolygonFromPath(pathElement) {
+      const pathLength = pathElement.getTotalLength()
+      const numPoints = 1000
+      const points = []
+
+      for (let i = 0; i <= numPoints; i++) {
+        const point = pathElement.getPointAtLength((i / numPoints) * pathLength)
+        points.push([point.x, point.y])
+      }
+
+      return points
+    },
+    isPointInPolygon(x, y, polygon) {
+      const dpr = window.devicePixelRatio || 1
+      x /= dpr
+      y /= dpr
+      let inside = false
+
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][0],
+          yi = polygon[i][1]
+        const xj = polygon[j][0],
+          yj = polygon[j][1]
+        const intersect =
+          yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
+        if (intersect) inside = !inside
+      }
+      return inside
+    },
     createCircleTexture(circleRadius, app) {
       // Use PIXI.Graphics to draw a circle
       const graphics = new PIXI.Graphics()
       // Draw the circle
       graphics.circle(circleRadius, circleRadius, circleRadius)
-      graphics.fill(0xd3d3d3)
+      graphics.fill(0xffffff)
       // Generate a texture from the Graphics object
       this.circleTexture = app.renderer.generateTexture(graphics)
     },
@@ -356,6 +327,7 @@ export default {
       const circleSprite = new PIXI.Sprite(this.circleTexture)
       circleSprite.x = x
       circleSprite.y = y
+      circleSprite.tint = 0xd3d3d3
 
       // Add interactivity to the sprite
       circleSprite.interactive = true
@@ -369,7 +341,7 @@ export default {
             : (sequence_length / 1000).toFixed(2) + ' Kb'
         }`,
         style: {
-          fontSize: 8,
+          fontSize: 12 * devicePixelRatio,
           fill: 0xffffff,
           align: 'left',
           resolution: window.devicePixelRatio || 1,
@@ -420,12 +392,75 @@ export default {
         chromosome: chromosome,
       })
     },
-    updateCanvasSize(app) {
-      const container = this.$refs.pixiContainer
-      if (container) {
-        // Set canvas size to fit the container
-        app.renderer.resize(container.clientWidth, container.clientHeight)
-      }
+    resizeWindow(app) {
+      const devicePixelRatio = window.devicePixelRatio || 1
+      const parentWidth = this.$el.parentElement.clientWidth
+      const parentHeight = this.$el.parentElement.clientHeight
+      console.log(`${parentWidth} x ${parentHeight}`)
+      console.log(`devicePixelRatio ${devicePixelRatio}`)
+
+      const canvasWidth = parentWidth * devicePixelRatio
+      const canvasHeight = parentHeight * devicePixelRatio
+
+      app.renderer.resize(canvasWidth, canvasHeight)
+      console.log(`canvas resize ${canvasWidth} x ${canvasHeight}`)
+      const canvas = app.canvas
+      canvas.style.width = `${parentWidth}px`
+      canvas.style.height = `${parentHeight}px`
+
+      const svgElement = this.$refs.lasso
+      svgElement.setAttribute('width', canvasWidth)
+      svgElement.setAttribute('height', canvasHeight)
+      svgElement.style.width = `${parentWidth}px`
+      svgElement.style.height = `${parentHeight}px`
+
+      console.log('final width canvas after resize: ', canvas.width)
+
+      // // Access the parent element of this component's root element
+      // const parentElement = this.$el.parentElement
+      // const canvas = app.canvas
+      // const parentDiv = this.$refs.view
+      // const svgElement = this.$refs.lasso
+      // const devicePixelRatio = window.devicePixelRatio || 1
+
+      // // Check if parentElement exists, then log its width
+      // if (parentElement) {
+      //   const parentWidth = this.$el.parentElement.clientWidth
+      //   const parentHeight = this.$el.parentElement.clientHeight
+      //   console.log(
+      //     `Parent width:  ${parentWidth}, Parent height: ${parentHeight}`
+      //   )
+
+      //   console.log(`devicePixelRatio: ${devicePixelRatio}`)
+
+      //   // Set canvas size based on devicePixelRatio
+      //   const canvasWidth = parentWidth / devicePixelRatio
+      //   const canvasHeight = parentHeight / devicePixelRatio
+
+      //   // Canvas resize
+      //   app.renderer.resize(canvasWidth, canvasHeight)
+      //   canvas.style.width = `${parentWidth}px`
+      //   canvas.style.height = `${parentHeight}px`
+
+      //   console.log('Canvas resized to:', parentWidth, 'x', parentHeight)
+
+      //   // svg resize
+      //   svgElement.setAttribute('width', parentWidth)
+      //   svgElement.setAttribute('height', parentHeight)
+      //   svgElement.style.width = `${parentWidth}px`
+      //   svgElement.style.height = `${parentWidth}px`
+      //   // svgElement.setAttribute('preserveAspectRatio', 'none')
+
+      //   // Debug: Log both the attribute and inline style values
+      //   console.log(
+      //     `SVG Attributes - width: ${svgElement.getAttribute(
+      //       'width'
+      //     )}, height: ${svgElement.getAttribute('height')}`
+      //   )
+      //   console.log(
+      //     `SVG Styles - width: ${svgElement.style.width}, height: ${svgElement.style.height}`
+      //   )
+      // }
     },
     groupSequencesByChromosome(data) {
       const grouped = {}
@@ -446,13 +481,24 @@ export default {
 
 <style scoped>
 div {
-  width: 100vw;
-  height: 100vh;
   overflow: hidden;
-  position: relative; /* Ensure the container has relative positioning */
+  position: relative;
 }
-canvas {
-  display: block; /* Ensure the canvas is displayed as a block-level element */
+
+.child-container {
+  flex: 1; /* This will make it inherit the available width */
+  width: 100%; /* Ensures full width */
+}
+
+/* canvas {
+  height: 100%;
+  width: 100%;
+} */
+
+svg {
+  height: 100%;
+  width: 100%;
+  position: relative;
 }
 
 :deep(g.lasso path) {
@@ -470,5 +516,21 @@ canvas {
 :deep(g.lasso .origin) {
   fill: #007bff;
   fill-opacity: 0.5;
+}
+
+.selected {
+  fill: orange; /* Highlight selected items in orange */
+  stroke: darkorange;
+  stroke-width: 2px;
+}
+
+.possible {
+  fill: lightblue; /* Temporarily highlight items inside the lasso path */
+  stroke: blue;
+  stroke-width: 2px;
+}
+
+.not-selected {
+  opacity: 0.3; /* Dim items that are not selected */
 }
 </style>

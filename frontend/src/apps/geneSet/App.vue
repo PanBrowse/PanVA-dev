@@ -60,7 +60,7 @@ export default {
       <Unphased />
     </template>
 
-    <div class="content">
+    <div class="content" ref="parentElement">
       <PixiCanvas />
     </div>
 
@@ -110,9 +110,6 @@ export default {
   flex: 1;
   display: flex;
   overflow: hidden;
-}
-
-.pixi-container {
   width: 100%;
   height: 100%;
 }
