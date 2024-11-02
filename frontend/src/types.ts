@@ -129,21 +129,114 @@ export type Group = {
 /**
  * Data structures.
  */
-// Exactly the same as `MetadataValue`, but we allow multiple `MetadataCategorical` as an array.
-export type HomologyMetadataValue =
-  | MetadataBoolean
-  | MetadataCategorical
-  | MetadataCategorical[]
-  | MetadataQuantitative
-export type HomologyMetadata = Record<string, HomologyMetadataValue>
 
-export type Homology = {
-  id: string
-  members: number
-  alignment_length: number
-  metadata: HomologyMetadata
+/**
+ * GENE SET
+ */
+// Type for sequence info
+// Type genome
+export interface Genome {
+  uid: string
+  name: string
+  sequences: SequenceInfo[]
 }
 
+// Type for sequence info
+export interface SequenceInfo {
+  uid: string
+  sequence_length_nuc: number
+  gene_count: number
+  phasing: string | null
+  name: string
+  id: string
+  loci: string[]
+}
+
+export interface Locus {
+  uid: string
+  loci_length_nuc: number
+  genes: Gene[]
+  name: string
+  start: number
+  end: number
+}
+
+// Type for gene
+export interface Gene {
+  uid: string
+  names: string[]
+  strand: number
+  noncoding_rnas: { trnas: any[]; rrnas: any[] }
+  start: number
+  sequence_id: string
+  end: number
+  label: string
+  gene_length_nuc: number
+  mrnas: string[]
+}
+
+export interface Mrna {
+  uid: string
+  exons: Exon[]
+  cds_length_nuc: number
+  start: number[]
+  mrna_length_nuc: number[]
+  functional_domains: Domain[]
+  end: number[]
+  label: string
+  protein_length_aa: number[]
+  cdss: Cds[]
+}
+
+export interface Domain {
+  uid: string
+  domain_id: string
+  domain_type: string
+  name: string
+}
+
+export interface Exon {
+  uid: string
+  start: number
+  end: number
+}
+
+export interface Cds {
+  uid: string
+  start: number
+  end: number
+}
+
+export interface HomologyGroup {
+  uid: string
+  hidden: boolean
+  label: string
+  mrnas: Mrna[]
+}
+
+export interface HomologyLink {
+  uid: string
+  identity: number
+  query: { uid: string } // mrna uid
+  target: { uid: string } // mrna uid
+}
+
+// Type for the overall hierarchical structure
+export interface GenomeData {
+  genomes: Genome[]
+  sequences: SequenceInfo[]
+  loci: Locus[]
+  // repeats: any[]
+  genes: Gene[]
+  mrnas: Mrna[]
+  cds: Cds[]
+  exons: Exon[]
+  functional_domains: Domain[]
+  groups: HomologyGroup[]
+  links: HomologyLink[]
+}
+
+// old types
 export type SequenceMetrics = {
   id: number
   sequence_id: string
@@ -189,6 +282,25 @@ export type GroupInfo = {
   cds_length_nuc: number
   protein_length_AA: number
   phasing_chromosome: string
+}
+
+/**
+ *  PANVA
+ */
+
+// Exactly the same as `MetadataValue`, but we allow multiple `MetadataCategorical` as an array.
+export type HomologyMetadataValue =
+  | MetadataBoolean
+  | MetadataCategorical
+  | MetadataCategorical[]
+  | MetadataQuantitative
+export type HomologyMetadata = Record<string, HomologyMetadataValue>
+
+export type Homology = {
+  id: string
+  members: number
+  alignment_length: number
+  metadata: HomologyMetadata
 }
 
 export type Alignment = {

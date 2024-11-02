@@ -2,6 +2,7 @@ import { ConsoleSqlOutlined } from '@ant-design/icons-vue'
 import { type Dictionary, sortBy } from 'lodash'
 import { defineStore } from 'pinia'
 
+import { fetchGenomeData } from '@/api/geneSet'
 import {
   fetchClusteringOrder,
   fetchGroupInfo,
@@ -15,13 +16,27 @@ import {
   sortedGroupInfosLookup,
   sortedSequenceIdsLookup,
 } from '@/helpers/chromosome'
+import type { GenomeData } from '@/types'
 import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
 import { useGlobalStore } from './global'
 
+export const useGenomeStore = defineStore({
+  id: 'genome',
+  state: () => ({
+    genomeData: null as GenomeData | null,
+  }),
+  actions: {
+    async loadGenomeData() {
+      this.genomeData = await fetchGenomeData()
+    },
+  },
+})
+
 export const useGeneSetStore = defineStore('geneSet', {
   state: () => ({
     // Data from API
+    genomeData: null as GenomeData | null,
     homologies: [] as Homology[],
     sequences: [] as SequenceMetrics[],
     groupInfo: [] as GroupInfo[],
@@ -87,6 +102,15 @@ export const useGeneSetStore = defineStore('geneSet', {
       //   232263008, 232263009, 232269781, 232269782, 232273529,
       // ]
 
+      try {
+        this.genomeData = await fetchGenomeData()
+      } catch (error) {
+        global.setError({
+          message: 'Could not load or parse genome data.',
+          isFatal: true,
+        })
+        throw error
+      }
       try {
         this.homologies = sortBy(await fetchHomologies(), 'id')
       } catch (error) {
