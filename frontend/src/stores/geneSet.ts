@@ -28,6 +28,7 @@ export const useGenomeStore = defineStore({
     genomeData: null as GenomeData | null,
     selectedGenomes: [] as string[],
     selectedSequences: [] as string[],
+    selectedSequencesLasso: [] as string[],
   }),
   getters: {
     genomeCount: (state) => state.genomeData?.genomes?.length || 0,
@@ -54,6 +55,9 @@ export const useGenomeStore = defineStore({
     },
     setSelectedSequences(sequenceNames: string[]) {
       this.selectedSequences = sequenceNames
+    },
+    setSelectedSequencesLasso(sequenceUids: string[]) {
+      this.selectedSequencesLasso = sequenceUids
     },
   },
 })

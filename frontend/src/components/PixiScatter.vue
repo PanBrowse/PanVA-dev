@@ -260,10 +260,9 @@ export default {
         .select('circle.origin')
 
       const lassoPath = dyn_path.attr('d') // Get the current lasso path
-      console.log('Lasso path data at end:', lassoPath)
+      // console.log('Lasso path data at end:', lassoPath)
 
       if (!lassoPath || lassoPath.length < 3) {
-        // A polygon needs at least 3 points
         // console.warn('Lasso selection is empty or too small.')
         return // Exit early
       }
@@ -293,6 +292,19 @@ export default {
 
       console.log('Selected sprites:', selectedSprites)
       this.selectedSprites = selectedSprites
+      // Flattening the array and extracting UIDs
+      const flattenedUids = selectedSprites.flat().map((sprite) => sprite.uid)
+
+      console.log(flattenedUids)
+
+      const genomeStore = useGenomeStore() // Create an instance of the store
+      // Save UIDs to the store
+      genomeStore.setSelectedSequencesLasso(flattenedUids)
+      console.log(
+        'Updated store with UIDs:',
+        genomeStore.selectedSequencesLasso
+      ) // Log the store state
+      this.$forceUpdate()
     },
     getPolygonFromPath(pathElement) {
       const pathLength = pathElement.getTotalLength()
