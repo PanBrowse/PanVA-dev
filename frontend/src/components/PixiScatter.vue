@@ -12,6 +12,7 @@ import * as PIXI from 'pixi.js'
 
 import { lasso } from '@/components/Lasso.js'
 import { useGeneSetStore } from '@/stores/geneSet'
+import { useGenomeStore } from '@/stores/geneSet'
 
 PIXI.Sprite.prototype.getBoundingClientRect = function () {
   return {
@@ -40,10 +41,17 @@ export default {
       'sequences',
       // 'percentageGC',
     ]),
+    // ...mapState(useGenomeStore, ['genomes', 'sequences']),
   },
   mounted() {
     this.$nextTick(async () => {
       try {
+        const genomeStore = useGenomeStore()
+        console.log(
+          'sequences from genomeStore: ',
+          genomeStore.genomeData.genomes
+        )
+
         // // Create a PIXI.Application instance
         const app = new PIXI.Application()
         this.app = app
@@ -91,15 +99,20 @@ export default {
         console.log('containerWidth', containerWidth)
         console.log('containerHeight', containerHeight)
 
+        // load data
+        const genomes = genomeStore.genomeData.genomes
+
         let numCols = Math.floor(
           (containerWidth - 2 * padding) /
             (2 * circleRadius + 2 * circleSpacing)
         )
         numCols = Math.floor(numCols / 5) * 5 // Make numCols a multiple of 5
-        console.log('numCols', numCols, this.sequences.length)
+        // console.log('numCols', numCols, this.sequences.length)
+        console.log('numCols', numCols)
 
         // Calculate the number of rows needed to fit all the points
-        const numRows = Math.ceil(this.sequences.length / numCols)
+        // const numRows = Math.ceil(this.sequences.length / numCols)
+        const numRows = Math.ceil(genomes.length / numCols)
         console.log('numRows', numRows)
 
         // Calculate the total grid width and height
@@ -110,16 +123,16 @@ export default {
         console.log('totalGridWidth', totalGridWidth)
         console.log('totalGridHeight', totalGridHeight)
 
-        // data
-        console.log('sequences', this.sequences)
-        const sequences_sorted = this.sequences.sort(
-          (a, b) => b.sequence_length - a.sequence_length
-        )
-        console.log('sequences sorted', sequences_sorted)
+        // test with old potato data
+        // console.log('sequences', this.sequences)
+        // const sequences_sorted = this.sequences.sort(
+        //   (a, b) => b.sequence_length - a.sequence_length
+        // )
+        // console.log('sequences sorted', sequences_sorted)
 
-        const sequencesGrouped =
-          this.groupSequencesByChromosome(sequences_sorted)
-        console.log('sequencesGrouped', sequencesGrouped)
+        // const sequencesGrouped =
+        //   this.groupSequencesByChromosome(sequences_sorted)
+        // console.log('sequencesGrouped', sequencesGrouped)
 
         // <---------------------Create circle sprites ---------------->
         this.createCircleTexture(circleRadius, app)
@@ -127,34 +140,45 @@ export default {
         const circles = []
         let currentXOffset = padding
 
-        // Loop through each chromosome group and create a grid for its sequences
-        Object.entries(sequencesGrouped).forEach(([chromosome, sequences]) => {
-          let numCols = Math.ceil(sequences.length / 10) // max 10 rows
+        // Loop through each genome and create a unit grid for its sequences
+        Object.entries(genomes).forEach(([_, genomeData]) => {
+          const sequences = genomeData.sequences
 
-          sequences.forEach((sequence, index) => {
-            const row = index % 10
-            const col = Math.floor(index / 10)
+          if (Array.isArray(sequences)) {
+            let numCols = Math.ceil(sequences.length / 10) // max 10 rows
 
-            const x =
-              (currentXOffset + col * circleSpacing + circleRadius) *
-              devicePixelRatio
-            const y =
-              (padding + row * circleSpacing + circleRadius) * devicePixelRatio
+            sequences.forEach((sequence, index) => {
+              const row = index % 10
+              const col = Math.floor(index / 10)
 
-            this.createSprites(
-              x,
-              y,
-              chromosome,
-              sequence.sequence_length,
-              app,
-              circles,
-              foregroundContainer,
-              circleContainer
+              const x =
+                (currentXOffset + col * circleSpacing + circleRadius) *
+                devicePixelRatio
+              const y =
+                (padding + row * circleSpacing + circleRadius) *
+                devicePixelRatio
+
+              this.createSprites(
+                x,
+                y,
+                genomeData.name,
+                sequence.sequence_length_nuc,
+                sequence.name,
+                app,
+                circles,
+                foregroundContainer,
+                circleContainer
+              )
+            })
+
+            // After placing the grid for this chromosome, move the horizontal offset
+            currentXOffset += numCols * circleSpacing + chromPadding
+          } else {
+            console.warn(
+              `Expected sequences to be an array for genome ${genomeData.name}, but got:`,
+              sequences
             )
-          })
-
-          // After placing the grid for this chromosome, move the horizontal offset
-          currentXOffset += numCols * circleSpacing + chromPadding
+          }
         })
         console.log('circles', circles)
         app.render()
@@ -311,8 +335,9 @@ export default {
     createSprites(
       x,
       y,
-      chromosome,
+      genome_name,
       sequence_length,
+      name,
       app,
       circles,
       foregroundContainer,
@@ -335,7 +360,7 @@ export default {
 
       // Create a PIXI.Text object to show the hover text (hidden by default)
       const hoverText = new PIXI.Text({
-        text: `${
+        text: `${genome_name}\n${name}\n${
           sequence_length > 100000
             ? (sequence_length / 1000000).toFixed(2) + ' Mb'
             : (sequence_length / 1000).toFixed(2) + ' Kb'
@@ -351,7 +376,12 @@ export default {
 
       // Create a background rectangle for the text
       const textBackground = new PIXI.Graphics()
-      textBackground.rect(0, 0, hoverText.width + 10, hoverText.height + 5) // Add some padding around the text
+      textBackground.rect(
+        0,
+        0,
+        hoverText.width + 10,
+        3 * (hoverText.height + 5)
+      ) // Add some padding around the text
       textBackground.fill({ color: 0x000000, alpha: 0.7 }) // Semi-transparent black background
       textBackground.visible = false // Hidden initially
 
@@ -389,7 +419,7 @@ export default {
         x: x,
         y: y,
         selected: false, // Track selection status
-        chromosome: chromosome,
+        genome: genome_name,
       })
     },
     resizeWindow(app) {

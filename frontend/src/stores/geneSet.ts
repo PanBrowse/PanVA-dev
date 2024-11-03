@@ -1,6 +1,7 @@
 import { ConsoleSqlOutlined } from '@ant-design/icons-vue'
 import { type Dictionary, sortBy } from 'lodash'
 import { defineStore } from 'pinia'
+import { computed, ref, watch } from 'vue'
 
 import { fetchGenomeData } from '@/api/geneSet'
 import {
@@ -25,10 +26,34 @@ export const useGenomeStore = defineStore({
   id: 'genome',
   state: () => ({
     genomeData: null as GenomeData | null,
+    selectedGenomes: [] as string[],
+    selectedSequences: [] as string[],
   }),
+  getters: {
+    genomeCount: (state) => state.genomeData?.genomes?.length || 0,
+    sequenceCount: (state) => state.genomeData?.sequences?.length || 0,
+    lociCount: (state) => state.genomeData?.loci?.length || 0,
+    geneCount: (state) => state.genomeData?.genes?.length || 0,
+    mrnaCount: (state) => state.genomeData?.mrnas?.length || 0,
+    cdsCount: (state) => state.genomeData?.cds?.length || 0,
+    exonCount: (state) => state.genomeData?.exons?.length || 0,
+    domainCount: (state) => state.genomeData?.functional_domains?.length || 0,
+    homologyGroupCount: (state) => state.genomeData?.groups?.length || 0,
+    homologyLinkCount: (state) => state.genomeData?.links?.length || 0,
+    genomeNames: (state) =>
+      state.genomeData?.genomes?.map((genome) => genome.name) || [],
+    sequenceNames: (state) =>
+      state.genomeData?.sequences?.map((sequence) => sequence.name) || [],
+  },
   actions: {
     async loadGenomeData() {
       this.genomeData = await fetchGenomeData()
+    },
+    setSelectedGenomes(genomeNames: string[]) {
+      this.selectedGenomes = genomeNames
+    },
+    setSelectedSequences(sequenceNames: string[]) {
+      this.selectedSequences = sequenceNames
     },
   },
 })

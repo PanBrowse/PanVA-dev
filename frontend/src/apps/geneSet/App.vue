@@ -1,17 +1,20 @@
-<script lang="ts">
-import { Col, Row } from 'ant-design-vue'
+<script setup lang="ts">
+import { Col, Form, FormItem, Row, Select } from 'ant-design-vue'
 import { mapState } from 'pinia'
+import { computed, onMounted } from 'vue' // Import computed and any other reactivity functions you need
 
 import Layout from '@/components/Layout.vue'
 import LoadingScreen from '@/components/LoadingScreen.vue'
 // import Homologies from './visualizations/Homologies.vue'
 import PixiCanvas from '@/components/PixiScatter.vue'
 import { useGeneSetStore } from '@/stores/geneSet'
+import { useGenomeStore } from '@/stores/geneSet'
 
 import ContextOptions from './sidebar/ContextOptions.vue'
 import Filters from './sidebar/Filters.vue'
 import GraphicsOptions from './sidebar/GraphicsOptions.vue'
 import HomologyOverview from './sidebar/HomologyOverview.vue'
+import OverviewFilters from './sidebar/OverviewFilters.vue'
 import Sorting from './sidebar/Sorting.vue'
 import Unphased from './sidebar/Unphased.vue'
 import ChromosomeDetails from './visualizations/ChromosomeDetails.vue'
@@ -19,28 +22,39 @@ import ChromosomeOverview from './visualizations/ChromosomeOverview.vue'
 import Density from './visualizations/Density.vue'
 import GroupInfoTable from './visualizations/GroupInfoTable.vue'
 
-export default {
-  components: {
-    // Homologies,
-    ChromosomeOverview,
-    ChromosomeDetails,
-    Layout,
-    LoadingScreen,
-    Sorting,
-    Unphased,
-    Filters,
-    ContextOptions,
-    GraphicsOptions,
-    GroupInfoTable,
-    ARow: Row,
-    ACol: Col,
-    HomologyOverview,
-    PixiCanvas,
-  },
-  computed: {
-    ...mapState(useGeneSetStore, ['isInitialized', 'showTable', 'showDetails']),
-  },
-}
+// export default {
+//   components: {
+//     // Homologies,
+//     ChromosomeOverview,
+//     ChromosomeDetails,
+//     Layout,
+//     LoadingScreen,
+//     Sorting,
+//     Unphased,
+//     Filters,
+//     ContextOptions,
+//     GraphicsOptions,
+//     GroupInfoTable,
+//     ARow: Row,
+//     ACol: Col,
+//     HomologyOverview,
+//     PixiCanvas,
+//   },
+//   computed: {
+//     ...mapState(useGeneSetStore, ['isInitialized', 'showTable', 'showDetails']),
+//   },
+// }
+const geneSetStore = useGeneSetStore()
+const genomeStore = useGenomeStore()
+// Access state and computed properties if needed
+const isInitialized = computed(() => geneSetStore.isInitialized)
+const showTable = computed(() => geneSetStore.showTable)
+const showDetails = computed(() => geneSetStore.showDetails)
+
+// Load genome data when the component is mounted
+onMounted(() => {
+  genomeStore.loadGenomeData()
+})
 </script>
 
 <!-- <template>
@@ -53,6 +67,7 @@ export default {
   <Layout v-if="isInitialized">
     <template #sidebar>
       <HomologyOverview />
+      <OverviewFilters />
       <Filters />
       <Sorting />
       <GraphicsOptions />
