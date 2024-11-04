@@ -224,12 +224,23 @@ export default {
   methods: {
     lassoStart() {
       console.log('Lasso selection started')
-      // console.log('Previous selected sprites:', this.selectedSprites)
+      const genomeStore = useGenomeStore()
+      const trackerUids = genomeStore.selectedSequencesTracker
+
+      // Filter the sprites in lassoInstance based on sequence_uids in tracker
+      const trackedSprites = this.lassoInstance.items().filter((sprite) => {
+        return trackerUids.has(sprite.sequence_uid) // Check if sprite's UID is in the tracker
+      })
+
+      // Apply different tint to sprites in the tracker
+      trackedSprites.forEach((sprite) => {
+        sprite.tint = 0xa9a9a9 // darker tint for previously selected sprites
+      })
       if (this.selectedSprites) {
-        const previouslySelectedSprites = this.selectedSprites
-        previouslySelectedSprites.forEach((sprite) => {
-          sprite.tint = 0xffffff
-          sprite.tint = 0x7f7f7f // slightly darker to indicate already visited points
+        this.selectedSprites.forEach((sprite) => {
+          if (!trackerUids.has(sprite.sequence_uid)) {
+            sprite.tint = 0xd3d3d3 // default tint for unmatched sprites
+          }
         })
       }
     },
@@ -301,11 +312,18 @@ export default {
       const genomeStore = useGenomeStore() // Create an instance of the store
       // Save UIDs to the store
       genomeStore.setSelectedSequencesLasso(flattenedSequenceUids)
-      console.log(
-        'Updated store with UIDs:',
-        genomeStore.selectedSequencesLasso
-      ) // Log the store state
-      this.$forceUpdate()
+      // console.log(
+      //   'Updated store with current lasso selection:',
+      //   genomeStore.selectedSequencesLasso
+      // )
+
+      genomeStore.setSelectedSequencesTracker(flattenedSequenceUids)
+      // console.log(
+      //   'Updated store lasso selection tracker:',
+      //   genomeStore.selectedSequencesTracker
+      // )
+
+      this.$forceUpdate() // might not need this?
     },
     getPolygonFromPath(pathElement) {
       const pathLength = pathElement.getTotalLength()

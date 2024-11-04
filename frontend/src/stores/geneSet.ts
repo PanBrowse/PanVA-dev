@@ -29,6 +29,7 @@ export const useGenomeStore = defineStore({
     selectedGenomes: [] as string[],
     selectedSequences: [] as string[],
     selectedSequencesLasso: [] as string[],
+    selectedSequencesTracker: new Set(),
     genomeUids: [] as string[], // Array to store genome numbers in the loading order
     genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
     sequenceUids: [] as string[], // Array to store genome numbers in the loading order
@@ -85,6 +86,12 @@ export const useGenomeStore = defineStore({
     },
     setSelectedSequencesLasso(sequenceUids: string[]) {
       this.selectedSequencesLasso = sequenceUids
+    },
+    setSelectedSequencesTracker(sequenceUids: string[]) {
+      // Add each `sequenceUid` to `selectedSequencesLassoTracker`
+      sequenceUids.forEach((uid) => {
+        this.selectedSequencesTracker.add(uid)
+      })
     },
   },
 })
