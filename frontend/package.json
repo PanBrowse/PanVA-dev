@@ -36,6 +36,7 @@
     "lodash": "^4.17.21",
     "mitt": "^3.0.0",
     "pinia": "^2.0.23",
+    "pixi-filters": "^6.0.5",
     "pixi.js": "^8.3.4",
     "string-natural-compare": "^3.0.1",
     "vue": "^3.2.41",

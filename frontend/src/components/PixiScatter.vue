@@ -9,6 +9,7 @@
 import * as d3 from 'd3'
 import { mapActions, mapState } from 'pinia'
 import * as PIXI from 'pixi.js'
+import { DropShadowFilter } from 'pixi-filters'
 
 import { lasso } from '@/components/Lasso.js'
 import { useGeneSetStore } from '@/stores/geneSet'
@@ -349,7 +350,7 @@ export default {
       y,
       genome_name,
       sequence_length,
-      name,
+      sequence_name,
       app,
       circles,
       foregroundContainer,
@@ -370,9 +371,66 @@ export default {
       circleSprite.interactive = true
       circleSprite.buttonMode = true
 
-      // Create a PIXI.Text object to show the hover text (hidden by default)
-      const hoverText = new PIXI.Text({
-        text: `${genome_name}\n${name}\n${
+      const hoverTextGenomeLabel = new PIXI.Text({
+        text: 'genome nr: ',
+        style: {
+          fontSize: 12 * devicePixelRatio,
+          fill: 0xffffff,
+          fontWeight: 'bold',
+          align: 'left',
+          resolution: window.devicePixelRatio || 1,
+        },
+      })
+      hoverTextGenomeLabel.visible = false // Hidden initially
+
+      const hoverTextGenomeValue = new PIXI.Text({
+        text: `${genome_name}`,
+        style: {
+          fontSize: 12 * devicePixelRatio,
+          fill: 0xffffff,
+          align: 'left',
+          resolution: window.devicePixelRatio || 1,
+        },
+      })
+      hoverTextGenomeValue.visible = false
+
+      const hoverTextSeqNameLabel = new PIXI.Text({
+        text: 'sequence: ',
+        style: {
+          fontSize: 12 * devicePixelRatio,
+          fill: 0xffffff,
+          fontWeight: 'bold',
+          align: 'left',
+          resolution: window.devicePixelRatio || 1,
+        },
+      })
+      hoverTextSeqNameLabel.visible = false // Hidden initially
+
+      const hoverTextSeqNameValue = new PIXI.Text({
+        text: `${sequence_name}`,
+        style: {
+          fontSize: 12 * devicePixelRatio,
+          fill: 0xffffff,
+          align: 'left',
+          resolution: window.devicePixelRatio || 1,
+        },
+      })
+      hoverTextSeqNameValue.visible = false
+
+      const hoverTextSeqLengthLabel = new PIXI.Text({
+        text: 'length: ',
+        style: {
+          fontSize: 12 * devicePixelRatio,
+          fill: 0xffffff,
+          fontWeight: 'bold',
+          align: 'left',
+          resolution: window.devicePixelRatio || 1,
+        },
+      })
+      hoverTextSeqLengthLabel.visible = false // Hidden initially
+
+      const hoverTextSeqLengthValue = new PIXI.Text({
+        text: `${
           sequence_length > 100000
             ? (sequence_length / 1000000).toFixed(2) + ' Mb'
             : (sequence_length / 1000).toFixed(2) + ' Kb'
@@ -384,43 +442,158 @@ export default {
           resolution: window.devicePixelRatio || 1,
         },
       })
-      hoverText.visible = false // Hidden initially
+      hoverTextSeqLengthValue.visible = false
 
-      // Create a background rectangle for the text
+      // // // Create a PIXI.Text object to show the hover text (hidden by default)
+      // const hoverText = new PIXI.Text({
+      //   text: `genome nr: ${genome_name}\n name: ${sequence_name}\nlength: ${
+      //     sequence_length > 100000
+      //       ? (sequence_length / 1000000).toFixed(2) + ' Mb'
+      //       : (sequence_length / 1000).toFixed(2) + ' Kb'
+      //   }`,
+      //   style: {
+      //     fontSize: 12 * devicePixelRatio,
+      //     fill: 0xffffff,
+      //     align: 'left',
+      //     resolution: window.devicePixelRatio || 1,
+      //   },
+      // })
+      // hoverText.visible = false // Hidden initially
+
+      // Set positions for each text object
+      const hoverTextPadding = 5 // Vertical padding between text lines
+      hoverTextGenomeLabel.position.set(
+        circleSprite.x + 20,
+        circleSprite.y + 20
+      )
+      hoverTextGenomeValue.position.set(
+        hoverTextGenomeLabel.x + hoverTextGenomeLabel.width,
+        hoverTextGenomeLabel.y
+      )
+
+      hoverTextSeqLengthLabel.position.set(
+        circleSprite.x + 20,
+        hoverTextGenomeLabel.y + hoverTextGenomeLabel.height + hoverTextPadding
+      )
+      hoverTextSeqLengthValue.position.set(
+        hoverTextSeqLengthLabel.x + hoverTextSeqLengthLabel.width,
+        hoverTextSeqLengthLabel.y
+      )
+
+      hoverTextSeqNameLabel.position.set(
+        circleSprite.x + 20,
+        hoverTextSeqLengthLabel.y +
+          hoverTextSeqLengthLabel.height +
+          hoverTextPadding
+      )
+      hoverTextSeqNameValue.position.set(
+        hoverTextSeqNameLabel.x + hoverTextSeqNameLabel.width,
+        hoverTextSeqNameLabel.y
+      )
+
       const textBackground = new PIXI.Graphics()
+
+      // Calculate the tooltip width and height
+      const tooltipWidth =
+        Math.max(
+          hoverTextGenomeLabel.width + hoverTextGenomeValue.width,
+          hoverTextSeqNameLabel.width + hoverTextSeqNameValue.width,
+          hoverTextSeqLengthLabel.width + hoverTextSeqLengthValue.width
+        ) + 20
+      const tooltipHeight =
+        hoverTextGenomeLabel.height +
+        hoverTextGenomeValue.height +
+        hoverTextSeqNameLabel.height +
+        hoverTextSeqNameValue.height +
+        hoverTextSeqLengthLabel.height +
+        hoverTextSeqLengthValue.height
+      // Draw the background rectangle
       textBackground.rect(
-        0,
-        0,
-        hoverText.width + 10,
-        3 * (hoverText.height + 5)
-      ) // Add some padding around the text
-      textBackground.fill({ color: 0x000000, alpha: 0.7 }) // Semi-transparent black background
+        circleSprite.x + 10, // Positioning the rectangle
+        circleSprite.y + 10, // Positioning below the sprite
+        tooltipWidth,
+        tooltipHeight
+      )
+      textBackground.fill({ color: 0x000000, alpha: 0.8 }) // Semi-transparent black background
+
+      // to-do make
+      const shadowFilter = new DropShadowFilter({
+        color: 0x64646f, // Shadow color
+        alpha: 0.3, // Shadow opacity
+        blur: 5, // Shadow blur radius
+        distance: 5, // Shadow distance from tooltip
+        rotation: 90, // Shadow angle
+      })
+      textBackground.filters = [shadowFilter]
+
       textBackground.visible = false // Hidden initially
 
-      // Add the hover text to the foreground container
+      // Add the text objects and background to the foreground container
       foregroundContainer.addChild(textBackground)
-      foregroundContainer.addChild(hoverText)
-      // app.stage.addChild(hoverText)
+      foregroundContainer.addChild(hoverTextGenomeLabel)
+      foregroundContainer.addChild(hoverTextSeqLengthLabel)
+      foregroundContainer.addChild(hoverTextSeqLengthValue)
+      foregroundContainer.addChild(hoverTextGenomeValue)
+      foregroundContainer.addChild(hoverTextSeqNameLabel)
+      foregroundContainer.addChild(hoverTextSeqNameValue)
 
       // Handle mouseover event to show the hover text
-      circleSprite.on('mouseover', (event) => {
-        hoverText.visible = true
+      circleSprite.on('mouseover', () => {
+        hoverTextGenomeLabel.visible = true
+        hoverTextGenomeValue.visible = true
+        hoverTextSeqNameLabel.visible = true
+        hoverTextSeqNameValue.visible = true
+        hoverTextSeqLengthLabel.visible = true
+        hoverTextSeqLengthValue.visible = true
         textBackground.visible = true
-        hoverText.x = circleSprite.x + 10 // Slightly offset from the sprite
-        hoverText.y = circleSprite.y - 10
-
-        // Position the background behind the text
-        textBackground.x = hoverText.x - 5 // Adjust to match text position
-        textBackground.y = hoverText.y - 2
-        textBackground.width = hoverText.width + 10
-        textBackground.height = hoverText.height + 5
       })
 
       // Handle mouseout event to hide the hover text
-      circleSprite.on('mouseout', (event) => {
-        hoverText.visible = false
+      circleSprite.on('mouseout', () => {
+        hoverTextGenomeLabel.visible = false
+        hoverTextGenomeValue.visible = false
+        hoverTextSeqNameLabel.visible = false
+        hoverTextSeqNameValue.visible = false
+        hoverTextSeqLengthLabel.visible = false
+        hoverTextSeqLengthValue.visible = false
         textBackground.visible = false
       })
+
+      // // Create a background rectangle for the text
+      // const textBackground = new PIXI.Graphics()
+      // textBackground.rect(
+      //   0,
+      //   0,
+      //   hoverText.width + 10,
+      //   3 * (hoverText.height + 5)
+      // ) // Add some padding around the text
+      // textBackground.fill({ color: 0x000000, alpha: 0.7 }) // Semi-transparent black background
+      // textBackground.visible = false // Hidden initially
+
+      // // Add the hover text to the foreground container
+      // foregroundContainer.addChild(textBackground)
+      // foregroundContainer.addChild(hoverText)
+      // app.stage.addChild(hoverText)
+
+      // // Handle mouseover event to show the hover text
+      // circleSprite.on('mouseover', (event) => {
+      //   hoverText.visible = true
+      //   textBackground.visible = true
+      //   hoverText.x = circleSprite.x + 10 // Slightly offset from the sprite
+      //   hoverText.y = circleSprite.y - 10
+
+      //   // Position the background behind the text
+      //   textBackground.x = hoverText.x - 5 // Adjust to match text position
+      //   textBackground.y = hoverText.y - 2
+      //   textBackground.width = hoverText.width + 10
+      //   textBackground.height = hoverText.height + 5
+      // })
+
+      // // Handle mouseout event to hide the hover text
+      // circleSprite.on('mouseout', (event) => {
+      //   hoverText.visible = false
+      //   textBackground.visible = false
+      // })
 
       // Add the sprite to the Pixi stage
 
