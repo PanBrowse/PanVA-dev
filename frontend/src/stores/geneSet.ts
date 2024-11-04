@@ -17,7 +17,7 @@ import {
   sortedGroupInfosLookup,
   sortedSequenceIdsLookup,
 } from '@/helpers/chromosome'
-import type { GenomeData } from '@/types'
+import type { Genome, GenomeData } from '@/types'
 import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
 import { useGlobalStore } from './global'
@@ -25,10 +25,14 @@ import { useGlobalStore } from './global'
 export const useGenomeStore = defineStore({
   id: 'genome',
   state: () => ({
-    genomeData: null as GenomeData | null,
+    genomeData: { genomes: [] } as unknown as GenomeData,
     selectedGenomes: [] as string[],
     selectedSequences: [] as string[],
     selectedSequencesLasso: [] as string[],
+    genomeUids: [] as string[], // Array to store genome numbers in the loading order
+    genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
+    sequenceUids: [] as string[], // Array to store genome numbers in the loading order
+    sequenceUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
   }),
   getters: {
     genomeCount: (state) => state.genomeData?.genomes?.length || 0,
@@ -49,7 +53,30 @@ export const useGenomeStore = defineStore({
   actions: {
     async loadGenomeData() {
       this.genomeData = await fetchGenomeData()
+      this.populateIndicesAndLookup() // Populate genomeNrs and genomeNrLookup after loading
     },
+    populateIndicesAndLookup() {
+      this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid) // Populate genomeNrs array
+      this.sequenceUids = this.genomeData.sequences.map((seq) => seq.uid) // Populate genomeNrs array
+
+      // Populate genomeNrLookup with uid as key and index as value
+      this.genomeUidLookup = this.genomeData.genomes.reduce(
+        (lookup, genome, index) => {
+          lookup[genome.uid] = index // Use uid as key and index as value
+          return lookup
+        },
+        {} as Record<string, number>
+      )
+
+      this.sequenceUidLookup = this.genomeData.sequences.reduce(
+        (lookup, sequence, index) => {
+          lookup[sequence.uid] = index // Use uid as key and index as value
+          return lookup
+        },
+        {} as Record<string, number>
+      )
+    },
+
     setSelectedGenomes(genomeNames: string[]) {
       this.selectedGenomes = genomeNames
     },

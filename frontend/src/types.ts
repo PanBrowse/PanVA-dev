@@ -139,6 +139,7 @@ export interface Genome {
   uid: string
   name: string
   sequences: SequenceInfo[]
+  genomeIndex?: number // Optional until we assign it
 }
 
 // Type for sequence info
@@ -150,6 +151,7 @@ export interface SequenceInfo {
   name: string
   id: string
   loci: string[]
+  sequenceIndex?: number // Optional until we assign it
 }
 
 export interface Locus {
