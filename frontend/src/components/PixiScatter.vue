@@ -138,7 +138,6 @@ export default {
         // <---------------------Create circle sprites ---------------->
         this.createCircleTexture(circleRadius, app)
 
-        const circles = []
         let currentXOffset = padding
 
         // Loop through each genome and create a unit grid for its sequences
@@ -166,9 +165,9 @@ export default {
                 sequence.sequence_length_nuc,
                 sequence.name,
                 app,
-                circles,
                 foregroundContainer,
-                circleContainer
+                circleContainer,
+                sequence.uid
               )
             })
 
@@ -181,7 +180,6 @@ export default {
             )
           }
         })
-        console.log('circles', circles)
         app.render()
 
         // --- Lasso Setup ---
@@ -204,7 +202,7 @@ export default {
 
         // // Attach lasso to Pixi.js objects
         lassoInstance.items(circleContainer.children)
-        console.log('cicrleContainer.children', circleContainer.children)
+        // console.log('cicrleContainer.children', circleContainer.children)
 
         this.lassoInstance = lassoInstance
 
@@ -294,13 +292,15 @@ export default {
       console.log('Selected sprites:', selectedSprites)
       this.selectedSprites = selectedSprites
       // Flattening the array and extracting UIDs
-      const flattenedUids = selectedSprites.flat().map((sprite) => sprite.uid)
+      const flattenedSequenceUids = selectedSprites
+        .flat()
+        .map((sprite) => sprite.sequence_uid)
 
-      console.log(flattenedUids)
+      console.log(flattenedSequenceUids)
 
       const genomeStore = useGenomeStore() // Create an instance of the store
       // Save UIDs to the store
-      genomeStore.setSelectedSequencesLasso(flattenedUids)
+      genomeStore.setSelectedSequencesLasso(flattenedSequenceUids)
       console.log(
         'Updated store with UIDs:',
         genomeStore.selectedSequencesLasso
@@ -352,9 +352,9 @@ export default {
       sequence_length,
       sequence_name,
       app,
-      circles,
       foregroundContainer,
-      circleContainer
+      circleContainer,
+      sequence_uid
     ) {
       if (!this.circleTexture) {
         console.error('Circle texture is not created.')
@@ -366,6 +366,8 @@ export default {
       circleSprite.x = x
       circleSprite.y = y
       circleSprite.tint = 0xd3d3d3
+
+      circleSprite.sequence_uid = sequence_uid
 
       // Add interactivity to the sprite
       circleSprite.interactive = true
@@ -598,14 +600,6 @@ export default {
       // Add the sprite to the Pixi stage
 
       circleContainer.addChild(circleSprite)
-
-      circles.push({
-        sprite: circleSprite,
-        x: x,
-        y: y,
-        selected: false, // Track selection status
-        genome: genome_name,
-      })
     },
     resizeWindow(app) {
       const devicePixelRatio = window.devicePixelRatio || 1
