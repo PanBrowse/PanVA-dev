@@ -34,6 +34,7 @@ export const useGenomeStore = defineStore({
     genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
     sequenceUids: [] as string[], // Array to store genome numbers in the loading order
     sequenceUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
+    isInitialized: false,
   }),
   getters: {
     genomeCount: (state) => state.genomeData?.genomes?.length || 0,
@@ -53,8 +54,20 @@ export const useGenomeStore = defineStore({
   },
   actions: {
     async loadGenomeData() {
-      this.genomeData = await fetchGenomeData()
-      this.populateIndicesAndLookup() // Populate genomeNrs and genomeNrLookup after loading
+      const global = useGlobalStore()
+
+      try {
+        this.genomeData = await fetchGenomeData()
+        this.populateIndicesAndLookup()
+      } catch (error) {
+        global.setError({
+          message: 'Could not load or parse genome data.',
+          isFatal: true,
+        })
+        throw error
+      }
+      // Set initialized flag only after all API calls complete successfully
+      this.isInitialized = true
     },
     populateIndicesAndLookup() {
       this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid) // Populate genomeNrs array

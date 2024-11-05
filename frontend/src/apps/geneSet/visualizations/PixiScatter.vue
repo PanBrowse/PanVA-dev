@@ -26,6 +26,7 @@ PIXI.Sprite.prototype.getBoundingClientRect = function () {
 
 export default {
   name: 'PixiCanvas',
+  emits: ['loaded'], // Declare the emitted event
   computed: {
     ...mapState(useGeneSetStore, [
       'sortedChromosomeSequenceIndices',
@@ -216,6 +217,10 @@ export default {
           this.resizeWindow(app)
           //   app.renderer.resize(window.innerWidth, window.innerHeight)
         })
+
+        // to-do: fix this workaround
+        // Emit the loaded event after everything is set up
+        this.$emit('loaded')
       } catch (error) {
         console.error('Error initializing Pixi.js:', error)
       }

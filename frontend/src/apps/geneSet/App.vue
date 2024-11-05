@@ -1,6 +1,6 @@
 <script lang="ts">
 import { Col, Form, FormItem, Row, Select } from 'ant-design-vue'
-import { computed, defineComponent, onMounted } from 'vue'
+import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 
 import Layout from '@/components/Layout.vue'
 import LoadingScreen from '@/components/LoadingScreen.vue'
@@ -32,7 +32,6 @@ export default defineComponent({
     GraphicsOptions,
     ContextOptions,
     Unphased,
-    // ChromosomeOverview,
     ChromosomeDetails,
     Density,
     GroupInfoTable,
@@ -45,28 +44,54 @@ export default defineComponent({
   setup() {
     const geneSetStore = useGeneSetStore()
     const genomeStore = useGenomeStore()
+    const pixiLoaded = ref(false)
 
+    // Trigger loading of genome data
+    genomeStore.loadGenomeData()
+    const isInitializedGenome = computed(() => genomeStore.isInitialized)
+
+    // Computed properties for state
     const isInitialized = computed(() => geneSetStore.isInitialized)
     const showTable = computed(() => geneSetStore.showTable)
     const showDetails = computed(() => geneSetStore.showDetails)
 
+    // Sample chromosome number for demonstration
+    const chromosomeNr = 5
+
+    console.log('isInitialized:', isInitialized.value)
+    console.log('isInitializedGenome:', isInitializedGenome.value)
+
+    // Watchers to observe initialization state changes
+    watch([isInitialized, isInitializedGenome], ([geneInit, genomeInit]) => {
+      console.log('isInitialized:', geneInit)
+      console.log('isInitializedGenome:', genomeInit)
+    })
+
+    // Trigger loading on component mount
     onMounted(() => {
-      genomeStore.loadGenomeData()
+      if (!isInitialized.value) {
+        geneSetStore.initialize()
+      }
+      if (!isInitializedGenome.value) {
+        genomeStore.loadGenomeData()
+      }
     })
 
     return {
       isInitialized,
+      isInitializedGenome,
       showTable,
       showDetails,
+      chromosomeNr,
+      pixiLoaded,
     }
   },
 })
 </script>
 
 <template>
-  <Layout v-if="isInitialized">
+  <Layout v-if="isInitialized && isInitializedGenome">
     <template #sidebar>
-      <HomologyOverview />
       <OverviewFilters />
       <Filters />
       <Sorting />
@@ -75,25 +100,26 @@ export default defineComponent({
       <Unphased />
     </template>
 
-    <div class="content" ref="parentElement">
-      <PixiCanvas />
-    </div>
+    <!-- Row 1: PixiCanvas Visualization -->
+    <ARow type="flex" :gutter="8" class="row">
+      <ACol :span="12" class="overview-height">
+        <div class="content" ref="parentElement">
+          <PixiCanvas @loaded="pixiLoaded = true" />
+        </div>
+      </ACol>
+      <ACol v-if="pixiLoaded" :span="12" class="focus-height">
+        <ChromosomeDetails :chromosomeNr="String(chromosomeNr)" />
+      </ACol>
+    </ARow>
 
-    <!-- <template v-if="showTable && showDetails">
-      <ARow type="flex" :gutter="8">
-        <ACol :span="12">
-          <ChromosomeDetails />
-        </ACol>
-        <ACol :span="12">
-          <GroupInfoTable />
-        </ACol>
-      </ARow>
-    </template>
-
-    <GroupInfoTable v-if="showTable && !showDetails"></GroupInfoTable>
-    <ChromosomeDetails v-if="!showTable && showDetails"></ChromosomeDetails> -->
+    <!-- Row 2: Sequence Details (ChromosomeDetails) -->
+    <!-- <ARow type="flex" :gutter="8" class="row">
+      <ACol :span="24" class="focus-height">
+        <ChromosomeDetails :chromosomeNr="String(chromosomeNr)" />
+      </ACol>
+    </ARow> -->
   </Layout>
-  <LoadingScreen v-else>Loading data, please wait...</LoadingScreen>
+  <LoadingScreen v-else>Loading homologies, please wait...</LoadingScreen>
 </template>
 
 <style>
@@ -107,5 +133,23 @@ export default defineComponent({
   overflow: hidden;
   width: 100%;
   height: 100%;
+}
+
+.overview-height {
+  height: 93vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focus-height {
+  height: 93vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.row {
+  width: 100%;
 }
 </style>
