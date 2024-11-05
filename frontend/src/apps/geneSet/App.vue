@@ -79,6 +79,29 @@ onMounted(() => {
       <PixiCanvas />
     </div>
 
+    <!-- <template>
+      <Row type="flex" :gutter="8">
+        <div class="content" ref="parentElement">
+          <PixiCanvas />
+        </div>
+      </Row>
+    </template> -->
+    <!-- 
+    <template v-if="showTable && showDetails">
+      <ARow type="flex" :gutter="8">
+        <ACol :span="12">
+          <ChromosomeDetails />
+        </ACol>
+        <ACol :span="12">
+          <GroupInfoTable />
+        </ACol>
+      </ARow>
+    </template>
+    <GroupInfoTable v-if="showTable && showDetails == false"></GroupInfoTable>
+    <ChromosomeDetails
+      v-if="showTable == false && showDetails"
+    ></ChromosomeDetails> -->
+
     <!-- <Homologies /> -->
   </Layout>
   <LoadingScreen v-else>Loading data, please wait...</LoadingScreen>

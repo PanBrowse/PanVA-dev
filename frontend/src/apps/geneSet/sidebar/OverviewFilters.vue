@@ -133,6 +133,7 @@ export default defineComponent({
       .data(sequenceLengths)
       .enter()
       .append('rect')
+      .attr('class', 'bar')
       .attr('x', (d) => x(d.uid)!)
       .attr('y', (d) => y(d.length))
       .attr('width', x.bandwidth())
@@ -190,6 +191,15 @@ export default defineComponent({
             return xPosition >= x0 && xPosition <= x1
           })
           console.log('Selected data:', selectedData)
+
+          // Update the colors of all bars based on selection
+          svg.selectAll('.bar').style('fill', function (d) {
+            const xPosition = x(d.uid)! + x.bandwidth() / 2
+            return xPosition >= x0 && xPosition <= x1 ? '#007bff' : '#e0e0e0'
+          })
+        } else {
+          // If no selection, reset all bars to the default color
+          svg.selectAll('.bar').style('fill', '#d3d3d3')
         }
       })
 
@@ -203,8 +213,9 @@ export default defineComponent({
   text-align: left !important;
 }
 
-:deep(g.brush .selection) {
+g.brush .selection {
   fill: #007bff;
+  stroke: none;
   fill-opacity: 0.3;
 }
 </style>
