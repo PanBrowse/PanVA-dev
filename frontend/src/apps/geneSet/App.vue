@@ -136,20 +136,36 @@ export default defineComponent({
 }
 
 .overview-height {
-  height: 93vh;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .focus-height {
-  height: 93vh;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+/* Ensure ant-layout and ant-layout-content take up full viewport height */
+.ant-layout {
+  height: 100vh;
+  display: flex;
+}
+
+.ant-layout-content {
+  padding: 0; /* Remove padding here, add it to child elements if needed */
+  flex: 1;
+  display: flex;
+  flex-direction: column; /* Allows row to take full height */
+}
+
+/* Adjust row to inherit height and add margin for spacing */
 .row {
-  width: 100%;
+  flex: 1;
+  overflow: hidden; /* Prevent overflow */
+  display: flex; /* Ensures child columns also flex */
 }
 </style>
