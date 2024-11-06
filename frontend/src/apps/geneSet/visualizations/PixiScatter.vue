@@ -1,11 +1,34 @@
-<template>
+<!-- <template>
   <div class="child-container" ref="view">
     <canvas ref="pixi"></canvas>
     <svg ref="lasso"><g class="lasso"></g></svg>
   </div>
+</template> -->
+
+<template>
+  <ACard
+    title="Overview"
+    :style="{
+      width: `${100}%`,
+      height: `${100}%`,
+    }"
+    :bordered="false"
+    size="small"
+  >
+    <template #extra
+      ><AButton type="text" size="small"
+        ><CloseCircleOutlined key="edit" /></AButton
+    ></template>
+    <div class="child-container" ref="view">
+      <canvas ref="pixi"></canvas>
+      <svg ref="lasso"><g class="lasso"></g></svg>
+    </div>
+  </ACard>
 </template>
 
 <script lang="ts">
+import { CloseCircleOutlined } from '@ant-design/icons-vue'
+import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 import { mapActions, mapState } from 'pinia'
 import * as PIXI from 'pixi.js'
@@ -29,6 +52,17 @@ PIXI.Sprite.prototype.getBoundingClientRect = function () {
 export default {
   name: 'PixiCanvas',
   emits: ['loaded'], // Declare the emitted event
+  components: {
+    ACard: Card,
+    AButton: Button,
+    CloseCircleOutlined: CloseCircleOutlined,
+  },
+  data: () => ({
+    padding: {
+      cardBody: 12,
+    },
+    cardHeaderHeight: 40,
+  }),
   setup() {
     const genomeStore = useGenomeStore()
     const selectedGenes = ref<Gene[]>([])
