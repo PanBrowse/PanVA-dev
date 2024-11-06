@@ -5,7 +5,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import * as d3 from 'd3'
 import { mapActions, mapState } from 'pinia'
 import * as PIXI from 'pixi.js'
@@ -49,10 +49,10 @@ export default {
     this.$nextTick(async () => {
       try {
         const genomeStore = useGenomeStore()
-        console.log(
-          'sequences from genomeStore: ',
-          genomeStore.genomeData.genomes
-        )
+        // console.log(
+        //   'sequences from genomeStore: ',
+        //   genomeStore.genomeData.genomes
+        // )
 
         // // Create a PIXI.Application instance
         const app = new PIXI.Application()
@@ -220,6 +220,8 @@ export default {
 
         // to-do: fix this workaround
         // Emit the loaded event after everything is set up
+
+        console.log('PixiScatter loaded event emitted')
         this.$emit('loaded')
       } catch (error) {
         console.error('Error initializing Pixi.js:', error)

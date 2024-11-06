@@ -25,7 +25,6 @@ export default defineComponent({
   components: {
     Layout,
     LoadingScreen,
-    HomologyOverview,
     OverviewFilters,
     Filters,
     Sorting,
@@ -33,11 +32,8 @@ export default defineComponent({
     ContextOptions,
     Unphased,
     ChromosomeDetails,
-    Density,
-    GroupInfoTable,
+    // GroupInfoTable,
     PixiCanvas,
-    AForm: Form,
-    AFormItem: FormItem,
     ARow: Row,
     ACol: Col,
   },
@@ -46,6 +42,14 @@ export default defineComponent({
     const genomeStore = useGenomeStore()
     const pixiLoaded = ref(false)
 
+    const handlePixiLoaded = () => {
+      try {
+        console.log('PixiScatter loaded event received in App.vue')
+        pixiLoaded.value = true
+      } catch (error) {
+        console.error('Error handling PixiScatter loaded event:', error)
+      }
+    }
     // Trigger loading of genome data
     genomeStore.loadGenomeData()
     const isInitializedGenome = computed(() => genomeStore.isInitialized)
@@ -69,11 +73,15 @@ export default defineComponent({
 
     // Trigger loading on component mount
     onMounted(() => {
-      if (!isInitialized.value) {
-        geneSetStore.initialize()
-      }
-      if (!isInitializedGenome.value) {
-        genomeStore.loadGenomeData()
+      try {
+        if (!isInitialized.value) {
+          geneSetStore.initialize()
+        }
+        if (!isInitializedGenome.value) {
+          genomeStore.loadGenomeData()
+        }
+      } catch (error) {
+        console.error('Error during component initialization:', error)
       }
     })
 
@@ -84,6 +92,7 @@ export default defineComponent({
       showDetails,
       chromosomeNr,
       pixiLoaded,
+      handlePixiLoaded,
     }
   },
 })
@@ -103,12 +112,13 @@ export default defineComponent({
     <!-- Row 1: PixiCanvas Visualization -->
     <ARow type="flex" :gutter="8" class="row">
       <ACol :span="12" class="overview-height">
-        <div class="content" ref="parentElement">
-          <PixiCanvas @loaded="pixiLoaded = true" />
+        <div class="content-overview" ref="parentElement">
+          <PixiCanvas @loaded="handlePixiLoaded" />
         </div>
       </ACol>
       <ACol v-if="pixiLoaded" :span="12" class="focus-height">
-        <ChromosomeDetails :chromosomeNr="String(chromosomeNr)" />
+        <ChromosomeDetails />
+        <!-- <GroupInfoTable /> -->
       </ACol>
     </ARow>
 
@@ -119,7 +129,7 @@ export default defineComponent({
       </ACol>
     </ARow> -->
   </Layout>
-  <LoadingScreen v-else>Loading homologies, please wait...</LoadingScreen>
+  <LoadingScreen v-else>Loading data, please wait...</LoadingScreen>
 </template>
 
 <style>
@@ -127,7 +137,7 @@ export default defineComponent({
   background: #fafafa !important;
 }
 
-.content {
+.content-overview {
   flex: 1;
   display: flex;
   overflow: hidden;
