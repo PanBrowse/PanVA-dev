@@ -1,6 +1,33 @@
 import type { Dictionary } from 'lodash'
 
 import type { GroupInfo, Sequence, SequenceMetrics } from '@/types'
+import type { Gene, GenomeData } from '@/types'
+
+///// new helpers for genomeData
+export const createSequenceToLociGenesLookup = (
+  genomeData: GenomeData
+): Map<string, { loci: string[]; genes: Gene[] }> => {
+  const sequenceToLociGenes = new Map<
+    string,
+    { loci: string[]; genes: Gene[] }
+  >()
+
+  genomeData.sequences.forEach((sequence) => {
+    // Get loci associated with this sequence
+    const lociUids = genomeData.loci
+      .filter((locus) => sequence.loci.includes(locus.uid))
+      .map((locus) => locus.uid)
+
+    // Get all genes associated with these loci
+    const genes = genomeData.loci
+      .filter((locus) => lociUids.includes(locus.uid))
+      .flatMap((locus) => locus.genes)
+
+    sequenceToLociGenes.set(sequence.uid, { loci: lociUids, genes })
+  })
+
+  return sequenceToLociGenes
+}
 
 export const chromosomesLookup = (sequences: SequenceMetrics[]) => {
   /**

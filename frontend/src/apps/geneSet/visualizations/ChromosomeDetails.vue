@@ -8,7 +8,7 @@
       justify-content: space-between;
     "
   >
-    <SequencesDetails
+    <FocusView
       v-bind:key="`chr${chrFocus}_focus`"
       :chromosomeNr="String(chrFocus)"
       :name="`chr${chrFocus}_focus`"
@@ -31,11 +31,13 @@ import { useGeneSetStore } from '@/stores/geneSet'
 import { useGlobalStore } from '@/stores/global'
 import type { SequenceMetrics } from '@/types'
 
+import FocusView from './FocusView.vue'
 import SequencesDetails from './SequencesDetails.vue'
 
 export default {
   components: {
-    SequencesDetails,
+    // SequencesDetails,
+    FocusView,
   },
   data: () => ({
     svgWidth: 0,
@@ -84,7 +86,7 @@ export default {
   },
   created() {},
   mounted() {
-    console.log('Chromosome details mounted')
+    // console.log('Chromosome details mounted')
 
     const contentElement = document.getElementById('content-focus')
     this.svgWidth =

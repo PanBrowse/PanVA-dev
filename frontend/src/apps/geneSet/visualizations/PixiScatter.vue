@@ -10,10 +10,12 @@ import * as d3 from 'd3'
 import { mapActions, mapState } from 'pinia'
 import * as PIXI from 'pixi.js'
 import { DropShadowFilter } from 'pixi-filters'
+import { defineComponent, ref, watch } from 'vue'
 
 import { lasso } from '@/components/Lasso.js'
 import { useGeneSetStore } from '@/stores/geneSet'
 import { useGenomeStore } from '@/stores/geneSet'
+import type { Gene, Genome, GenomeData } from '@/types'
 
 PIXI.Sprite.prototype.getBoundingClientRect = function () {
   return {
@@ -27,6 +29,29 @@ PIXI.Sprite.prototype.getBoundingClientRect = function () {
 export default {
   name: 'PixiCanvas',
   emits: ['loaded'], // Declare the emitted event
+  setup() {
+    const genomeStore = useGenomeStore()
+    const selectedGenes = ref<Gene[]>([])
+
+    // Watcher to react to changes in selectedSequencesLasso
+    watch(
+      () => genomeStore.selectedSequencesLasso,
+      async (_newLassoSelection) => {
+        console.log(
+          'lasso selection from watch pixi scatter',
+          _newLassoSelection
+        )
+        selectedGenes.value = await genomeStore.getGenesForSelectedLasso()
+        console.log('Updated selectedGenes:', selectedGenes.value)
+      },
+      { immediate: true } // Run immediately on component load
+    )
+
+    return {
+      selectedGenes,
+      genomeStore,
+    }
+  },
   computed: {
     ...mapState(useGeneSetStore, [
       'sortedChromosomeSequenceIndices',
@@ -48,7 +73,8 @@ export default {
   mounted() {
     this.$nextTick(async () => {
       try {
-        const genomeStore = useGenomeStore()
+        const genomeStore = this.genomeStore
+        // const genomeStore = useGenomeStore()
         // console.log(
         //   'sequences from genomeStore: ',
         //   genomeStore.genomeData.genomes
@@ -165,6 +191,7 @@ export default {
                 genomeData.name,
                 sequence.sequence_length_nuc,
                 sequence.name,
+                sequence.id,
                 app,
                 foregroundContainer,
                 circleContainer,
@@ -376,6 +403,7 @@ export default {
       genome_name,
       sequence_length,
       sequence_name,
+      sequence_id,
       app,
       foregroundContainer,
       circleContainer,
@@ -411,7 +439,7 @@ export default {
       hoverTextGenomeLabel.visible = false // Hidden initially
 
       const hoverTextGenomeValue = new PIXI.Text({
-        text: `${genome_name}`,
+        text: `${sequence_id}`,
         style: {
           fontSize: 12 * devicePixelRatio,
           fill: 0xffffff,

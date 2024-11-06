@@ -1,6 +1,6 @@
 <template>
   <ACard
-    :title="`${cardName}`"
+    title="Focus View"
     :style="{
       width: `${100}%`,
       height: `${100}%`,
@@ -9,7 +9,7 @@
     size="small"
   >
     <template #extra
-      ><AButton type="text" size="small" @click="deleteChromosome(`${name}`)"
+      ><AButton type="text" size="small"
         ><CloseCircleOutlined key="edit" /></AButton
     ></template>
     <svg
@@ -54,7 +54,7 @@ const crossingHomologyGroups = ref<number[]>([])
 const showGeneBars = ref<boolean>(true)
 
 export default {
-  name: 'SequencesDetails',
+  name: 'FocusView',
   props: {
     chromosomeNr: { type: String, required: true },
     name: String,
@@ -114,12 +114,6 @@ export default {
       // 'colorGenes',
       'showLinks',
     ]),
-    cardName() {
-      if (this.name === undefined) {
-        return 'Undefined'
-      }
-      return this.name.split('_')[0]
-    },
     containerWidth() {
       return this.showTable ? this.svgWidth / 2 : this.svgWidth
     },
@@ -1114,6 +1108,8 @@ export default {
             showGeneBars.value
           )
         })
+
+      console.log('draw genes input', genes)
 
       this.svg()
         .selectAll('path.gene')

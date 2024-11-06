@@ -12,12 +12,13 @@ import {
 } from '@/api/geneSet'
 import {
   chromosomesLookup,
+  createSequenceToLociGenesLookup,
   groupInfosLookup,
   sequencesIdLookup,
   sortedGroupInfosLookup,
   sortedSequenceIdsLookup,
 } from '@/helpers/chromosome'
-import type { Genome, GenomeData } from '@/types'
+import type { Gene, GenomeData, Locus } from '@/types'
 import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
 import { useGlobalStore } from './global'
@@ -25,10 +26,19 @@ import { useGlobalStore } from './global'
 export const useGenomeStore = defineStore({
   id: 'genome',
   state: () => ({
-    genomeData: { genomes: [] } as unknown as GenomeData,
+    genomeData: {
+      genomes: [],
+      sequences: [],
+      loci: [],
+      genes: [],
+    } as unknown as GenomeData,
     selectedGenomes: [] as string[],
     selectedSequences: [] as string[],
     selectedSequencesLasso: [] as string[],
+    sequenceToLociGenesLookup: new Map<
+      string,
+      { loci: string[]; genes: Gene[] }
+    >(),
     selectedSequencesTracker: new Set(),
     genomeUids: [] as string[], // Array to store genome numbers in the loading order
     genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
@@ -58,7 +68,10 @@ export const useGenomeStore = defineStore({
 
       try {
         this.genomeData = await fetchGenomeData()
-        this.populateIndicesAndLookup()
+        this.generateIndicesAndLookup()
+        this.sequenceToLociGenesLookup = createSequenceToLociGenesLookup(
+          this.genomeData
+        )
       } catch (error) {
         global.setError({
           message: 'Could not load or parse genome data.',
@@ -69,7 +82,7 @@ export const useGenomeStore = defineStore({
       // Set initialized flag only after all API calls complete successfully
       this.isInitialized = true
     },
-    populateIndicesAndLookup() {
+    generateIndicesAndLookup() {
       this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid) // Populate genomeNrs array
       this.sequenceUids = this.genomeData.sequences.map((seq) => seq.uid) // Populate genomeNrs array
 
@@ -89,6 +102,25 @@ export const useGenomeStore = defineStore({
         },
         {} as Record<string, number>
       )
+    },
+    getGenesForSelectedLasso(): Gene[] {
+      const genes: Gene[] = []
+      const selectedSequenceUids = this.selectedSequencesLasso
+
+      // console.log('sequenceToLociGenesLookup', this.sequenceToLociGenesLookup)
+
+      selectedSequenceUids.forEach((sequenceUid) => {
+        const lociAndGenes = this.sequenceToLociGenesLookup.get(sequenceUid)
+
+        if (lociAndGenes) {
+          // Add loci genes to the main genes list
+          genes.push(...lociAndGenes.genes)
+        } else {
+          console.warn(`No loci found for sequence UID: ${sequenceUid}`)
+        }
+      })
+
+      return genes
     },
 
     setSelectedGenomes(genomeNames: string[]) {
