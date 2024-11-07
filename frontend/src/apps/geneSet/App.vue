@@ -110,13 +110,13 @@ export default defineComponent({
     </template>
 
     <!-- Row 1: PixiCanvas Visualization -->
-    <ARow type="flex" :gutter="8" class="row">
-      <ACol :span="12" class="overview-height">
+    <ARow type="flex" :gutter="8" class="row full-height">
+      <ACol :span="12" class="col full-height">
         <div class="content-overview" ref="parentElement">
           <PixiCanvas @loaded="handlePixiLoaded" />
         </div>
       </ACol>
-      <ACol v-if="pixiLoaded" :span="12" class="focus-height">
+      <ACol v-if="pixiLoaded" :span="12" class="col full-height">
         <ChromosomeDetails />
         <!-- <GroupInfoTable /> -->
       </ACol>
@@ -137,15 +137,19 @@ export default defineComponent({
   background: #fafafa !important;
 }
 
-.content-overview {
-  flex: 1;
+.ant-layout {
+  height: 100vh;
   display: flex;
-  overflow: hidden;
-  width: 100%;
-  height: 100%;
 }
 
-.overview-height {
+.ant-layout-content {
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* .overview-height {
   height: 100vh;
   display: flex;
   align-items: center;
@@ -157,25 +161,31 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: center;
+} */
+
+.full-height {
+  height: 100%;
 }
 
-/* Ensure ant-layout and ant-layout-content take up full viewport height */
-.ant-layout {
-  height: 100vh;
+/* ACol styling */
+.col {
   display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
-.ant-layout-content {
-  padding: 0; /* Remove padding here, add it to child elements if needed */
-  flex: 1;
-  display: flex;
-  flex-direction: column; /* Allows row to take full height */
-}
-
-/* Adjust row to inherit height and add margin for spacing */
 .row {
   flex: 1;
-  overflow: hidden; /* Prevent overflow */
-  display: flex; /* Ensures child columns also flex */
+  display: flex;
+  overflow: hidden;
+}
+
+.content-overview {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
 }
 </style>

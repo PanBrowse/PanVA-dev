@@ -26,7 +26,7 @@ import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 import { type Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
-import { defineComponent, ref, watch } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 
 import colors from '@/assets/colors.module.scss'
 import {
@@ -75,6 +75,7 @@ export default {
   setup() {
     const genomeStore = useGenomeStore()
     const filteredSequences = ref<SequenceInfo[]>([])
+    const indexMap = ref<Map<number, number>>(new Map())
     const mappedIndices = ref<number[]>([])
 
     // Watch for changes in selectedSequencesLasso
@@ -113,13 +114,12 @@ export default {
           sequenceIndicesInLookup
         )
 
-        const indexMap = new Map(
+        indexMap.value = new Map(
           sequenceIndicesInLookup.map((value, idx) => [value, idx])
         )
         mappedIndices.value = sequenceIndicesInLookup.map(
-          (index) => indexMap.get(index) ?? 0
+          (index) => indexMap.value.get(index) ?? 0
         )
-
         console.log('mappedIndices: ', mappedIndices.value) // Output: [0, 1, 2]
       },
       { immediate: true }
@@ -129,6 +129,7 @@ export default {
       filteredSequences,
       mappedIndices,
       genomeStore,
+      indexMap,
     }
   },
   data: () => ({
@@ -944,7 +945,12 @@ export default {
     ///////////////////////////////////////////////////////////////////////////////add labels ////////////////////////////////////
     addLabels() {
       let vis = this
-      console.log('adding sequence labels', this.filteredSequences)
+      console.log(
+        'drawing sequence labels'
+        // this.filteredSequences,
+        // this.mappedIndices,
+        // this.indexMap
+      )
 
       if (this.filteredSequences === undefined) {
         return
@@ -962,17 +968,22 @@ export default {
               .attr('text-anchor', 'end')
               .attr('x', 5)
               .attr('font-size', 10)
-              .attr('y', (d, i) => i * (this.barHeight + 10))
+              .attr(
+                'y',
+                (d, i) => this.mappedIndices[i] * (this.barHeight + 10)
+              )
 
               .attr('dy', -this.barHeight / 2)
-              // .text((d) => d.sequence_id.split('_')),
               .text((d) => d.id),
 
           (update) =>
             update
               .transition()
               .duration(this.transitionTime)
-              .attr('y', (d, i) => i * (this.barHeight + 10)),
+              .attr(
+                'y',
+                (d, i) => this.mappedIndices[i] * (this.barHeight + 10)
+              ),
           (exit) => exit.remove()
         )
 
@@ -1447,13 +1458,20 @@ export default {
     this.svgWidth =
       (contentElement?.offsetWidth || 0) * this.svgWidthScaleFactor
 
-    if (this.chromosomeNr == 'unphased') {
-      this.sortedChromosomeSequenceIndices[12].length * (this.barHeight + 10) +
-        this.margin.top * 2
-    } else {
-      this.svgHeight = contentElement?.offsetHeight || 0
-      // this.svgHeight = document.getElementById('content-focus').offsetHeight
-    }
+    this.svgHeight = contentElement?.clientHeight - 40
+    console.log(
+      'contentElement?.offsetHeight',
+      contentElement?.clientHeight,
+      contentElement
+    )
+
+    // if (this.chromosomeNr == 'unphased') {
+    //   this.sortedChromosomeSequenceIndices[12].length * (this.barHeight + 10) +
+    //     this.margin.top * 2
+    // } else {
+    //   this.svgHeight = contentElement?.offsetHeight || 0
+    //   // this.svgHeight = document.getElementById('content-focus').offsetHeight
+    // }
 
     // Anchor
     ////
@@ -1624,10 +1642,10 @@ export default {
   //   this.resizeObserver?.disconnect()
   // },
   watch: {
-    // Watch for updates to `filteredSequences`
-    filteredSequences: {
+    //Watch for updates to `mappedIndices` before redrawing
+    mappedIndices: {
       handler(newVal) {
-        console.log('Filtered sequences updated:', newVal)
+        console.log('Filtered sequence indices updated:', newVal)
         this.addLabels()
       },
       deep: true,

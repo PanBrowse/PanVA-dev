@@ -60,7 +60,7 @@ export const useGenomeStore = defineStore({
       string,
       { loci: string[]; genes: Gene[] }
     >(),
-    selectedSequencesTracker: new Set(),
+    selectedSequencesTracker: new Set(DEFAULT_SEQUENCE_UIDS),
     genomeUids: [] as string[], // Array to store genome numbers in the loading order
     genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
     sequenceUids: [] as string[], // Array to store genome numbers in the loading order

@@ -305,8 +305,8 @@ export default {
   },
   methods: {
     lassoStart() {
-      console.log('Lasso selection started')
       const genomeStore = useGenomeStore()
+      console.log('Lasso selection started', genomeStore.selectedSequencesLasso)
       const trackerUids = genomeStore.selectedSequencesTracker
 
       // Filter the sprites in lassoInstance based on sequence_uids in tracker
@@ -467,6 +467,11 @@ export default {
       circleSprite.x = x
       circleSprite.y = y
       circleSprite.tint = 0xd3d3d3
+
+      // Check if this sequence is part of the selectedSequencesLasso
+      const isSelected =
+        this.genomeStore.selectedSequencesLasso.includes(sequence_uid)
+      circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3 // Blue if selected, gray otherwise
 
       circleSprite.sequence_uid = sequence_uid
 
