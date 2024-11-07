@@ -33,7 +33,7 @@ import * as d3 from 'd3'
 import { mapActions, mapState } from 'pinia'
 import * as PIXI from 'pixi.js'
 import { DropShadowFilter } from 'pixi-filters'
-import { defineComponent, ref, watch } from 'vue'
+import { defineComponent, onMounted, ref, watch } from 'vue'
 
 import { lasso } from '@/components/Lasso.js'
 import { useGeneSetStore } from '@/stores/geneSet'
@@ -67,6 +67,19 @@ export default {
     const genomeStore = useGenomeStore()
     const selectedGenes = ref<Gene[]>([])
 
+    // Fetch default selection on mount if it's already set in the store
+    onMounted(() => {
+      if (genomeStore.selectedSequencesLasso.length) {
+        updateSelectedGenes()
+      }
+    })
+
+    // Helper function to update selected genes based on `selectedSequencesLasso`
+    const updateSelectedGenes = async () => {
+      selectedGenes.value = await genomeStore.getGenesForSelectedLasso()
+      console.log('Updated selectedGenes:', selectedGenes.value)
+    }
+
     // Watcher to react to changes in selectedSequencesLasso
     watch(
       () => genomeStore.selectedSequencesLasso,
@@ -75,8 +88,9 @@ export default {
           'lasso selection from watch pixi scatter',
           _newLassoSelection
         )
-        selectedGenes.value = await genomeStore.getGenesForSelectedLasso()
-        console.log('Updated selectedGenes:', selectedGenes.value)
+        // selectedGenes.value = await genomeStore.getGenesForSelectedLasso()
+        // console.log('Updated selectedGenes:', selectedGenes.value)
+        await updateSelectedGenes()
       },
       { immediate: true } // Run immediately on component load
     )

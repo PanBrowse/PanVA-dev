@@ -26,7 +26,7 @@ import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 import { type Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
-import { ref } from 'vue'
+import { defineComponent, ref, watch } from 'vue'
 
 import colors from '@/assets/colors.module.scss'
 import {
@@ -41,7 +41,8 @@ import { getGeneSymbolSize, getGeneSymbolType } from '@/helpers/customSymbols'
 import { runSpringSimulation } from '@/helpers/springSimulation'
 import type { GraphNode, GraphNodeGroup } from '@/helpers/springSimulationUtils'
 import { useGeneSetStore } from '@/stores/geneSet'
-import type { GroupInfo, SequenceMetrics } from '@/types'
+import { useGenomeStore } from '@/stores/geneSet'
+import type { GroupInfo, SequenceInfo, SequenceMetrics } from '@/types'
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0, 1])
@@ -70,6 +71,65 @@ export default {
     ACard: Card,
     AButton: Button,
     CloseCircleOutlined: CloseCircleOutlined,
+  },
+  setup() {
+    const genomeStore = useGenomeStore()
+    const filteredSequences = ref<SequenceInfo[]>([])
+    const mappedIndices = ref<number[]>([])
+
+    // Watch for changes in selectedSequencesLasso
+    watch(
+      () => genomeStore.selectedSequencesLasso,
+      (newSelection) => {
+        if (newSelection && newSelection.length) {
+          // Filter the sequences based on UIDs in selectedSequencesLasso
+          filteredSequences.value = genomeStore.genomeData.sequences.filter(
+            (sequence) => newSelection.includes(sequence.uid)
+          )
+          console.log('Filtered sequences:', filteredSequences.value)
+        } else {
+          // Reset or handle the case where no sequence is selected
+          filteredSequences.value = []
+        }
+      },
+      { immediate: true }
+    )
+
+    watch(
+      filteredSequences,
+      (newVal) => {
+        console.log('Filtered sequences updated:', newVal)
+
+        // Call addLabels whenever `filteredSequences` changes
+        // addLabels()
+        const sequenceIndicesInLookup = filteredSequences.value.map(
+          (sequence) => {
+            return genomeStore.sequenceUidLookup[sequence.uid]
+          }
+        )
+
+        console.log(
+          'Indices of filtered sequences in sequenceUidLookup:',
+          sequenceIndicesInLookup
+        )
+
+        const indexMap = new Map(
+          sequenceIndicesInLookup.map((value, idx) => [value, idx])
+        )
+        mappedIndices.value = sequenceIndicesInLookup.map(
+          (index) => indexMap.get(index) ?? 0
+        )
+
+        console.log('mappedIndices: ', mappedIndices.value) // Output: [0, 1, 2]
+      },
+      { immediate: true }
+    )
+
+    return {
+      filteredSequences,
+      mappedIndices,
+      genomeStore,
+    }
   },
   data: () => ({
     svgWidth: 0,
@@ -884,49 +944,82 @@ export default {
     ///////////////////////////////////////////////////////////////////////////////add labels ////////////////////////////////////
     addLabels() {
       let vis = this
-      if (this.data === undefined) {
+      console.log('adding sequence labels', this.filteredSequences)
+
+      if (this.filteredSequences === undefined) {
         return
       }
       this.svg()
-        .selectAll('text.label-chr')
-        .data(this.data, (d: any) => d.sequence_id)
+        .selectAll('text.label-seq')
+        .data(this.filteredSequences, (d: any) => d.uid)
         .join(
           (enter) =>
             enter
               .append('text')
               .attr('transform', `translate(20,${this.margin.top * 2})`)
-              .attr('class', 'label-chr')
+              .attr('class', 'label-seq')
               .attr('dominant-baseline', 'hanging')
               .attr('text-anchor', 'end')
               .attr('x', 5)
               .attr('font-size', 10)
-              .attr(
-                'y',
-                (d, i) =>
-                  this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
-                  (this.barHeight + 10)
-              )
+              .attr('y', (d, i) => i * (this.barHeight + 10))
 
-              .attr('dy', this.barHeight / 3)
+              .attr('dy', -this.barHeight / 2)
               // .text((d) => d.sequence_id.split('_')),
-              .text((d) =>
-                d.phasing_id.includes('unphased')
-                  ? d.genome_number + '_' + 'U'
-                  : d.genome_number + '_' + d.phasing_id.split('_')[1]
-              ),
+              .text((d) => d.id),
 
           (update) =>
             update
               .transition()
               .duration(this.transitionTime)
-              .attr('y', function (d, i) {
-                return (
-                  vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i] *
-                  (vis.barHeight + 10)
-                )
-              }),
+              .attr('y', (d, i) => i * (this.barHeight + 10)),
           (exit) => exit.remove()
         )
+
+      // if (this.data === undefined) {
+      //   return
+      // }
+      // this.svg()
+      //   .selectAll('text.label-seq')
+      //   .data(this.data, (d: any) => d.sequence_id)
+      //   .data(this.filteredSequences, (d: any) => d.id)
+      //   .join(
+      //     (enter) =>
+      //       enter
+      //         .append('text')
+      //         .attr('transform', `translate(20,${this.margin.top * 2})`)
+      //         .attr('class', 'label-seq')
+      //         .attr('dominant-baseline', 'hanging')
+      //         .attr('text-anchor', 'end')
+      //         .attr('x', 5)
+      //         .attr('font-size', 10)
+      //         .attr(
+      //           'y',
+      //           (d, i) =>
+      //             this.sortedChromosomeSequenceIndices[this.chromosomeNr][i] *
+      //             (this.barHeight + 10)
+      //         )
+
+      //         .attr('dy', this.barHeight / 3)
+      //         // .text((d) => d.sequence_id.split('_')),
+      //         .text((d) =>
+      //           d.phasing_id.includes('unphased')
+      //             ? d.genome_number + '_' + 'U'
+      //             : d.genome_number + '_' + d.phasing_id.split('_')[1]
+      //         ),
+
+      //     (update) =>
+      //       update
+      //         .transition()
+      //         .duration(this.transitionTime)
+      //         .attr('y', function (d, i) {
+      //           return (
+      //             vis.sortedChromosomeSequenceIndices[vis.chromosomeNr][i] *
+      //             (vis.barHeight + 10)
+      //           )
+      //         }),
+      //     (exit) => exit.remove()
+      //   )
     },
     /////////////////////////////////////////////////////////////////////////////// Add values ////////////////////////////////////
     addValues() {
@@ -1531,6 +1624,15 @@ export default {
   //   this.resizeObserver?.disconnect()
   // },
   watch: {
+    // Watch for updates to `filteredSequences`
+    filteredSequences: {
+      handler(newVal) {
+        console.log('Filtered sequences updated:', newVal)
+        this.addLabels()
+      },
+      deep: true,
+      immediate: true,
+    },
     colorGenes() {
       this.drawGenes()
     },
@@ -1617,7 +1719,7 @@ export default {
   stroke: black;
 }
 
-.label-chr {
+.label-seq {
   fill: #c0c0c0;
   font-size: 12;
   font-family: sans-serif;

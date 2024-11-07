@@ -23,6 +23,27 @@ import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
 import { useGlobalStore } from './global'
 
+// to-do: add this to config! this is data dependent
+const DEFAULT_SEQUENCE_UIDS = [
+  '9ef875b2-1f8b-4f9f-a641-e024a79ac3c0',
+  'e73b991e-c690-4476-b625-67369570751c',
+  '7c99b547-7bc6-4dbd-8945-e6f94b0bf465',
+  'f52393d9-9c07-4f86-b341-042f48cceb7b',
+  '1c2507a9-f92f-4420-84d7-55b83935d75e',
+  'da548006-4a01-475d-9473-b4b9a49a7ecc',
+  '0e5223b7-7d67-4a01-9e46-b3ded55d48b6',
+  '1eda4508-c371-4f78-b969-01f99d4e4167',
+  'f1775f27-f8ce-4c82-a383-694028c6af2b',
+  '6ddce53a-25f5-4c22-9d7a-d29bc58745a2',
+  'fc543928-c06c-44d4-b398-780e66da418b',
+  'c5609232-568c-41de-944c-cc5dc8d3054c',
+  '6eadc148-ce01-46f5-b06b-5acb50463343',
+  '645cfdc1-5dbc-4159-be78-fcbe0110687e',
+  '35e3e8d1-3cbc-456f-b7c8-674ad93c3930',
+  '6c926994-fc1b-44c9-9531-b60492306aee',
+  '00e62324-363e-4c4f-b5f4-8857008ff8d3',
+]
+
 export const useGenomeStore = defineStore({
   id: 'genome',
   state: () => ({
@@ -34,7 +55,7 @@ export const useGenomeStore = defineStore({
     } as unknown as GenomeData,
     selectedGenomes: [] as string[],
     selectedSequences: [] as string[],
-    selectedSequencesLasso: [] as string[],
+    selectedSequencesLasso: [...DEFAULT_SEQUENCE_UIDS],
     sequenceToLociGenesLookup: new Map<
       string,
       { loci: string[]; genes: Gene[] }
