@@ -56,10 +56,15 @@ export const useGenomeStore = defineStore({
     selectedGenomes: [] as string[],
     selectedSequences: [] as string[],
     selectedSequencesLasso: [...DEFAULT_SEQUENCE_UIDS],
+    selectedGeneUids: [] as string[],
     sequenceToLociGenesLookup: new Map<
       string,
-      { loci: string[]; genes: Gene[] }
+      { loci: string[]; genes: string[] }
     >(),
+    geneToHomologyGroupLookup: {} as Record<
+      string,
+      { id: number; uid: string }[]
+    >,
     selectedSequencesTracker: new Set(DEFAULT_SEQUENCE_UIDS),
     genomeUids: [] as string[], // Array to store genome numbers in the loading order
     genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
@@ -123,13 +128,41 @@ export const useGenomeStore = defineStore({
         },
         {} as Record<string, number>
       )
+
+      const mRNAToHomologyGroup: Record<string, { id: number; uid: string }> =
+        {}
+
+      this.genomeData.groups.forEach((group) => {
+        group.mrnas.forEach((mrna_uid) => {
+          mRNAToHomologyGroup[mrna_uid] = {
+            id: group.label,
+            uid: group.uid,
+          }
+        })
+      })
+      // Populate geneToHomologyGroupLookup using mRNA to homology group mapping
+      this.geneToHomologyGroupLookup = this.genomeData.genes.reduce(
+        (lookup, gene) => {
+          const homologyGroups = new Map<number, { id: number; uid: string }>()
+
+          gene.mrnas.forEach((mRNA) => {
+            const homologyGroupInfo = mRNAToHomologyGroup[mRNA]
+            if (homologyGroupInfo) {
+              homologyGroups.set(homologyGroupInfo.id, homologyGroupInfo)
+            }
+          })
+
+          lookup[gene.uid] = Array.from(homologyGroups.values()) // Convert Map to array
+          return lookup
+        },
+        {} as Record<string, { id: number; uid: string }[]>
+      )
     },
-    getGenesForSelectedLasso(): Gene[] {
-      const genes: Gene[] = []
+    getGenesForSelectedLasso(): string[] {
+      const genes: string[] = []
       const selectedSequenceUids = this.selectedSequencesLasso
 
       // console.log('sequenceToLociGenesLookup', this.sequenceToLociGenesLookup)
-
       selectedSequenceUids.forEach((sequenceUid) => {
         const lociAndGenes = this.sequenceToLociGenesLookup.get(sequenceUid)
 
@@ -158,6 +191,9 @@ export const useGenomeStore = defineStore({
       sequenceUids.forEach((uid) => {
         this.selectedSequencesTracker.add(uid)
       })
+    },
+    setSelectedGeneUids(uids: string[]) {
+      this.selectedGeneUids = uids
     },
   },
 })

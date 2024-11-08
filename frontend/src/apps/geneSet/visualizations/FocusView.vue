@@ -42,7 +42,7 @@ import { runSpringSimulation } from '@/helpers/springSimulation'
 import type { GraphNode, GraphNodeGroup } from '@/helpers/springSimulationUtils'
 import { useGeneSetStore } from '@/stores/geneSet'
 import { useGenomeStore } from '@/stores/geneSet'
-import type { GroupInfo, SequenceInfo, SequenceMetrics } from '@/types'
+import type { Gene, GroupInfo, SequenceInfo, SequenceMetrics } from '@/types'
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0, 1])
@@ -75,8 +75,34 @@ export default {
   setup() {
     const genomeStore = useGenomeStore()
     const filteredSequences = ref<SequenceInfo[]>([])
+    const filteredGenes = ref<Gene[]>([])
     const indexMap = ref<Map<number, number>>(new Map())
     const mappedIndices = ref<number[]>([])
+    // const selectedGeneUids = ref<string[]>([])
+    const selectedGeneUids = computed(() => genomeStore.selectedGeneUids)
+
+    // watch(
+    //   () => genomeStore.selectedGeneUids,
+    //   (newSelectedGeneUids) => {
+    //     selectedGeneUids.value = newSelectedGeneUids
+    //   }
+    // )
+
+    // Watch for changes in selectedGeneUids and update filteredGenes accordingly
+    watch(
+      selectedGeneUids,
+      (newSelectedGeneUids) => {
+        filteredGenes.value = genomeStore.genomeData.genes.filter((gene) =>
+          newSelectedGeneUids.includes(gene.uid)
+        )
+        console.log('Filtered gene uids:', genomeStore.selectedGeneUids)
+
+        console.log('Filtered genes:', filteredGenes.value)
+      },
+      { immediate: true } // Ensures filteredGenes is populated on component load
+    )
+
+    // const selectedGeneUids = computed(() => genomeStore.selectedGeneUids)
 
     // Watch for changes in selectedSequencesLasso
     watch(
@@ -102,7 +128,6 @@ export default {
         console.log('Filtered sequences updated:', newVal)
 
         // Call addLabels whenever `filteredSequences` changes
-        // addLabels()
         const sequenceIndicesInLookup = filteredSequences.value.map(
           (sequence) => {
             return genomeStore.sequenceUidLookup[sequence.uid]
@@ -127,9 +152,11 @@ export default {
 
     return {
       filteredSequences,
+      filteredGenes,
       mappedIndices,
       genomeStore,
       indexMap,
+      selectedGeneUids,
     }
   },
   data: () => ({
@@ -257,6 +284,7 @@ export default {
     },
     geneToWindowScales() {
       let newScales: Dictionary<d3.ScaleLinear<number, number, never>> = {}
+      console.log('geneToCompressionScales', geneToCompressionScales.value)
       Object.entries(geneToCompressionScales.value).forEach((scaleEntry) => {
         newScales[scaleEntry[0]] = updateViewportRangeBounds(
           scaleEntry[1],
@@ -1106,6 +1134,9 @@ export default {
         return
       }
       const genes: GroupInfo[] = this.dataGenes
+      console.log('gemes from draw genes', genes)
+      console.log('new gemes from draw genes', this.filteredGenes)
+
       /// connection lines
       this.svg().selectAll('path.connection').remove()
       let currentHomologyGroups = this.homologyGroups
@@ -1183,10 +1214,59 @@ export default {
         }
       })
 
+      console.log('CHECK')
+      console.log(
+        'this.geneToWindowScales[key]',
+        this.geneToWindowScales[this.filteredGenes[0].sequence_id]
+      )
+
+      // const geneSymbol = d3
+      //   .symbol()
+      //   .size((d: Gene) => {
+      //     const key = d.sequence_id
+      //     console.log(
+      //       'key',
+      //       key,
+      //       'currentGeneToWindow',
+      //       this.geneToWindowScales[key]
+      //     )
+      //     const currentGeneToWindow = this.geneToWindowScales[key]
+
+      //     const size = getGeneSymbolSize(
+      //       d,
+      //       currentGeneToWindow,
+      //       vis.barHeight,
+      //       showGeneBars.value
+      //     )
+      //     if (
+      //       currentGeneToWindow(d.start) > this.windowRange[1] ||
+      //       currentGeneToWindow(d.end) < this.windowRange[0]
+      //     ) {
+      //       return 0
+      //     }
+      //     return size
+      //   })
+      //   .type((d) => {
+      //     const key = `${d.genome_number}_${d.sequence_number}`
+      //     const currentGeneToWindow = this.geneToWindowScales[key]
+      //     return getGeneSymbolType(
+      //       d,
+      //       currentGeneToWindow,
+      //       vis.barHeight,
+      //       showGeneBars.value
+      //     )
+      //   })
+
       const geneSymbol = d3
         .symbol()
         .size((d: GroupInfo) => {
           const key = `${d.genome_number}_${d.sequence_number}`
+          console.log(
+            'key',
+            key,
+            'currentGeneToWindow',
+            this.geneToWindowScales[key]
+          )
           const currentGeneToWindow = this.geneToWindowScales[key]
           const size = getGeneSymbolSize(
             d,
@@ -1212,96 +1292,138 @@ export default {
             showGeneBars.value
           )
         })
+      console.log('draw genes input', this.filteredGenes)
 
-      console.log('draw genes input', genes)
+      // this.svg()
+      //   .selectAll('path.gene')
+      //   .data(this.filteredGenes, (d) => d.uid)
+      //   .join((enter) =>
+      //     enter
+      //       .append('path')
+      //       .attr('d', geneSymbol)
+      //       .attr('transform', function (d, i) {
+      //         const key = d.id
+      //         const currentScale = vis.geneToWindowScales[key]
+      //         let startPosition = vis.anchor
+      //           ? currentScale(d.start - vis.anchorLookup[key])
+      //           : currentScale(d.start)
+      //         let endPosition = vis.anchor
+      //           ? currentScale(d.end - vis.anchorLookup[key])
+      //           : currentScale(d.end)
+      //         let xTransform =
+      //           vis.margin.left * 3 + (startPosition + endPosition) / 2
+      //         let yTransform =
+      //           vis.margin.top * 2 +
+      //           vis.barHeight / 2 +
+      //           // vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+      //           i * (vis.barHeight + 10)
+      //         return `translate(${xTransform},${yTransform})`
+      //       })
+      //       .attr('class', 'gene')
+      //       // .attr('hg', (d: GroupInfo) => d.homology_id ?? 0)
+      //       .attr('z-index', 100)
+      //       // .attr('stroke', (d): string =>
+      //       //   vis.colorGenes
+      //       //     ? vis.upstreamHomologies.includes(d.homology_id)
+      //       //       ? (this.colorScale(String(d.homology_id)) as string)
+      //       //       : ''
+      //       //     : ''
+      //       // )
+      //       .attr('stroke-width', (d) => '3px')
+      //       .attr('fill', (d) => {
+      //         return vis.colorGenes
+      //           ? (vis.colorScale(String(d.homology_id)) as string)
+      //           : colors['gray-7']
+      //       })
+      //       .attr('opacity', 0.8)
+      //   )
 
-      this.svg()
-        .selectAll('path.gene')
-        .data(genes, (d) => d.mRNA_id)
-        .join(
-          (enter) =>
-            enter
-              .append('path')
-              .attr('d', geneSymbol)
-              .attr('transform', function (d, i) {
-                const key = `${d.genome_number}_${d.sequence_number}`
-                const currentScale = vis.geneToWindowScales[key]
-                let startPosition = vis.anchor
-                  ? currentScale(d.mRNA_start_position - vis.anchorLookup[key])
-                  : currentScale(d.mRNA_start_position)
-                let endPosition = vis.anchor
-                  ? currentScale(d.mRNA_end_position - vis.anchorLookup[key])
-                  : currentScale(d.mRNA_end_position)
-                let xTransform =
-                  vis.margin.left * 3 + (startPosition + endPosition) / 2
-                let yTransform =
-                  vis.margin.top * 2 +
-                  vis.barHeight / 2 +
-                  vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                    (vis.barHeight + 10)
-                return `translate(${xTransform},${yTransform})`
-              })
-              .attr('class', 'gene')
-              .attr('hg', (d: GroupInfo) => d.homology_id ?? 0)
-              .attr('z-index', 100)
-              .attr('stroke', (d): string =>
-                vis.colorGenes
-                  ? vis.upstreamHomologies.includes(d.homology_id)
-                    ? (this.colorScale(String(d.homology_id)) as string)
-                    : ''
-                  : ''
-              )
-              .attr('stroke-width', (d) => '3px')
-              .attr('fill', (d) => {
-                return vis.colorGenes
-                  ? (vis.colorScale(String(d.homology_id)) as string)
-                  : colors['gray-7']
-              })
-              .attr('opacity', 0.8),
+      // this.svg()
+      //   .selectAll('path.gene')
+      //   .data(this.genes, (d) => d.mRNA_id)
+      //   .join((enter) =>
+      //     enter
+      //       .append('path')
+      //       .attr('d', geneSymbol)
+      //       .attr('transform', function (d, i) {
+      //         const key = `${d.genome_number}_${d.sequence_number}`
+      //         const currentScale = vis.geneToWindowScales[key]
+      //         let startPosition = vis.anchor
+      //           ? currentScale(d.mRNA_start_position - vis.anchorLookup[key])
+      //           : currentScale(d.mRNA_start_position)
+      //         let endPosition = vis.anchor
+      //           ? currentScale(d.mRNA_end_position - vis.anchorLookup[key])
+      //           : currentScale(d.mRNA_end_position)
+      //         let xTransform =
+      //           vis.margin.left * 3 + (startPosition + endPosition) / 2
+      //         let yTransform =
+      //           vis.margin.top * 2 +
+      //           vis.barHeight / 2 +
+      //           vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+      //             (vis.barHeight + 10)
+      //         return `translate(${xTransform},${yTransform})`
+      //       })
+      //       .attr('class', 'gene')
+      //       .attr('hg', (d: GroupInfo) => d.homology_id ?? 0)
+      //       .attr('z-index', 100)
+      //       .attr('stroke', (d): string =>
+      //         vis.colorGenes
+      //           ? vis.upstreamHomologies.includes(d.homology_id)
+      //             ? (this.colorScale(String(d.homology_id)) as string)
+      //             : ''
+      //           : ''
+      //       )
+      //       .attr('stroke-width', (d) => '3px')
+      //       .attr('fill', (d) => {
+      //         return vis.colorGenes
+      //           ? (vis.colorScale(String(d.homology_id)) as string)
+      //           : colors['gray-7']
+      //       })
+      //       .attr('opacity', 0.8)
 
-          (update) =>
-            update
-              .transition()
-              .duration(this.transitionTime)
-              .attr('transform', function (d, i) {
-                const key = `${d.genome_number}_${d.sequence_number}`
-                const currentScale = vis.geneToWindowScales[key]
-                let startPosition = vis.anchor
-                  ? currentScale(d.mRNA_start_position - vis.anchorLookup[key])
-                  : currentScale(d.mRNA_start_position)
-                let endPosition = vis.anchor
-                  ? currentScale(d.mRNA_end_position - vis.anchorLookup[key])
-                  : currentScale(d.mRNA_end_position)
-                let xTransform =
-                  vis.margin.left * 3 + (startPosition + endPosition) / 2
-                let yTransform =
-                  vis.margin.top * 2 +
-                  vis.barHeight / 2 +
-                  vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-                    (vis.barHeight + 10)
-                return `translate(${xTransform},${yTransform})`
-              })
-              .attr('d', geneSymbol)
-              .attr('fill', (d) => {
-                return vis.colorGenes
-                  ? (vis.colorScale(String(d.homology_id)) as string)
-                  : colors['gray-7']
-              })
-              .attr('stroke-width', (d) => '3px')
-              .attr('stroke', (d) =>
-                vis.colorGenes
-                  ? (vis.colorScale(String(d.homology_id)) as string)
-                  : colors['gray-7']
-              ),
-          //   vis.colorGenes
-          //     ? vis.upstreamHomologies.includes(d.homology_id ?? 0)
-          //       ? vis.colorScale(String(d.homology_id))
-          //       : ''
-          //     : ''
-          // ),
+      //     (update) =>
+      //       update
+      //         .transition()
+      //         .duration(this.transitionTime)
+      //         .attr('transform', function (d, i) {
+      //           const key = `${d.genome_number}_${d.sequence_number}`
+      //           const currentScale = vis.geneToWindowScales[key]
+      //           let startPosition = vis.anchor
+      //             ? currentScale(d.mRNA_start_position - vis.anchorLookup[key])
+      //             : currentScale(d.mRNA_start_position)
+      //           let endPosition = vis.anchor
+      //             ? currentScale(d.mRNA_end_position - vis.anchorLookup[key])
+      //             : currentScale(d.mRNA_end_position)
+      //           let xTransform =
+      //             vis.margin.left * 3 + (startPosition + endPosition) / 2
+      //           let yTransform =
+      //             vis.margin.top * 2 +
+      //             vis.barHeight / 2 +
+      //             vis.sortedMrnaIndices[vis.chromosomeNr][i] *
+      //               (vis.barHeight + 10)
+      //           return `translate(${xTransform},${yTransform})`
+      //         })
+      //         .attr('d', geneSymbol)
+      //         .attr('fill', (d) => {
+      //           return vis.colorGenes
+      //             ? (vis.colorScale(String(d.homology_id)) as string)
+      //             : colors['gray-7']
+      //         })
+      //         .attr('stroke-width', (d) => '3px')
+      //         .attr('stroke', (d) =>
+      //           vis.colorGenes
+      //             ? (vis.colorScale(String(d.homology_id)) as string)
+      //             : colors['gray-7']
+      //         ),
+      //     //   vis.colorGenes
+      //     //     ? vis.upstreamHomologies.includes(d.homology_id ?? 0)
+      //     //       ? vis.colorScale(String(d.homology_id))
+      //     //       : ''
+      //     //     : ''
+      //     // ),
 
-          (exit) => exit.remove()
-        )
+      //     (exit) => exit.remove()
+      //   )
     },
 
     //////////////////////////////////////////////////////////////////// Draw notifications //////////////////////////////////////
@@ -1452,18 +1574,11 @@ export default {
     },
   },
   mounted() {
-    console.log('sequence data from focusview', this.data)
-    console.log('gene data from focusview', this.dataGenes)
     const contentElement = document.getElementById('content-focus')
     this.svgWidth =
       (contentElement?.offsetWidth || 0) * this.svgWidthScaleFactor
 
-    this.svgHeight = contentElement?.clientHeight - 40
-    console.log(
-      'contentElement?.offsetHeight',
-      contentElement?.clientHeight,
-      contentElement
-    )
+    this.svgHeight = contentElement?.clientHeight
 
     // if (this.chromosomeNr == 'unphased') {
     //   this.sortedChromosomeSequenceIndices[12].length * (this.barHeight + 10) +
@@ -1485,7 +1600,10 @@ export default {
       const key = `${item.genome_number}_${item.sequence_number}`
       anchorLookup[key] = 0 //item.mRNA_start_position
     })
+
     this.anchorLookup = anchorLookup
+    console.log('this.anchorLookup', this.anchorLookup)
+    console.log('homologyanchor', homologyAnchor)
 
     const divergentScale = this.dataGenes.map((item) => {
       const key = `${item.genome_number}_${item.sequence_number}`

@@ -65,19 +65,21 @@ export default {
   }),
   setup() {
     const genomeStore = useGenomeStore()
-    const selectedGenes = ref<Gene[]>([])
+    const selectedGeneUids = ref<string[]>([])
 
     // Fetch default selection on mount if it's already set in the store
     onMounted(() => {
       if (genomeStore.selectedSequencesLasso.length) {
-        updateSelectedGenes()
+        updateSelectedGeneUids()
       }
     })
 
     // Helper function to update selected genes based on `selectedSequencesLasso`
-    const updateSelectedGenes = async () => {
-      selectedGenes.value = await genomeStore.getGenesForSelectedLasso()
-      console.log('Updated selectedGenes:', selectedGenes.value)
+    const updateSelectedGeneUids = async () => {
+      const geneUids = await genomeStore.getGenesForSelectedLasso()
+      console.log('Updated selectedGeneUids:', geneUids)
+      genomeStore.setSelectedGeneUids(geneUids) // set store value
+      selectedGeneUids.value = geneUids // set local value
     }
 
     // Watcher to react to changes in selectedSequencesLasso
@@ -88,15 +90,13 @@ export default {
           'lasso selection from watch pixi scatter',
           _newLassoSelection
         )
-        // selectedGenes.value = await genomeStore.getGenesForSelectedLasso()
-        // console.log('Updated selectedGenes:', selectedGenes.value)
-        await updateSelectedGenes()
+        await updateSelectedGeneUids()
       },
-      { immediate: true } // Run immediately on component load
+      { immediate: true }
     )
 
     return {
-      selectedGenes,
+      selectedGeneUids,
       genomeStore,
     }
   },
@@ -262,7 +262,7 @@ export default {
         const svg = d3
           .select(this.$refs.lasso)
           .attr('width', this.$el.parentElement.clientWidth)
-          .attr('height', this.$el.parentElement.clientHeigh)
+          .attr('height', this.$el.parentElement.clientHeight)
           .style('position', 'absolute')
           .style('top', '0')
           .style('left', '0')
@@ -464,8 +464,7 @@ export default {
 
       // Create a sprite using the circle texture
       const circleSprite = new PIXI.Sprite(this.circleTexture)
-      circleSprite.x = x
-      circleSprite.y = y
+
       circleSprite.tint = 0xd3d3d3
 
       // Check if this sequence is part of the selectedSequencesLasso
@@ -478,6 +477,9 @@ export default {
       // Add interactivity to the sprite
       circleSprite.interactive = true
       circleSprite.buttonMode = true
+
+      circleSprite.x = x
+      circleSprite.y = y
 
       const hoverTextGenomeLabel = new PIXI.Text({
         text: 'genome nr: ',
@@ -707,6 +709,7 @@ export default {
 
       circleContainer.addChild(circleSprite)
     },
+
     resizeWindow(app) {
       const devicePixelRatio = window.devicePixelRatio || 1
       const parentWidth = this.$el.parentElement.clientWidth

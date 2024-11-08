@@ -6,7 +6,7 @@ import type { Gene, GenomeData } from '@/types'
 ///// new helpers for genomeData
 export const createSequenceToLociGenesLookup = (
   genomeData: GenomeData
-): Map<string, { loci: string[]; genes: Gene[] }> => {
+): Map<string, { loci: string[]; genes: string[] }> => {
   const sequenceToLociGenes = new Map<
     string,
     { loci: string[]; genes: Gene[] }
