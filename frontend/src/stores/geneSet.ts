@@ -12,6 +12,7 @@ import {
 } from '@/api/geneSet'
 import {
   chromosomesLookup,
+  createGeneToLociAndSequenceLookup,
   createSequenceToLociGenesLookup,
   groupInfosLookup,
   sequencesIdLookup,
@@ -61,6 +62,10 @@ export const useGenomeStore = defineStore({
       string,
       { loci: string[]; genes: string[] }
     >(),
+    geneToLocusSequenceLookup: new Map<
+      string,
+      { loci: string; sequence: string }
+    >(),
     geneToHomologyGroupLookup: {} as Record<
       string,
       { id: number; uid: string }[]
@@ -96,6 +101,9 @@ export const useGenomeStore = defineStore({
         this.genomeData = await fetchGenomeData()
         this.generateIndicesAndLookup()
         this.sequenceToLociGenesLookup = createSequenceToLociGenesLookup(
+          this.genomeData
+        )
+        this.geneToLocusSequenceLookup = createGeneToLociAndSequenceLookup(
           this.genomeData
         )
       } catch (error) {
@@ -157,6 +165,11 @@ export const useGenomeStore = defineStore({
         },
         {} as Record<string, { id: number; uid: string }[]>
       )
+      // Extend each gene object in genomeData.genes with its homology groups
+      this.genomeData.genes = this.genomeData.genes.map((gene) => ({
+        ...gene,
+        homology_groups: this.geneToHomologyGroupLookup[gene.uid] || [],
+      }))
     },
     getGenesForSelectedLasso(): string[] {
       const genes: string[] = []

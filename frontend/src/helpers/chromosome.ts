@@ -1,15 +1,23 @@
 import type { Dictionary } from 'lodash'
 
 import type { GroupInfo, Sequence, SequenceMetrics } from '@/types'
-import type { Gene, GenomeData } from '@/types'
+import type { Gene, GenomeData, SequenceInfo } from '@/types'
 
 ///// new helpers for genomeData
+export function getSequenceIdByUid(
+  sequences: SequenceInfo[],
+  uid: string
+): string | undefined {
+  const sequence = sequences.find((seq) => seq.uid === uid)
+  return sequence ? sequence.id : undefined
+}
+
 export const createSequenceToLociGenesLookup = (
   genomeData: GenomeData
 ): Map<string, { loci: string[]; genes: string[] }> => {
   const sequenceToLociGenes = new Map<
     string,
-    { loci: string[]; genes: Gene[] }
+    { loci: string[]; genes: string[] }
   >()
 
   genomeData.sequences.forEach((sequence) => {
@@ -27,6 +35,38 @@ export const createSequenceToLociGenesLookup = (
   })
 
   return sequenceToLociGenes
+}
+
+export const createGeneToLociAndSequenceLookup = (
+  genomeData: GenomeData
+): Record<string, { loci: string; sequence: string }> => {
+  const geneToLociAndSequence: Record<
+    string,
+    { loci: string; sequence: string }
+  > = {}
+
+  // Loop through each sequence in genomeData
+  genomeData.sequences.forEach((sequence) => {
+    sequence.loci.forEach((locusUid) => {
+      // Find the corresponding locus by UID
+      const locus = genomeData.loci.find((l) => l.uid === locusUid)
+
+      if (locus) {
+        // Map each gene within this locus to its locus and sequence UID
+        locus.genes.forEach((geneUid) => {
+          geneToLociAndSequence[geneUid] = {
+            loci: locus.uid,
+            sequence: sequence.uid,
+          }
+        })
+      } else {
+        console.warn(`Locus with UID ${locusUid} not found in genomeData.loci`)
+      }
+    })
+  })
+
+  console.log('geneToLociAndSequence', geneToLociAndSequence)
+  return geneToLociAndSequence
 }
 
 export const chromosomesLookup = (sequences: SequenceMetrics[]) => {

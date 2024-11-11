@@ -144,6 +144,7 @@ export interface Genome {
 
 // Type for sequence info
 export interface SequenceInfo {
+  find(arg0: (seq: any) => boolean): unknown
   uid: string
   sequence_length_nuc: number
   gene_count: number
@@ -157,7 +158,7 @@ export interface SequenceInfo {
 export interface Locus {
   uid: string
   loci_length_nuc: number
-  genes: Gene[]
+  genes: string[]
   name: string
   start: number
   end: number
@@ -175,6 +176,7 @@ export interface Gene {
   label: string
   gene_length_nuc: number
   mrnas: string[]
+  homology_groups?: { id: number; uid: string }[]
 }
 
 export interface Mrna {

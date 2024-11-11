@@ -35,7 +35,7 @@ import {
   calculateWidth,
   updateViewportRangeBounds,
 } from '@/helpers/axisStretch'
-import { groupInfoDensity } from '@/helpers/chromosome'
+import { getSequenceIdByUid, groupInfoDensity } from '@/helpers/chromosome'
 import { crossDetection } from '@/helpers/crossDetection'
 import { getGeneSymbolSize, getGeneSymbolType } from '@/helpers/customSymbols'
 import { runSpringSimulation } from '@/helpers/springSimulation'
@@ -78,8 +78,10 @@ export default {
     const filteredGenes = ref<Gene[]>([])
     const indexMap = ref<Map<number, number>>(new Map())
     const mappedIndices = ref<number[]>([])
+    const sequenceIndicesInLookup = ref<number[]>([])
     // const selectedGeneUids = ref<string[]>([])
     const selectedGeneUids = computed(() => genomeStore.selectedGeneUids)
+    const geneToLocusSequenceLookup = genomeStore.geneToLocusSequenceLookup
 
     // watch(
     //   () => genomeStore.selectedGeneUids,
@@ -128,7 +130,7 @@ export default {
         console.log('Filtered sequences updated:', newVal)
 
         // Call addLabels whenever `filteredSequences` changes
-        const sequenceIndicesInLookup = filteredSequences.value.map(
+        sequenceIndicesInLookup.value = filteredSequences.value.map(
           (sequence) => {
             return genomeStore.sequenceUidLookup[sequence.uid]
           }
@@ -140,23 +142,25 @@ export default {
         )
 
         indexMap.value = new Map(
-          sequenceIndicesInLookup.map((value, idx) => [value, idx])
+          sequenceIndicesInLookup.value.map((value, idx) => [value, idx])
         )
-        mappedIndices.value = sequenceIndicesInLookup.map(
+        mappedIndices.value = sequenceIndicesInLookup.value.map(
           (index) => indexMap.value.get(index) ?? 0
         )
-        console.log('mappedIndices: ', mappedIndices.value) // Output: [0, 1, 2]
+        console.log('mappedIndices: ', mappedIndices.value, indexMap)
       },
       { immediate: true }
     )
 
     return {
       filteredSequences,
+      sequenceIndicesInLookup,
       filteredGenes,
       mappedIndices,
       genomeStore,
       indexMap,
       selectedGeneUids,
+      geneToLocusSequenceLookup,
     }
   },
   data: () => ({
@@ -973,12 +977,6 @@ export default {
     ///////////////////////////////////////////////////////////////////////////////add labels ////////////////////////////////////
     addLabels() {
       let vis = this
-      console.log(
-        'drawing sequence labels'
-        // this.filteredSequences,
-        // this.mappedIndices,
-        // this.indexMap
-      )
 
       if (this.filteredSequences === undefined) {
         return
@@ -998,20 +996,29 @@ export default {
               .attr('font-size', 10)
               .attr(
                 'y',
-                (d, i) => this.mappedIndices[i] * (this.barHeight + 10)
+
+                function (d, i) {
+                  // return vis.mappedIndices[i] * (vis.barHeight + 10)
+                  return i * (vis.barHeight + 10)
+                }
               )
 
               .attr('dy', -this.barHeight / 2)
-              .text((d) => d.id),
+              .text(
+                (d, i) =>
+                  getSequenceIdByUid(
+                    vis.filteredSequences,
+                    Object.entries(vis.genomeStore.sequenceUidLookup)[
+                      vis.sequenceIndicesInLookup[i]
+                    ][0]
+                  ) ?? 'undefined' //provide default undefined label if undefined
+              ),
 
           (update) =>
             update
               .transition()
               .duration(this.transitionTime)
-              .attr(
-                'y',
-                (d, i) => this.mappedIndices[i] * (this.barHeight + 10)
-              ),
+              .attr('y', (d, i) => i * (this.barHeight + 10)),
           (exit) => exit.remove()
         )
 
@@ -1134,8 +1141,6 @@ export default {
         return
       }
       const genes: GroupInfo[] = this.dataGenes
-      console.log('gemes from draw genes', genes)
-      console.log('new gemes from draw genes', this.filteredGenes)
 
       /// connection lines
       this.svg().selectAll('path.connection').remove()
@@ -1214,12 +1219,6 @@ export default {
         }
       })
 
-      console.log('CHECK')
-      console.log(
-        'this.geneToWindowScales[key]',
-        this.geneToWindowScales[this.filteredGenes[0].sequence_id]
-      )
-
       // const geneSymbol = d3
       //   .symbol()
       //   .size((d: Gene) => {
@@ -1257,86 +1256,117 @@ export default {
       //     )
       //   })
 
-      const geneSymbol = d3
-        .symbol()
-        .size((d: GroupInfo) => {
-          const key = `${d.genome_number}_${d.sequence_number}`
-          console.log(
-            'key',
-            key,
-            'currentGeneToWindow',
-            this.geneToWindowScales[key]
-          )
-          const currentGeneToWindow = this.geneToWindowScales[key]
-          const size = getGeneSymbolSize(
-            d,
-            currentGeneToWindow,
-            vis.barHeight,
-            showGeneBars.value
-          )
-          if (
-            currentGeneToWindow(d.mRNA_start_position) > this.windowRange[1] ||
-            currentGeneToWindow(d.mRNA_end_position) < this.windowRange[0]
-          ) {
-            return 0
-          }
-          return size
-        })
-        .type((d) => {
-          const key = `${d.genome_number}_${d.sequence_number}`
-          const currentGeneToWindow = this.geneToWindowScales[key]
-          return getGeneSymbolType(
-            d,
-            currentGeneToWindow,
-            vis.barHeight,
-            showGeneBars.value
-          )
-        })
-      console.log('draw genes input', this.filteredGenes)
+      // const geneSymbol = d3
+      //   .symbol()
+      //   .size((d: GroupInfo) => {
+      //     const key = `${d.genome_number}_${d.sequence_number}`
+      //     console.log(
+      //       'key',
+      //       key,
+      //       'currentGeneToWindow',
+      //       this.geneToWindowScales[key]
+      //     )
+      //     const currentGeneToWindow = this.geneToWindowScales[key]
+      //     const size = getGeneSymbolSize(
+      //       d,
+      //       currentGeneToWindow,
+      //       vis.barHeight,
+      //       showGeneBars.value
+      //     )
+      //     if (
+      //       currentGeneToWindow(d.mRNA_start_position) > this.windowRange[1] ||
+      //       currentGeneToWindow(d.mRNA_end_position) < this.windowRange[0]
+      //     ) {
+      //       return 0
+      //     }
+      //     return size
+      //   })
+      //   .type((d) => {
+      //     const key = `${d.genome_number}_${d.sequence_number}`
+      //     const currentGeneToWindow = this.geneToWindowScales[key]
+      //     return getGeneSymbolType(
+      //       d,
+      //       currentGeneToWindow,
+      //       vis.barHeight,
+      //       showGeneBars.value
+      //     )
+      //   })
 
-      // this.svg()
-      //   .selectAll('path.gene')
-      //   .data(this.filteredGenes, (d) => d.uid)
-      //   .join((enter) =>
-      //     enter
-      //       .append('path')
-      //       .attr('d', geneSymbol)
-      //       .attr('transform', function (d, i) {
-      //         const key = d.id
-      //         const currentScale = vis.geneToWindowScales[key]
-      //         let startPosition = vis.anchor
-      //           ? currentScale(d.start - vis.anchorLookup[key])
-      //           : currentScale(d.start)
-      //         let endPosition = vis.anchor
-      //           ? currentScale(d.end - vis.anchorLookup[key])
-      //           : currentScale(d.end)
-      //         let xTransform =
-      //           vis.margin.left * 3 + (startPosition + endPosition) / 2
-      //         let yTransform =
-      //           vis.margin.top * 2 +
-      //           vis.barHeight / 2 +
-      //           // vis.sortedMrnaIndices[vis.chromosomeNr][i] *
-      //           i * (vis.barHeight + 10)
-      //         return `translate(${xTransform},${yTransform})`
-      //       })
-      //       .attr('class', 'gene')
-      //       // .attr('hg', (d: GroupInfo) => d.homology_id ?? 0)
-      //       .attr('z-index', 100)
-      //       // .attr('stroke', (d): string =>
-      //       //   vis.colorGenes
-      //       //     ? vis.upstreamHomologies.includes(d.homology_id)
-      //       //       ? (this.colorScale(String(d.homology_id)) as string)
-      //       //       : ''
-      //       //     : ''
-      //       // )
-      //       .attr('stroke-width', (d) => '3px')
-      //       .attr('fill', (d) => {
-      //         return vis.colorGenes
-      //           ? (vis.colorScale(String(d.homology_id)) as string)
-      //           : colors['gray-7']
-      //       })
-      //       .attr('opacity', 0.8)
-      //   )
+      this.svg()
+        .selectAll('path.gene')
+        .data(this.filteredGenes, (d: any) => d.uid)
+        .join(
+          (enter) =>
+            enter
+              .append('path')
+              .attr('d', d3.symbol().type(d3.symbolTriangle).size(50))
+              .attr('transform', function (d, i) {
+                // const key = d.id
+                // const currentScale = vis.geneToWindowScales[key]
+                // let startPosition = vis.anchor
+                //   ? currentScale(d.start)
+                //   : currentScale(d.start)
+                // let endPosition = vis.anchor
+                //   ? currentScale(d.start)
+                //   : currentScale(d.end)
+
+                let xTransform = 20
+                let drawingIndex =
+                  vis.indexMap.get(
+                    vis.genomeStore.sequenceUidLookup[
+                      vis.geneToLocusSequenceLookup[d.uid].sequence
+                    ]
+                  ) ?? 0
+                let yTransform = 20 + drawingIndex * (vis.barHeight + 10)
+                return `translate(${xTransform},${yTransform}) rotate(90)`
+              })
+              .attr('class', 'gene')
+              .attr(
+                'hg',
+                (d: Gene) => d.homology_groups?.map((entry) => entry.id) ?? []
+                // vis.genomeStore.geneToHomologyGroupLookup[d.uid].values ??
+                // 'undefined'
+              )
+              .attr('z-index', 1000)
+              // .attr('stroke', (d): string =>
+              //   vis.colorGenes
+              //     ? vis.upstreamHomologies.includes(d.homology_id)
+              //       ? (this.colorScale(String(d.homology_id)) as string)
+              //       : ''
+              //     : ''
+              // )
+              .attr('stroke-width', '3px')
+              .attr('fill', colors['gray-7'])
+              .attr('opacity', 0.8),
+          (update) =>
+            update
+              .transition()
+              .duration(this.transitionTime)
+              .attr('transform', function (d, i) {
+                // const key = d.id
+                // const currentScale = vis.geneToWindowScales[key]
+                // let startPosition = vis.anchor
+                //   ? currentScale(d.start)
+                //   : currentScale(d.start)
+                // let endPosition = vis.anchor
+                //   ? currentScale(d.start)
+                //   : currentScale(d.end)
+
+                let xTransform = 20
+                let drawingIndex =
+                  vis.indexMap.get(
+                    vis.genomeStore.sequenceUidLookup[
+                      vis.geneToLocusSequenceLookup[d.uid].sequence
+                    ]
+                  ) ?? 0
+                let yTransform = 20 + drawingIndex * (vis.barHeight + 10)
+                return `translate(${xTransform},${yTransform}) rotate(90)`
+              })
+              // .attr('d', geneSymbol)
+              .attr('z-index', 1000)
+              .attr('fill', colors['gray-7']),
+          (exit) => exit.remove()
+        )
 
       // this.svg()
       //   .selectAll('path.gene')
@@ -1761,10 +1791,37 @@ export default {
   // },
   watch: {
     //Watch for updates to `mappedIndices` before redrawing
+    filteredGenes: {
+      handler(newVal) {
+        console.log('filteredGenes updated:', newVal)
+        this.drawGenes()
+      },
+      deep: true,
+      immediate: true,
+    },
     mappedIndices: {
       handler(newVal) {
-        console.log('Filtered sequence indices updated:', newVal)
+        console.log('mappedIndices updated:', newVal)
         this.addLabels()
+        this.drawGenes()
+      },
+      deep: true,
+      immediate: true,
+    },
+    indexMap: {
+      handler(newVal) {
+        console.log('indexMap updated:', newVal)
+        this.addLabels()
+        this.drawGenes()
+      },
+      deep: true,
+      immediate: true,
+    },
+    sequenceIndicesInLookup: {
+      handler(newVal) {
+        console.log('sequenceIndicesInLookup updated:', newVal)
+        this.addLabels()
+        this.drawGenes()
       },
       deep: true,
       immediate: true,
