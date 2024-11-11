@@ -177,6 +177,7 @@ export interface Gene {
   gene_length_nuc: number
   mrnas: string[]
   homology_groups?: { id: number; uid: string }[]
+  sequence_uid?: string
 }
 
 export interface Mrna {

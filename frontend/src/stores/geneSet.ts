@@ -170,6 +170,12 @@ export const useGenomeStore = defineStore({
         ...gene,
         homology_groups: this.geneToHomologyGroupLookup[gene.uid] || [],
       }))
+
+      // Extend each gene object in genomeData.genes with its sequence uid
+      this.genomeData.genes = this.genomeData.genes.map((gene) => ({
+        ...gene,
+        sequence_uid: this.geneToLocusSequenceLookup[gene.uid]?.sequence,
+      }))
     },
     getGenesForSelectedLasso(): string[] {
       const genes: string[] = []

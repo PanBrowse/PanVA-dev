@@ -1,6 +1,6 @@
 import { type Dictionary } from 'lodash'
 
-import type { GroupInfo } from '@/types'
+import type { Gene, GroupInfo } from '@/types'
 
 import { filterUniquePosition } from './axisStretch'
 import { abs } from './math'
@@ -427,19 +427,19 @@ export const addYConnections = (nodeGroups: GraphNodeGroup[]) => {
   return nodeGroups
 }
 
-export const genesToNodes = (genes: GroupInfo[]) => {
+export const genesToNodes = (genes: Gene[]) => {
   // Convert genes to graphNodes
   const nodes: GraphNode[] = []
   genes.forEach((gene, index) => {
-    const uId = gene.gene_id + '_' + index.toString() // add index to get unique id
+    // const uId = gene.gene_id + '_' + index.toString() // add index to get unique id
     nodes.push(
       new GraphNode(
-        uId,
-        gene.mRNA_start_position,
-        gene.mRNA_end_position,
-        gene.homology_id,
-        gene.sequence_number,
-        `${gene.genome_number}_${gene.sequence_number}`
+        gene.uid,
+        gene.start,
+        gene.end,
+        gene.homology_groups[0]['id'],
+        gene.sequence_id,
+        `${gene.sequence_uid}`
       )
     )
   })
