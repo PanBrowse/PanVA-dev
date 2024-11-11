@@ -1318,7 +1318,8 @@ export default {
                     ]
                   ) ?? 0
                 let yTransform = 20 + drawingIndex * (vis.barHeight + 10)
-                return `translate(${xTransform},${yTransform}) rotate(90)`
+                let rotation = d.strand === 0 ? 90 : 270
+                return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('class', 'gene')
               .attr(
@@ -1360,7 +1361,8 @@ export default {
                     ]
                   ) ?? 0
                 let yTransform = 20 + drawingIndex * (vis.barHeight + 10)
-                return `translate(${xTransform},${yTransform}) rotate(90)`
+                let rotation = d.strand === 0 ? 90 : 270
+                return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               // .attr('d', geneSymbol)
               .attr('z-index', 1000)
@@ -1649,13 +1651,22 @@ export default {
 
     // Create individual scales
     ///
+    // let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] =
+    //   runSpringSimulation(
+    //     this.dataGenes ?? [],
+    //     this.data ?? [],
+    //     currentHeat.value,
+    //     0.5,
+    //     232273529
+    //   )
+
     let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] =
       runSpringSimulation(
-        this.dataGenes ?? [],
-        this.data ?? [],
+        this.filteredGenes ?? [],
+        this.filteredSequences ?? [],
         currentHeat.value,
         0.5,
-        232273529
+        736740
       )
 
     crossingHomologyGroups.value = crossDetection(newGenePositions)
