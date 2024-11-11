@@ -92,6 +92,8 @@ export const runSpringSimulation = (
   }
 }
 
+/////////////////// Previous spring simulation code: ///////////////////////////
+
 // export const runSpringSimulation = ( genes: GroupInfo[], sequences: SequenceMetrics[], fromHeat:number = 1000, toHeat: number = 0.1, initializeOnHomologygroup?:number) => {
 //   // simulates forces applied to all nodes in the graph
 //   // if tuning of the evaluateForces function is bad it can result in strange behaviour (ugly layout)
