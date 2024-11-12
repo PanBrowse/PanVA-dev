@@ -16,6 +16,7 @@ import ChromosomeDetails from './visualizations/ChromosomeDetails.vue'
 import ChromosomeOverview from './visualizations/ChromosomeOverview.vue'
 import Density from './visualizations/Density.vue'
 import GroupInfoTable from './visualizations/GroupInfoTable.vue'
+import SpringTuning from './sidebar/SpringTuning.vue';
 // import Homologies from './visualizations/Homologies.vue'
 
 export default {
@@ -34,6 +35,7 @@ export default {
     ARow: Row,
     ACol: Col,
     HomologyOverview,
+    SpringTuning,
   },
   computed: {
     ...mapState(useGeneSetStore, ['isInitialized', 'showTable', 'showDetails']),
@@ -47,6 +49,7 @@ export default {
       <HomologyOverview />
       <Filters />
       <Sorting />
+      <SpringTuning />
       <GraphicsOptions />
       <ContextOptions />
       <Unphased />
