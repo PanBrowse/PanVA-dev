@@ -1,7 +1,9 @@
 import { ConsoleSqlOutlined } from '@ant-design/icons-vue';
-import { sortBy, type Dictionary } from 'lodash';
+import { type Dictionary, sortBy } from 'lodash';
 import { defineStore } from 'pinia';
+import { computed, ref, watch } from 'vue';
 
+import { fetchGenomeData } from '@/api/geneSet';
 import {
   fetchClusteringOrder,
   fetchGroupInfo,
@@ -10,19 +12,209 @@ import {
 } from '@/api/geneSet';
 import {
   chromosomesLookup,
+  createGeneToLociAndSequenceLookup,
+  createSequenceToLociGenesLookup,
   groupInfosLookup,
   sequencesIdLookup,
   sortedGroupInfosLookup,
   sortedSequenceIdsLookup,
 } from '@/helpers/chromosome';
+import type { Gene, GenomeData, Locus } from '@/types';
 import type { GroupInfo, Homology, SequenceMetrics } from '@/types';
 
 import { useGlobalStore } from './global';
 import { runSpringSimulation } from '@/helpers/springSimulation';
 
+// to-do: add this to config! this is data dependent
+const DEFAULT_SEQUENCE_UIDS = [
+  '405ddb34-205c-4f83-91ef-939a01140637', //1_1
+  '0eb86f3a-45e8-44c0-9c9f-0000bd3c8a1f', //2_1
+  '57af37c8-b8d1-48c8-8b01-bddaf0da31b4', //3_1
+  '85f65741-674b-48f7-a544-daff518247e9', //4_1
+  '9ef875b2-1f8b-4f9f-a641-e024a79ac3c0', //5_1
+  '4aa41269-bc58-48e2-9521-34f3e075e6ee', //6_1
+  'd9d31634-8177-4b3c-b9e8-e2be37bb894c', //7_1
+  '8b6da358-520e-434d-b205-a23dda1cef19', //8_1
+  '3f1d2bf9-aa72-4263-a95c-d1728bddff1b', //9_1
+  '1a03d037-0edf-4ab3-912d-af128f9fc53d', //10_1
+];
+
+export const useGenomeStore = defineStore({
+  id: 'genome',
+  state: () => ({
+    genomeData: {
+      genomes: [],
+      sequences: [],
+      loci: [],
+      genes: [],
+    } as unknown as GenomeData,
+    selectedGenomes: [] as string[],
+    selectedSequences: [] as string[],
+    selectedSequencesLasso: [...DEFAULT_SEQUENCE_UIDS],
+    selectedGeneUids: [] as string[],
+    sequenceToLociGenesLookup: new Map<
+      string,
+      { loci: string[]; genes: string[]; }
+    >(),
+    geneToLocusSequenceLookup: new Map<
+      string,
+      { loci: string; sequence: string; }
+    >(),
+    geneToHomologyGroupLookup: {} as Record<
+      string,
+      { id: number; uid: string; }[]
+    >,
+    selectedSequencesTracker: new Set(DEFAULT_SEQUENCE_UIDS),
+    genomeUids: [] as string[], // Array to store genome numbers in the loading order
+    genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
+    sequenceUids: [] as string[], // Array to store genome numbers in the loading order
+    sequenceUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
+    isInitialized: false,
+  }),
+  getters: {
+    genomeCount: (state) => state.genomeData?.genomes?.length || 0,
+    sequenceCount: (state) => state.genomeData?.sequences?.length || 0,
+    lociCount: (state) => state.genomeData?.loci?.length || 0,
+    geneCount: (state) => state.genomeData?.genes?.length || 0,
+    mrnaCount: (state) => state.genomeData?.mrnas?.length || 0,
+    cdsCount: (state) => state.genomeData?.cds?.length || 0,
+    exonCount: (state) => state.genomeData?.exons?.length || 0,
+    domainCount: (state) => state.genomeData?.functional_domains?.length || 0,
+    homologyGroupCount: (state) => state.genomeData?.groups?.length || 0,
+    homologyLinkCount: (state) => state.genomeData?.links?.length || 0,
+    genomeNames: (state) =>
+      state.genomeData?.genomes?.map((genome) => genome.name) || [],
+    sequenceNames: (state) =>
+      state.genomeData?.sequences?.map((sequence) => sequence.name) || [],
+  },
+  actions: {
+    async loadGenomeData() {
+      const global = useGlobalStore();
+
+      try {
+        this.genomeData = await fetchGenomeData();
+        this.generateIndicesAndLookup();
+        this.sequenceToLociGenesLookup = createSequenceToLociGenesLookup(
+          this.genomeData
+        );
+        this.geneToLocusSequenceLookup = createGeneToLociAndSequenceLookup(
+          this.genomeData
+        );
+      } catch (error) {
+        global.setError({
+          message: 'Could not load or parse genome data.',
+          isFatal: true,
+        });
+        throw error;
+      }
+      // Set initialized flag only after all API calls complete successfully
+      this.isInitialized = true;
+    },
+    generateIndicesAndLookup() {
+      this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid); // Populate genomeNrs array
+      this.sequenceUids = this.genomeData.sequences.map((seq) => seq.uid); // Populate genomeNrs array
+
+      // Populate genomeNrLookup with uid as key and index as value
+      this.genomeUidLookup = this.genomeData.genomes.reduce(
+        (lookup, genome, index) => {
+          lookup[genome.uid] = index; // Use uid as key and index as value
+          return lookup;
+        },
+        {} as Record<string, number>
+      );
+
+      this.sequenceUidLookup = this.genomeData.sequences.reduce(
+        (lookup, sequence, index) => {
+          lookup[sequence.uid] = index; // Use uid as key and index as value
+          return lookup;
+        },
+        {} as Record<string, number>
+      );
+
+      const mRNAToHomologyGroup: Record<string, { id: number; uid: string; }> =
+        {};
+
+      this.genomeData.groups.forEach((group) => {
+        group.mrnas.forEach((mrna_uid) => {
+          mRNAToHomologyGroup[mrna_uid] = {
+            id: group.label,
+            uid: group.uid,
+          };
+        });
+      });
+      // Populate geneToHomologyGroupLookup using mRNA to homology group mapping
+      this.geneToHomologyGroupLookup = this.genomeData.genes.reduce(
+        (lookup, gene) => {
+          const homologyGroups = new Map<number, { id: number; uid: string; }>();
+
+          gene.mrnas.forEach((mRNA) => {
+            const homologyGroupInfo = mRNAToHomologyGroup[mRNA];
+            if (homologyGroupInfo) {
+              homologyGroups.set(homologyGroupInfo.id, homologyGroupInfo);
+            }
+          });
+
+          lookup[gene.uid] = Array.from(homologyGroups.values()); // Convert Map to array
+          return lookup;
+        },
+        {} as Record<string, { id: number; uid: string; }[]>
+      );
+      // Extend each gene object in genomeData.genes with its homology groups
+      this.genomeData.genes = this.genomeData.genes.map((gene) => ({
+        ...gene,
+        homology_groups: this.geneToHomologyGroupLookup[gene.uid] || [],
+      }));
+
+      // Extend each gene object in genomeData.genes with its sequence uid
+      this.genomeData.genes = this.genomeData.genes.map((gene) => ({
+        ...gene,
+        sequence_uid: this.geneToLocusSequenceLookup[gene.uid]?.sequence,
+      }));
+    },
+    getGenesForSelectedLasso(): string[] {
+      const genes: string[] = [];
+      const selectedSequenceUids = this.selectedSequencesLasso;
+
+      // console.log('sequenceToLociGenesLookup', this.sequenceToLociGenesLookup)
+      selectedSequenceUids.forEach((sequenceUid) => {
+        const lociAndGenes = this.sequenceToLociGenesLookup.get(sequenceUid);
+
+        if (lociAndGenes) {
+          // Add loci genes to the main genes list
+          genes.push(...lociAndGenes.genes);
+        } else {
+          console.warn(`No loci found for sequence UID: ${sequenceUid}`);
+        }
+      });
+
+      return genes;
+    },
+
+    setSelectedGenomes(genomeNames: string[]) {
+      this.selectedGenomes = genomeNames;
+    },
+    setSelectedSequences(sequenceNames: string[]) {
+      this.selectedSequences = sequenceNames;
+    },
+    setSelectedSequencesLasso(sequenceUids: string[]) {
+      this.selectedSequencesLasso = sequenceUids;
+    },
+    setSelectedSequencesTracker(sequenceUids: string[]) {
+      // Add each `sequenceUid` to `selectedSequencesLassoTracker`
+      sequenceUids.forEach((uid) => {
+        this.selectedSequencesTracker.add(uid);
+      });
+    },
+    setSelectedGeneUids(uids: string[]) {
+      this.selectedGeneUids = uids;
+    },
+  },
+});
+
 export const useGeneSetStore = defineStore('geneSet', {
   state: () => ({
     // Data from API
+    genomeData: null as GenomeData | null,
     homologies: [] as Homology[],
     sequences: [] as SequenceMetrics[],
     groupInfo: [] as GroupInfo[],
@@ -64,7 +256,7 @@ export const useGeneSetStore = defineStore('geneSet', {
 
     //Graphics
     overviewArrows: false,
-    showTable: true,
+    showTable: false,
     showDetails: true,
     showNotificationsDetail: false,
     showNotificationsOverview: true,
@@ -96,6 +288,15 @@ export const useGeneSetStore = defineStore('geneSet', {
       //   232263008, 232263009, 232269781, 232269782, 232273529,
       // ]
 
+      try {
+        this.genomeData = await fetchGenomeData();
+      } catch (error) {
+        global.setError({
+          message: 'Could not load or parse genome data.',
+          isFatal: true,
+        });
+        throw error;
+      }
       try {
         this.homologies = sortBy(await fetchHomologies(), 'id');
       } catch (error) {

@@ -1,11 +1,17 @@
-import { type Dictionary } from "lodash";
-import { abs } from "./math";
-import { filterUniquePosition } from "./axisStretch";
-import type { GroupInfo } from "@/types";
-import { evaluateForces, findNeighgourNodes, findNormalForces } from "./springSimulationForceCalculations";
+import { type Dictionary } from 'lodash';
+
+import type { Gene, GroupInfo } from '@/types';
+
+import { filterUniquePosition } from './axisStretch';
+import { abs } from './math';
+import {
+  evaluateForces,
+  findNeighgourNodes,
+  findNormalForces,
+} from './springSimulationForceCalculations';
 
 export interface xConnections {
-  left: [id: string, distance: number] | undefined,
+  left: [id: string, distance: number] | undefined;
   right: [id: string, distance: number] | undefined;
 }
 export class GraphNode {
@@ -20,11 +26,17 @@ export class GraphNode {
   private _lastMove: number = 0;
   private _localTempScaling: number = 1;
   private _width: number;
-  private _row: number = 0;
 
-  constructor(id: string, position: number, endPosition: number, homologyGroup: number, sequence: number, sequenceId: string, originalPosition?: number) {
-    this._id = id,
-      this._position = position;
+  constructor(
+    id: string,
+    position: number,
+    endPosition: number,
+    homologyGroup: number,
+    sequence: number,
+    sequenceId: string,
+    originalPosition?: number
+  ) {
+    ; (this._id = id), (this._position = position);
     this._homologyGroup = homologyGroup;
     this._sequence = sequence;
     this._sequenceId = sequenceId;
@@ -32,28 +44,64 @@ export class GraphNode {
     this._width = endPosition - position;
   }
 
-  public get id() { return this._id; }
-  public get position() { return this._position; }
-  public get endPosition() { return this._width + this.position; }
-  public get originalPosition() { return this._originalPosition; }
-  public get sequence() { return this._sequence; }
-  public get sequenceId() { return this._sequenceId; }
-  public get homologyGroup() { return this._homologyGroup; }
-  public get connectionsX() { return this._connectionsX; }
-  public get connectionsY() { return this._connectionsY; }
-  public get lastMove() { return this._lastMove; }
-  public get localTempScaling() { return this._localTempScaling; }
-  public get width() { return this._width; }
-  public get range() { return [this.position, this.position + this.width] as [number, number]; }
-  public get row() { return this._row; }
+  public get id() {
+    return this._id;
+  }
+  public get position() {
+    return this._position;
+  }
+  public get endPosition() {
+    return this._width + this.position;
+  }
+  public get originalPosition() {
+    return this._originalPosition;
+  }
+  public get sequence() {
+    return this._sequence;
+  }
+  public get sequenceId() {
+    return this._sequenceId;
+  }
+  public get homologyGroup() {
+    return this._homologyGroup;
+  }
+  public get connectionsX() {
+    return this._connectionsX;
+  }
+  public get connectionsY() {
+    return this._connectionsY;
+  }
+  public get lastMove() {
+    return this._lastMove;
+  }
+  public get localTempScaling() {
+    return this._localTempScaling;
+  }
+  public get width() {
+    return this._width;
+  }
+  public get range() {
+    return [this.position, this.position + this.width] as [number, number];
+  }
 
-  public set connectionsX(connections: xConnections) { this._connectionsX = connections; }
-  public set connectionsY(connections: string[]) { this._connectionsY = connections; }
-  public set position(newPos: number) { this._position = newPos; }
-  public set width(newWidth: number) { this._width = newWidth; }
-  public set lastMove(newMove: number) { this._lastMove = newMove; }
-  public set localTempScaling(newScale: number) { this._localTempScaling = Math.abs(newScale); }
-  public set row(newRow: number) { if (newRow >= 0) { this._row = Math.floor(newRow); } }
+  public set connectionsX(connections: xConnections) {
+    this._connectionsX = connections;
+  }
+  public set connectionsY(connections: string[]) {
+    this._connectionsY = connections;
+  }
+  public set position(newPos: number) {
+    this._position = newPos;
+  }
+  public set width(newWidth: number) {
+    this._width = newWidth;
+  }
+  public set lastMove(newMove: number) {
+    this._lastMove = newMove;
+  }
+  public set localTempScaling(newScale: number) {
+    this._localTempScaling = Math.abs(newScale);
+  }
 }
 
 export class GraphNodeGroup {
@@ -65,107 +113,170 @@ export class GraphNodeGroup {
   private _lastMove: number;
   private _localTempScaling: number;
 
-  constructor(nodes: GraphNode[], originalRange?: [number, number], id?: string, xConnections?: xConnections, yConnections?: string[], lastMove?: number, localTempScaling?: number) {
-    this._nodes = [];
+  constructor(
+    nodes: GraphNode[],
+    originalRange?: [number, number],
+    id?: string,
+    xConnections?: xConnections,
+    yConnections?: string[],
+    lastMove?: number,
+    localTempScaling?: number
+  ) {
+    const newNodes: GraphNode[] = [];
+    nodes.forEach((node) => {
+      const newNode = new GraphNode(
+        node.id,
+        node.position,
+        node.endPosition,
+        node.homologyGroup,
+        node.sequence,
+        node.sequenceId,
+        node.originalPosition
+      );
+      newNode.connectionsX = node.connectionsX;
+      newNode.connectionsY = node.connectionsY;
+      newNode.lastMove = node.lastMove;
+      newNode.localTempScaling = node.localTempScaling;
+      newNodes.push(newNode);
+    });
+    this._nodes = newNodes;
     this._originalRange = originalRange ?? calculateRange(nodes);
     this._id = id ?? nodes[0].id + 'group';
     this._xConnections = xConnections ?? { left: undefined, right: undefined };
     this._yConnections = yConnections ?? [];
     this._lastMove = lastMove ?? 0;
     this._localTempScaling = localTempScaling ?? 1;
-
-    nodes.forEach(node => {
-      const newNode = new GraphNode(node.id, node.position, node.endPosition, node.homologyGroup, node.sequence, node.sequenceId, node.originalPosition);
-      newNode.connectionsX = node.connectionsX;
-      newNode.connectionsY = node.connectionsY;
-      newNode.lastMove = node.lastMove;
-      newNode.localTempScaling = node.localTempScaling;
-
-      this.addNode(newNode);
-    });
   }
 
-  public get nodes() { return this._nodes; }
-  public get homologyGroups() { return this._nodes.map(node => node.homologyGroup); }
-  public get range() { return calculateRange(this._nodes); }
-  public get originalRange() { return this._originalRange; }
-  public get originalPosition() { return this._originalRange[0]; }
-  public get position() { return this.range[0]; }
-  public get endPosition() { return this.range[1]; }
-  public get connectionsX() { return this._xConnections; }
-  public get connectionsY() { return this._yConnections; }
-  public get id() { return this._id; }
-  public get nodeIds() { return this._nodes.map(d => d.id); }
-  public get sequenceId() { return this._nodes[0].sequenceId; }
-  public get lastMove() { return this._lastMove; }
-  public get localTempScaling() { return this._localTempScaling; }
-  public get width() { return this.range[1] - this.range[0]; }
+  public get nodes() {
+    return this._nodes;
+  }
+  public get homologyGroups() {
+    return this._nodes.map((node) => node.homologyGroup);
+  }
+  public get range() {
+    return calculateRange(this._nodes);
+  }
+  public get originalRange() {
+    return this._originalRange;
+  }
+  public get originalPosition() {
+    return this._originalRange[0];
+  }
+  public get position() {
+    return this.range[0];
+  }
+  public get endPosition() {
+    return this.range[1];
+  }
+  public get connectionsX() {
+    return this._xConnections;
+  }
+  public get connectionsY() {
+    return this._yConnections;
+  }
+  public get id() {
+    return this._id;
+  }
+  public get nodeIds() {
+    return this._nodes.map((d) => d.id);
+  }
+  public get sequenceId() {
+    return this._nodes[0].sequenceId;
+  }
+  public get lastMove() {
+    return this._lastMove;
+  }
+  public get localTempScaling() {
+    return this._localTempScaling;
+  }
+  public get width() {
+    return this.range[1] - this.range[0];
+  }
 
   // public set range(newRange: [number, number]) {this._range = newRange}
-  public set originalRange(newRange: [number, number]) { this._originalRange = newRange; }
+  public set originalRange(newRange: [number, number]) {
+    this._originalRange = newRange;
+  }
   public set position(newPosition: number) {
     const oldEnd = this.endPosition;
     const oldStart = this.position;
     const newStart = newPosition;
 
     // update nodes as well
-    this._nodes.forEach(node => {
+    this._nodes.forEach((node) => {
       const nodeOffsetWithinGroup: number = node.position - oldStart;
       node.position = newStart + nodeOffsetWithinGroup;
     });
   }
-  public set connectionsX(newConnections: xConnections) { this._xConnections = newConnections; }
-  public set connectionsY(newConnections: string[]) { this._yConnections = newConnections; }
-  public set lastMove(newMove: number) { this._lastMove = newMove; }
-  public set localTempScaling(newScale: number) { this._localTempScaling = Math.abs(newScale); }
+  public set connectionsX(newConnections: xConnections) {
+    this._xConnections = newConnections;
+  }
+  public set connectionsY(newConnections: string[]) {
+    this._yConnections = newConnections;
+  }
+  public set lastMove(newMove: number) {
+    this._lastMove = newMove;
+  }
+  public set localTempScaling(newScale: number) {
+    this._localTempScaling = Math.abs(newScale);
+  }
 
   public addNode(newNode: GraphNode) {
-    let countOverlapping = 0;
-    this._nodes.forEach(node => {
-      if (rangesOverlap(node.range, newNode.range)) {
-        countOverlapping = countOverlapping + 1;
-      }
-    }
-    );
-    newNode.row = countOverlapping;
     this._nodes.push(newNode);
   }
 }
 
-
-export const applyOrderConstraint = (currentNode: GraphNode | GraphNodeGroup, connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[], deltaPosIn: number, heat: number, touchingDistance: number = 1000) => {
+export const applyOrderConstraint = (
+  currentNode: GraphNode | GraphNodeGroup,
+  connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[],
+  deltaPosIn: number,
+  heat: number,
+  touchingDistance: number = 1000
+) => {
   // maximum allowed move depends on the heat (Davidson and Harel)
   const maxMove = 1000 * heat;
-  let bounds = [-maxMove, maxMove];
+  const bounds = [-maxMove, maxMove];
   let deltaPos: number = deltaPosIn;
   //calculate bounds
   const connectedRight = connectedXNodes[1];
   const connectedLeft = connectedXNodes[0];
-  const previousDistanceRight = connectedRight ? connectedRight.position - currentNode.endPosition : maxMove;
-  const previousDistanceLeft = connectedLeft ? connectedLeft.endPosition - currentNode.position : -maxMove;
+  const previousDistanceRight = connectedRight
+    ? connectedRight.position - currentNode.endPosition
+    : maxMove;
+  const previousDistanceLeft = connectedLeft
+    ? connectedLeft.endPosition - currentNode.position
+    : -maxMove;
   bounds[0] = Math.max(previousDistanceLeft + touchingDistance, -maxMove);
   bounds[1] = Math.min(previousDistanceRight - touchingDistance, maxMove);
 
   //apply bounds
   if (deltaPos < 0) {
     deltaPos = Math.max(deltaPos, bounds[0]);
-  }
-  else {
+  } else {
     deltaPos = Math.min(deltaPos, bounds[1]);
   }
   return deltaPos;
 };
 
-export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNodeGroup)[], minimumAbsoluteDistance: number): Dictionary<number> => {
+export const calculateShiftMinDist = (
+  currentSequenceNodes: (GraphNode | GraphNodeGroup)[],
+  minimumAbsoluteDistance: number
+): Dictionary<number> => {
   let accumulatedShift = 0;
   //don't apply to nodes in the same position
   const uniquePositionNodes = filterUniquePosition(currentSequenceNodes);
   const shiftCoefficients: Dictionary<number> = {};
 
   uniquePositionNodes.forEach((currentNode) => {
-    const precedingNode = currentNode.connectionsX.left ? currentSequenceNodes.find(d => d.id === currentNode.connectionsX.left![0]) : undefined;
+    const precedingNode = currentNode.connectionsX.left
+      ? currentSequenceNodes.find(
+        (d) => d.id === currentNode.connectionsX.left![0]
+      )
+      : undefined;
     if (precedingNode === undefined) {
-      return shiftCoefficients[String(currentNode.originalPosition)] = accumulatedShift;
+      return (shiftCoefficients[String(currentNode.originalPosition)] =
+        accumulatedShift);
     }
     const distanceToPreceding = precedingNode.endPosition - currentNode.position;
     const minimumDistance = -minimumAbsoluteDistance;
@@ -179,53 +290,79 @@ export const calculateShiftMinDist = (currentSequenceNodes: (GraphNode | GraphNo
   return shiftCoefficients;
 };
 
-export const applyMinimumdistanceOnSequence = (nodesOnSequence: (GraphNode | GraphNodeGroup)[], minimumAbsDistance: number) => {
-  const sorted = nodesOnSequence.sort((a, b) => a.originalPosition - b.originalPosition);
+export const applyMinimumdistanceOnSequence = (
+  nodesOnSequence: (GraphNode | GraphNodeGroup)[],
+  minimumAbsDistance: number
+) => {
+  const sorted = nodesOnSequence.sort(
+    (a, b) => a.originalPosition - b.originalPosition
+  );
   const deltaPosCorrection = calculateShiftMinDist(sorted, minimumAbsDistance);
 
-  sorted.forEach(node => {
-    const newPosition = node.position + deltaPosCorrection[`${node.originalPosition}`];
+  sorted.forEach((node) => {
+    const newPosition =
+      node.position + deltaPosCorrection[`${node.originalPosition}`];
     node.position = newPosition;
   });
   return sorted;
 };
 
-
 const calculateRange = (nodes: GraphNode[]) => {
-  if (nodes.length === 0) { return [0, 0] as [number, number]; }
-  const positions = nodes.flatMap(node => [node.position, node.endPosition]).sort((a, b) => a - b);
+  if (nodes.length === 0) {
+    return [0, 0] as [number, number];
+  }
+  const positions = nodes
+    .flatMap((node) => [node.position, node.endPosition])
+    .sort((a, b) => a - b);
   return [positions[0], positions[positions.length - 1]] as [number, number];
 };
 
-export const rangesOverlap = (range1: [number, number], range2: [number, number]): boolean => {
-  let overlaps = true;
-  range1.sort((a, b) => a - b);
-  range2.sort((a, b) => a - b);
-  if (range1[1] < range2[0]) { return false; }
-  if (range2[1] < range1[0]) { return false; }
+export const rangesOverlap = (
+  range1: [number, number],
+  range2: [number, number]
+): boolean => {
+  const overlaps = true;
+  if (range1[1] < range2[0]) {
+    return false;
+  }
+  if (range2[1] < range1[0]) {
+    return false;
+  }
   return overlaps;
 };
 
-
 export const createNodeGroups = (nodes: GraphNode[]): GraphNodeGroup[] => {
   const uniqueSequences: number[] = [];
-  nodes.map(d => d.sequence).forEach(d => {
-    if (uniqueSequences.includes(d)) { return; }
-    uniqueSequences.push(d);
-  });
+  nodes
+    .map((d) => d.sequence)
+    .forEach((d) => {
+      if (uniqueSequences.includes(d)) {
+        return;
+      }
+      uniqueSequences.push(d);
+    });
 
   const groups: GraphNodeGroup[] = [];
-  uniqueSequences.forEach(currentSequence => {
+  uniqueSequences.forEach((currentSequence) => {
     const groupsInSequence: GraphNodeGroup[] = [];
-    const nodesInSequence: GraphNode[] = nodes.filter(node => node.sequence === currentSequence);
-    if (nodesInSequence.length === 0) { return []; }
+    const nodesInSequence: GraphNode[] = nodes.filter(
+      (node) => node.sequence === currentSequence
+    );
+    if (nodesInSequence.length === 0) {
+      return [];
+    }
 
-    nodesInSequence.forEach(node => {
-      if (groupsInSequence.length === 0) { groupsInSequence.push(new GraphNodeGroup([node])); }
-      else if (rangesOverlap(node.range, groupsInSequence[groupsInSequence.length - 1].range)) {
+    nodesInSequence.forEach((node) => {
+      if (groupsInSequence.length === 0) {
+        groupsInSequence.push(new GraphNodeGroup([node]));
+      } else if (
+        rangesOverlap(
+          node.range,
+          groupsInSequence[groupsInSequence.length - 1].range
+        )
+      ) {
         groupsInSequence[groupsInSequence.length - 1].addNode(node);
-      }
-      else {
+      } else {
         groupsInSequence.push(new GraphNodeGroup([node]));
       }
     });
@@ -240,24 +377,46 @@ export const createNodeGroups = (nodes: GraphNode[]): GraphNodeGroup[] => {
 export const addXConnections = (nodeGroups: (GraphNodeGroup | GraphNode)[]) => {
   const sortedNodeGroups = nodeGroups.sort((a, b) => a.position - b.position);
   sortedNodeGroups.forEach((currentGroup, i) => {
-    const nodesOnSameSequence = sortedNodeGroups.filter(d => d.sequenceId === currentGroup.sequenceId);
-    const currentGroupIndex = nodesOnSameSequence.findIndex(d => d.id === currentGroup.id);
-    const leftGroupConnection = currentGroupIndex === 0 ? undefined : nodesOnSameSequence[currentGroupIndex - 1];
-    const rightGroupConnection = currentGroupIndex > nodesOnSameSequence.length - 2 ? undefined : nodesOnSameSequence[currentGroupIndex + 1];
+    const nodesOnSameSequence = sortedNodeGroups.filter(
+      (d) => d.sequenceId === currentGroup.sequenceId
+    );
+    const currentGroupIndex = nodesOnSameSequence.findIndex(
+      (d) => d.id === currentGroup.id
+    );
+    const leftGroupConnection =
+      currentGroupIndex === 0
+        ? undefined
+        : nodesOnSameSequence[currentGroupIndex - 1];
+    const rightGroupConnection =
+      currentGroupIndex > nodesOnSameSequence.length - 2
+        ? undefined
+        : nodesOnSameSequence[currentGroupIndex + 1];
 
-    const leftConnection: [string, number] | undefined = leftGroupConnection === undefined ? undefined : [leftGroupConnection.id, leftGroupConnection.endPosition - currentGroup.position];
-    const rightConnection: [string, number] | undefined = rightGroupConnection === undefined ? undefined : [rightGroupConnection.id, rightGroupConnection.position - currentGroup.endPosition];
+    const leftConnection: [string, number] | undefined =
+      leftGroupConnection === undefined
+        ? undefined
+        : [
+          leftGroupConnection.id,
+          leftGroupConnection.endPosition - currentGroup.position,
+        ];
+    const rightConnection: [string, number] | undefined =
+      rightGroupConnection === undefined
+        ? undefined
+        : [
+          rightGroupConnection.id,
+          rightGroupConnection.position - currentGroup.endPosition,
+        ];
     currentGroup.connectionsX = { left: leftConnection, right: rightConnection };
   });
   return sortedNodeGroups;
 };
 
 export const addYConnections = (nodeGroups: GraphNodeGroup[]) => {
-  nodeGroups.forEach(group => {
-    const yConnections = group.nodes.flatMap(node => node.connectionsY);
+  nodeGroups.forEach((group) => {
+    const yConnections = group.nodes.flatMap((node) => node.connectionsY);
     const yConnectionsGroup: string[] = [];
-    yConnections.forEach(d => {
-      const neighbour = nodeGroups.find(group => group.nodeIds.includes(d));
+    yConnections.forEach((d) => {
+      const neighbour = nodeGroups.find((group) => group.nodeIds.includes(d));
       if (neighbour !== undefined) {
         yConnectionsGroup.push(neighbour.id);
       }
@@ -268,20 +427,30 @@ export const addYConnections = (nodeGroups: GraphNodeGroup[]) => {
   return nodeGroups;
 };
 
-
-export const genesToNodes = (genes: GroupInfo[]) => {
+export const genesToNodes = (genes: Gene[]) => {
   // Convert genes to graphNodes
-  let nodes: GraphNode[] = [];
+  const nodes: GraphNode[] = [];
   genes.forEach((gene, index) => {
-    const uId = gene.mRNA_id;  // add index to get unique id
-    nodes.push(new GraphNode(uId, gene.mRNA_start_position, gene.mRNA_end_position, gene.homology_id, gene.sequence_number, `${gene.genome_number}_${gene.sequence_number}`));
+    // const uId = gene.gene_id + '_' + index.toString() // add index to get unique id
+    nodes.push(
+      new GraphNode(
+        gene.uid,
+        gene.start,
+        gene.end,
+        gene.homology_groups[0]['id'],
+        gene.sequence_id,
+        `${gene.sequence_uid}`
+      )
+    );
   });
   nodes.sort((d, b) => d.position - b.position);
 
   // assign connections
   addXConnections(nodes);
-  nodes.forEach(currentGroup => {
-    const yConnections = nodes.filter(d => d.homologyGroup === currentGroup.homologyGroup).map(d => d.id);
+  nodes.forEach((currentGroup) => {
+    const yConnections = nodes
+      .filter((d) => d.homologyGroup === currentGroup.homologyGroup)
+      .map((d) => d.id);
     currentGroup.connectionsY = yConnections;
   });
   return nodes;
@@ -289,30 +458,51 @@ export const genesToNodes = (genes: GroupInfo[]) => {
 
 export const checkNodeOrder = (newNodes: GraphNodeGroup[]) => {
   newNodes.forEach((node, i) => {
-    [node.connectionsX.left, node.connectionsX.right].forEach((connection, index) => {
-      if (connection === undefined) { return; }
-      const connectionNode = newNodes.find(node => node.id === connection[0]);
-      if (connectionNode === undefined) { return; }
+    ;[node.connectionsX.left, node.connectionsX.right].forEach(
+      (connection, index) => {
+        if (connection === undefined) {
+          return;
+        }
+        const connectionNode = newNodes.find(
+          (node) => node.id === connection[0]
+        );
+        if (connectionNode === undefined) {
+          return;
+        }
 
-      const currentDistance = connectionNode.endPosition - node.position;
-      const expectedDistance = connection[1];
-      if (Math.sign(currentDistance) !== Math.sign(expectedDistance)) { console.log('unordered', i, index); }
-    });
+        const currentDistance = connectionNode.endPosition - node.position;
+        const expectedDistance = connection[1];
+        if (Math.sign(currentDistance) !== Math.sign(expectedDistance)) {
+          console.log('unordered', i, index);
+        }
+      }
+    );
   });
 };
 
-const enforceMinimumDistance = (inputNodes: GraphNodeGroup[], minimumDistance: number) => {
-
-  const newNodes: (GraphNodeGroup)[] = [];
+const enforceMinimumDistance = (
+  inputNodes: GraphNodeGroup[],
+  minimumDistance: number
+) => {
+  const newNodes: GraphNodeGroup[] = [];
   const uniqueSequences: string[] = [];
-  inputNodes.map(d => d.sequenceId).forEach(d => {
-    if (uniqueSequences.includes(d)) { return; }
-    uniqueSequences.push(d);
-  });
-  uniqueSequences.forEach(sequence => {
+  inputNodes
+    .map((d) => d.sequenceId)
+    .forEach((d) => {
+      if (uniqueSequences.includes(d)) {
+        return;
+      }
+      uniqueSequences.push(d);
+    });
+  uniqueSequences.forEach((sequence) => {
     const currentSequence = sequence;
-    const nodesOnSequence = inputNodes.filter(d => d.sequenceId === currentSequence);
-    const spreadNodes = applyMinimumdistanceOnSequence(nodesOnSequence, minimumDistance) as GraphNodeGroup[];
+    const nodesOnSequence = inputNodes.filter(
+      (d) => d.sequenceId === currentSequence
+    );
+    const spreadNodes = applyMinimumdistanceOnSequence(
+      nodesOnSequence,
+      minimumDistance
+    ) as GraphNodeGroup[];
     newNodes.push(...spreadNodes);
   });
   return newNodes;
@@ -324,31 +514,54 @@ export const updateHighStressNodeGroup = (
   excludedHomologyGroup: number = 0,
   touchingDistance: number = 1000
 ): [GraphNodeGroup[], boolean] => {
-
   let terminate = false;
-  let largestStep = 0; // used for the termination condition
+  const largestStep = 0; // used for the termination condition
   let highestForceNode = undefined;
   let highestDeltaPosNodeIndex = -1;
   let highestDeltaPosConstrained = 0;
   let currentIndex = -1;
-  let nodeGroupRange = [Math.min(...nodeGroups.map(d => d.position)), Math.max(...nodeGroups.map(d => d.endPosition))];
-  let nodeGroupSpread = nodeGroupRange[1] - nodeGroupRange[0];
-  // find node that moves the most 
+  const nodeGroupRange = [
+    Math.min(...nodeGroups.map((d) => d.position)),
+    Math.max(...nodeGroups.map((d) => d.endPosition)),
+  ];
+  const nodeGroupSpread = nodeGroupRange[1] - nodeGroupRange[0];
+  // find node that moves the most
   for (const group of nodeGroups) {
     currentIndex = currentIndex + 1;
     // calculate direct forces
     const connectedXNodes = findNeighgourNodes(group, nodeGroups);
-    const connectedYNodes = nodeGroups.filter(d => group.connectionsY.includes(d.id));
-    let [force, forceWithoutNormal] = evaluateForces(group, connectedXNodes, connectedYNodes, heat, excludedHomologyGroup);
+    const connectedYNodes = nodeGroups.filter((d) =>
+      group.connectionsY.includes(d.id)
+    );
+    let [force, forceWithoutNormal] = evaluateForces(
+      group,
+      connectedXNodes,
+      connectedYNodes,
+      heat,
+      excludedHomologyGroup,
+      touchingDistance
+    );
     // calculate forces through other blocks "touching"
-    const [forceFromLeft, forceFromRight] = findNormalForces(group, nodeGroups, touchingDistance);
+    const [forceFromLeft, forceFromRight] = findNormalForces(
+      group,
+      nodeGroups,
+      touchingDistance
+    );
     force = force + forceFromLeft + forceFromRight;
 
     // calculate new position
     const deltaPos = force * group.localTempScaling;
-    const deltaPosConstrained: number = applyOrderConstraint(group, connectedXNodes, deltaPos, heat, touchingDistance);
+    const deltaPosConstrained: number = applyOrderConstraint(
+      group,
+      connectedXNodes,
+      deltaPos,
+      heat,
+      touchingDistance
+    );
 
-    if (abs(deltaPosConstrained) < abs(highestDeltaPosConstrained)) { continue; }
+    if (abs(deltaPosConstrained) < abs(highestDeltaPosConstrained)) {
+      continue;
+    }
     highestDeltaPosConstrained = deltaPosConstrained;
     highestDeltaPosNodeIndex = currentIndex;
   }
@@ -366,15 +579,21 @@ export const updateHighStressNodeGroup = (
 
   // local temperature changes to reduce oscilations (Frick et al.)
   if (Math.sign(group.lastMove) !== Math.sign(deltaPosConstrained)) {
-
     group.localTempScaling = group.localTempScaling * 0.5;
-  }
-  else {
+  } else {
     group.localTempScaling = group.localTempScaling * 1.5;
   }
 
   // replace old node
-  highestForceNode = new GraphNodeGroup(group.nodes, group.originalRange, group.id, group.connectionsX, group.connectionsY, deltaPosConstrained, group.localTempScaling);
+  highestForceNode = new GraphNodeGroup(
+    group.nodes,
+    group.originalRange,
+    group.id,
+    group.connectionsX,
+    group.connectionsY,
+    deltaPosConstrained,
+    group.localTempScaling
+  );
   if (highestForceNode !== undefined) {
     nodeGroups.splice(highestDeltaPosNodeIndex, 1, highestForceNode);
   }
@@ -383,13 +602,28 @@ export const updateHighStressNodeGroup = (
   // check for order changes
   checkNodeOrder(newNodes);
   // check termination criteria
-  if (Math.abs(highestDeltaPosConstrained) < 2000 || ((Math.abs(highestDeltaPosConstrained) / nodeGroupSpread) < 0.008)) {
-    console.log('terminating highest delta pos too low.', 'heat: ', heat, 'highest delta pos: ', highestDeltaPosConstrained),
-      terminate = true;
+  if (
+    Math.abs(highestDeltaPosConstrained) < 10 ||
+    Math.abs(highestDeltaPosConstrained) / nodeGroupSpread < 0.005
+  ) {
+    console.log(
+      'terminating highest delta pos too low.',
+      'heat: ',
+      heat,
+      'highest delta pos: ',
+      highestDeltaPosConstrained
+    ),
+      (terminate = true);
   }
-  if (heat < 100) {
-    console.log('terminating heat too low.', 'heat: ', heat, 'highest delta pos: ', highestDeltaPosConstrained),
-      terminate = true;
+  if (heat < 1) {
+    console.log(
+      'terminating heat too low.',
+      'heat: ',
+      heat,
+      'highest delta pos: ',
+      highestDeltaPosConstrained
+    ),
+      (terminate = true);
   }
 
   return [newNodes, terminate];
