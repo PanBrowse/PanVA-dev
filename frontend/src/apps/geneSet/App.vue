@@ -1,5 +1,13 @@
 <script lang="ts">
-import { Col, Form, FormItem, Row, Select } from 'ant-design-vue'
+import {
+  Button,
+  Col,
+  Form,
+  FormItem,
+  RadioGroup,
+  Row,
+  Select,
+} from 'ant-design-vue'
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 
 import Layout from '@/components/Layout.vue'
@@ -19,6 +27,7 @@ import ChromosomeOverview from './visualizations/ChromosomeOverview.vue'
 import Density from './visualizations/Density.vue'
 import GroupInfoTable from './visualizations/GroupInfoTable.vue'
 import PixiCanvas from './visualizations/PixiScatter.vue'
+import PixiUMAP from './visualizations/PixiUMAP.vue'
 
 export default defineComponent({
   name: 'App',
@@ -34,13 +43,17 @@ export default defineComponent({
     ChromosomeDetails,
     // GroupInfoTable,
     PixiCanvas,
+    PixiUMAP,
     ARow: Row,
     ACol: Col,
+    AButton: Button,
+    ARadioGroup: RadioGroup,
   },
   setup() {
     const geneSetStore = useGeneSetStore()
     const genomeStore = useGenomeStore()
     const pixiLoaded = ref(false)
+    // const showPixiScatter = ref(true) // true for PixiScatter, false for PixiUMAP
 
     const handlePixiLoaded = () => {
       try {
@@ -50,6 +63,27 @@ export default defineComponent({
         console.error('Error handling PixiScatter loaded event:', error)
       }
     }
+
+    // const toggleVisualization = () => {
+    //   showPixiScatter.value = !showPixiScatter.value
+    // }
+
+    const selectedVisualization = ref('PixiScatter') // Default to PixiScatter
+
+    // Define options for Radio Group
+    const visualizationOptions = [
+      { label: 'Grid', value: 'PixiScatter' },
+      { label: 'UMAP', value: 'PixiUMAP' },
+    ]
+
+    // Computed properties to control which component to render
+    const showPixiScatter = computed(
+      () => selectedVisualization.value === 'PixiScatter'
+    )
+    const showPixiUMAP = computed(
+      () => selectedVisualization.value === 'PixiUMAP'
+    )
+
     // Trigger loading of genome data
     genomeStore.loadGenomeData()
     const isInitializedGenome = computed(() => genomeStore.isInitialized)
@@ -58,6 +92,9 @@ export default defineComponent({
     const isInitialized = computed(() => geneSetStore.isInitialized)
     const showTable = computed(() => geneSetStore.showTable)
     const showDetails = computed(() => geneSetStore.showDetails)
+
+    const distanceMatrix = computed(() => genomeStore.distanceMatrix)
+    const embedding = computed(() => genomeStore.embedding)
 
     // Sample chromosome number for demonstration
     const chromosomeNr = 5
@@ -93,6 +130,14 @@ export default defineComponent({
       chromosomeNr,
       pixiLoaded,
       handlePixiLoaded,
+      // toggleVisualization,
+      selectedVisualization,
+      visualizationOptions,
+      showPixiScatter,
+      showPixiUMAP,
+
+      distanceMatrix,
+      embedding,
     }
   },
 })
@@ -101,6 +146,16 @@ export default defineComponent({
 <template>
   <Layout v-if="isInitialized && isInitializedGenome">
     <template #sidebar>
+      <!-- <AButton type="primary" @click="toggleVisualization">
+        Toggle Overview Visualization
+      </AButton> -->
+      <div class="radio-group-container">
+        <ARadioGroup
+          v-model:value="selectedVisualization"
+          option-type="button"
+          :options="visualizationOptions"
+        />
+      </div>
       <OverviewFilters />
       <Filters />
       <Sorting />
@@ -113,7 +168,12 @@ export default defineComponent({
     <ARow type="flex" :gutter="8" class="row full-height">
       <ACol :span="12" class="col full-height">
         <div class="content-overview" ref="parentElement">
-          <PixiCanvas @loaded="handlePixiLoaded" />
+          <PixiCanvas v-if="showPixiScatter" @loaded="handlePixiLoaded" />
+          <PixiUMAP
+            v-if="showPixiUMAP"
+            :embedding="embedding"
+            @loaded="handlePixiLoaded"
+          />
         </div>
       </ACol>
       <ACol v-if="pixiLoaded" :span="12" class="col full-height">
@@ -133,6 +193,13 @@ export default defineComponent({
 </template>
 
 <style>
+.radio-group-container {
+  display: flex;
+  justify-content: center; /* Center horizontally */
+  align-items: center; /* Center vertically if needed */
+  padding: 16px; /* Adjust padding as needed */
+}
+
 .ant-layout-sider {
   background: #fafafa !important;
 }

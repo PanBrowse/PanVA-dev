@@ -5,6 +5,7 @@ import sys
 import os
 import pandas as pd
 import numpy as np
+import base64
 from dotenv import load_dotenv
 from flask_json_schema import JsonSchema
 
@@ -88,6 +89,43 @@ def get_dendrogram(id):
     return create_dendrogram(linkage_matrix, labels)
 
 #### new route geneSets ####
+@app.route('/geneSet/yeast_embeddings_test/protein_umap_embedding', methods=['GET'])
+def get_umap_embedding():
+    # Define the path to the UMAP embedding JSON file
+    embedding_path = os.path.join(db_path, "geneSet", "yeast_embeddings_test", "umap_embedding_protein.json")
+    print("Loading embedding from:", embedding_path)
+    
+    # Load the JSON embedding
+    try:
+        with open(embedding_path, "r") as f:
+            embedding = json.load(f)
+        print("Loaded embedding with", len(embedding), "points.")
+        
+        # Return the embedding as JSON
+        return jsonify({"embedding": embedding})
+    except Exception as e:
+        print("Error loading embedding:", e)
+        return jsonify({"error": "Failed to load embedding"}), 500
+    
+@app.route('/geneSet/yeast_matrices_test/protein_distance_matrix', methods=['GET'])
+def get_distance_matrix():
+    # Load the .npy file
+    matrix_path = os.path.join(db_path, "geneSet", "yeast_matrices_test", "protein_distance_matrix.npy")
+    print("Loading matrix from:", matrix_path)
+    
+    
+    # Load the matrix and encode it in base64
+    matrix = np.load(matrix_path)
+    print("Matrix shape:", matrix.shape)
+    print("Total elements:", matrix.size)
+    print("Data type:", matrix.dtype)
+
+    matrix_bytes = matrix.tobytes()
+    matrix_base64 = base64.b64encode(matrix_bytes).decode("utf-8")  # Convert to base64 string
+    
+    # Return as JSON
+    return jsonify({"matrix": matrix_base64})
+
 @app.route("/geneSet/clustering.json", methods=["GET", "POST"])
 def get_clustering_order():
 

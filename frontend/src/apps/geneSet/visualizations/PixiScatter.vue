@@ -233,6 +233,8 @@ export default {
                 (padding + row * circleSpacing + circleRadius) *
                 devicePixelRatio
 
+              console.log('x', x, 'y', y)
+
               this.createSprites(
                 x,
                 y,
@@ -317,11 +319,13 @@ export default {
       // Apply different tint to sprites in the tracker
       trackedSprites.forEach((sprite) => {
         sprite.tint = 0xa9a9a9 // darker tint for previously selected sprites
+        sprite.alpha = 0.5 // Set opacity to 50%
       })
       if (this.selectedSprites) {
         this.selectedSprites.forEach((sprite) => {
           if (!trackerUids.has(sprite.sequence_uid)) {
             sprite.tint = 0xd3d3d3 // default tint for unmatched sprites
+            sprite.alpha = 0.5 // Set opacity to 50%
           }
         })
       }
@@ -466,11 +470,13 @@ export default {
       const circleSprite = new PIXI.Sprite(this.circleTexture)
 
       circleSprite.tint = 0xd3d3d3
+      circleSprite.alpha = 0.5 // Set opacity to 50%
 
       // Check if this sequence is part of the selectedSequencesLasso
       const isSelected =
         this.genomeStore.selectedSequencesLasso.includes(sequence_uid)
       circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3 // Blue if selected, gray otherwise
+      circleSprite.alpha = isSelected ? 1 : 0.5
 
       circleSprite.sequence_uid = sequence_uid
 

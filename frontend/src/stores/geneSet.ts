@@ -3,7 +3,11 @@ import { type Dictionary, sortBy } from 'lodash'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 
-import { fetchGenomeData } from '@/api/geneSet'
+import {
+  fetchDistanceMatrix,
+  fetchEmbedding,
+  fetchGenomeData,
+} from '@/api/geneSet'
 import {
   fetchClusteringOrder,
   fetchGroupInfo,
@@ -68,6 +72,8 @@ export const useGenomeStore = defineStore({
     genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
     sequenceUids: [] as string[], // Array to store genome numbers in the loading order
     sequenceUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
+    distanceMatrix: [],
+    embedding: [],
     isInitialized: false,
   }),
   getters: {
@@ -99,6 +105,13 @@ export const useGenomeStore = defineStore({
         this.geneToLocusSequenceLookup = createGeneToLociAndSequenceLookup(
           this.genomeData
         )
+        // Fetch and set the distance matrix
+        const matrix = await fetchDistanceMatrix()
+        this.setDistanceMatrix(matrix)
+
+        // Fetch and set the embedding matrix
+        const embedding = await fetchEmbedding()
+        this.setEmbeddingMatrix(embedding)
       } catch (error) {
         global.setError({
           message: 'Could not load or parse genome data.',
@@ -188,7 +201,12 @@ export const useGenomeStore = defineStore({
 
       return genes
     },
-
+    setDistanceMatrix(matrix) {
+      this.distanceMatrix = matrix // Set the matrix using an action
+    },
+    setEmbeddingMatrix(embedding_matrix) {
+      this.embedding = embedding_matrix // Set the matrix using an action
+    },
     setSelectedGenomes(genomeNames: string[]) {
       this.selectedGenomes = genomeNames
     },
