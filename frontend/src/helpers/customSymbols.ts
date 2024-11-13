@@ -2,7 +2,7 @@ import { min, sqrt } from '@/helpers/math';
 import type { Gene, GroupInfo } from '@/types';
 
 export const plus = {
-  draw(context, size) {
+  draw(context: CanvasRenderingContext2D, size: number) {
     const r = sqrt(size - min(size / 7, 2)) * 0.87559;
     context.moveTo(-r, 0);
     context.lineTo(r, 0);
@@ -12,7 +12,7 @@ export const plus = {
 };
 
 export const cross = {
-  draw(context, size) {
+  draw(context: CanvasRenderingContext2D, size: number) {
     const r = sqrt(size / 5) / 2;
     context.moveTo(-3 * r, -r);
     context.lineTo(-r, -r);
@@ -32,7 +32,7 @@ export const cross = {
 const sqrt3 = sqrt(3);
 
 export const asterisk = {
-  draw(context, size) {
+  draw(context: CanvasRenderingContext2D, size: number) {
     const r = sqrt(size + min(size / 28, 0.75)) * 0.59436;
     const t = r / 2;
     const u = t * sqrt3;
@@ -54,8 +54,13 @@ export const geneRect: d3.SymbolType = {
 
 export const geneTriangleForward: d3.SymbolType = {
   draw(context, size) {
+
     const sqrt3 = Math.sqrt(3);
     const x = Math.sqrt(size / (sqrt3 * 3));
+    console.log(x);
+    if (Number.isNaN(x) || x === undefined) {
+      return;
+    }
     context.moveTo(2 * x, 0);
     context.lineTo(-x, -sqrt3 * x);
     context.lineTo(-x, sqrt3 * x);
@@ -63,9 +68,13 @@ export const geneTriangleForward: d3.SymbolType = {
   },
 };
 export const geneTriangleReverse: d3.SymbolType = {
-  draw(context, size) {
+  draw(context: CanvasRenderingContext2D, size: number) {
     const sqrt3 = Math.sqrt(3);
     const x = Math.sqrt(size / (sqrt3 * 3));
+    console.log(x);
+    if (Number.isNaN(x) || x === undefined) {
+      return;
+    }
     context.moveTo(-x * 2, 0);
     context.lineTo(x, -sqrt3 * x);
     context.lineTo(x, sqrt3 * x);
@@ -74,11 +83,15 @@ export const geneTriangleReverse: d3.SymbolType = {
 };
 
 export const geneTriangleRectForward: d3.SymbolType = {
-  draw(context, size) {
+  draw(context: CanvasRenderingContext2D, size: number) {
     const sqrt3 = Math.sqrt(3);
-    const geneHeight = 2;
+    const geneHeight = 6;
     const triangleSize = geneHeight * 8;
     const x = Math.sqrt(triangleSize / (sqrt3 * 3));
+    console.log(x);
+    if (Number.isNaN(x) || x === undefined) {
+      return;
+    }
 
     context.moveTo(-size / 2, -geneHeight / 2);
     context.lineTo(size / 2, -geneHeight / 2);
@@ -91,11 +104,12 @@ export const geneTriangleRectForward: d3.SymbolType = {
 };
 
 export const geneTriangleRectReverse: d3.SymbolType = {
-  draw(context, size) {
+  draw(context: CanvasRenderingContext2D, size: number) {
     const sqrt3 = Math.sqrt(3);
     const geneHeight = 2;
     const triangleSize = geneHeight * 8;
     const x = Math.sqrt(triangleSize / (sqrt3 * 3));
+    console.log(x);
 
     context.moveTo(-size / 2, -geneHeight / 2);
     context.lineTo(size / 2, -geneHeight / 2);
@@ -139,13 +153,13 @@ export const getGeneSymbolType = (
   showBars: boolean = true
 ) => {
   const geneSize =
-    currentGeneToWindow(d.mRNA_end_position) -
-    currentGeneToWindow(d.mRNA_start_position);
+    currentGeneToWindow(d.end) -
+    currentGeneToWindow(d.start);
   return geneSize > barHeight && showBars
-    ? d.strand === '+'
+    ? d.strand === 0
       ? geneTriangleRectForward
       : geneTriangleRectReverse
-    : d.strand === '+'
+    : d.strand === 0
       ? geneTriangleForward
       : geneTriangleReverse;
 };

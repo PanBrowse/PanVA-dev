@@ -85,10 +85,11 @@ export const runSpringSimulation = (
       // }
 
       console.log(nIterations, 'iterations in simulation');
-      return [
+      const answer = [
         nodeGroups.flatMap((nodeGroup) => nodeGroup.nodes),
         nodeGroups,
       ] as [GraphNode[], GraphNodeGroup[]];
+      return answer;
     }
   }
 };

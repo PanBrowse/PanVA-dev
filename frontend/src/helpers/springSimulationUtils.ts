@@ -18,7 +18,6 @@ export class GraphNode {
   private _id: string;
   private _position: number;
   private _homologyGroup: number;
-  private _sequence: number;
   private _connectionsX: xConnections = { left: undefined, right: undefined };
   private _connectionsY: string[] = [];
   private _sequenceId: string;
@@ -32,13 +31,11 @@ export class GraphNode {
     position: number,
     endPosition: number,
     homologyGroup: number,
-    sequence: number,
     sequenceId: string,
     originalPosition?: number
   ) {
     ; (this._id = id), (this._position = position);
     this._homologyGroup = homologyGroup;
-    this._sequence = sequence;
     this._sequenceId = sequenceId;
     this._originalPosition = originalPosition ?? position;
     this._width = endPosition - position;
@@ -56,9 +53,9 @@ export class GraphNode {
   public get originalPosition() {
     return this._originalPosition;
   }
-  public get sequence() {
-    return this._sequence;
-  }
+  // public get sequence() {
+  //   return this._sequence;
+  // }
   public get sequenceId() {
     return this._sequenceId;
   }
@@ -129,7 +126,6 @@ export class GraphNodeGroup {
         node.position,
         node.endPosition,
         node.homologyGroup,
-        node.sequence,
         node.sequenceId,
         node.originalPosition
       );
@@ -332,9 +328,9 @@ export const rangesOverlap = (
 };
 
 export const createNodeGroups = (nodes: GraphNode[]): GraphNodeGroup[] => {
-  const uniqueSequences: number[] = [];
+  const uniqueSequences: string[] = [];
   nodes
-    .map((d) => d.sequence)
+    .map((d) => d.sequenceId)
     .forEach((d) => {
       if (uniqueSequences.includes(d)) {
         return;
@@ -346,7 +342,7 @@ export const createNodeGroups = (nodes: GraphNode[]): GraphNodeGroup[] => {
   uniqueSequences.forEach((currentSequence) => {
     const groupsInSequence: GraphNodeGroup[] = [];
     const nodesInSequence: GraphNode[] = nodes.filter(
-      (node) => node.sequence === currentSequence
+      (node) => node.sequenceId === currentSequence
     );
     if (nodesInSequence.length === 0) {
       return [];
@@ -437,9 +433,8 @@ export const genesToNodes = (genes: Gene[]) => {
         gene.uid,
         gene.start,
         gene.end,
-        gene.homology_groups[0]['id'],
-        gene.sequence_id,
-        `${gene.sequence_uid}`
+        gene.homology_groups?.[0]?.id,
+        gene.sequence_uid ?? '',
       )
     );
   });
@@ -539,7 +534,7 @@ export const updateHighStressNodeGroup = (
       connectedYNodes,
       heat,
       excludedHomologyGroup,
-      touchingDistance
+      false
     );
     // calculate forces through other blocks "touching"
     const [forceFromLeft, forceFromRight] = findNormalForces(

@@ -19,7 +19,14 @@ export const evaluateForcesY = (currentNode: GraphNode, connectedYNodes: GraphNo
 };
 
 
-export const evaluateForces = (currentNode: GraphNode | GraphNodeGroup, connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[], connectedYNodes: (GraphNode | GraphNodeGroup)[], heat: number, excludedHomologyGroup?: number, print: boolean = false): [number, number] => {
+export const evaluateForces = (
+  currentNode: GraphNode | GraphNodeGroup,
+  connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[],
+  connectedYNodes: (GraphNode | GraphNodeGroup)[],
+  heat: number,
+  excludedHomologyGroup?: number,
+  print: boolean = false
+): [number, number] => {
   /* Returns [forcesWithNormal, forces] */
 
 
@@ -154,7 +161,7 @@ export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGrou
   touchingRight.sort((a, b) => b.position - a.position).forEach(neighbourGroup => {
     const connectedXNodes = findNeighgourNodes(neighbourGroup, allGroups);
     const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id));
-    const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1);
+    const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1, undefined, false);
     const updatedTotalRight = totalRightForce + forceContribution;
     totalRightForce = Math.min(updatedTotalRight, 0);
   });
@@ -163,7 +170,7 @@ export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGrou
   touchingLeft.sort((a, b) => a.position - b.position).forEach(neighbourGroup => {
     const connectedXNodes = findNeighgourNodes(neighbourGroup, allGroups);
     const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id));
-    const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1);
+    const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1, undefined, false);
     const updatedTotalLeft = totalLeftForce + forceContribution;
     totalLeftForce = Math.max(updatedTotalLeft, 0);
   });
