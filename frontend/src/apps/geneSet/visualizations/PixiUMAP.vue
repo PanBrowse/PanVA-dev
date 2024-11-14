@@ -213,8 +213,15 @@ export default defineComponent({
     createCircleTexture(circleRadius, app) {
       // Use PIXI.Graphics to draw a circle
       const graphics = new PIXI.Graphics()
+      // Draw border
+      const borderRadius = circleRadius + 0.5 * devicePixelRatio
+      const totalRadius =
+        borderRadius > circleRadius ? borderRadius : circleRadius
+      const borderColor = 0x000000
+      graphics.circle(totalRadius, totalRadius, borderRadius)
+      graphics.fill(borderColor)
       // Draw the circle
-      graphics.circle(circleRadius, circleRadius, circleRadius)
+      graphics.circle(totalRadius, totalRadius, circleRadius)
       graphics.fill(0xffffff)
       // Generate a texture from the Graphics object
       this.circleTexture = app.renderer.generateTexture(graphics)
