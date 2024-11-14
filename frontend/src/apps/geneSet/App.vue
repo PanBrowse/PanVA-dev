@@ -68,7 +68,7 @@ export default defineComponent({
     //   showPixiScatter.value = !showPixiScatter.value
     // }
 
-    const selectedVisualization = ref('PixiScatter') // Default to PixiScatter
+    const selectedVisualization = ref('PixiUMAP') // Default to PixiScatter
 
     // Define options for Radio Group
     const visualizationOptions = [
@@ -171,13 +171,13 @@ export default defineComponent({
           <PixiCanvas v-if="showPixiScatter" @loaded="handlePixiLoaded" />
           <PixiUMAP
             v-if="showPixiUMAP"
-            :embedding="embedding"
+            :distanceMatrix="distanceMatrix"
             @loaded="handlePixiLoaded"
           />
         </div>
       </ACol>
       <ACol v-if="pixiLoaded" :span="12" class="col full-height">
-        <ChromosomeDetails />
+        <!-- <ChromosomeDetails /> -->
         <!-- <GroupInfoTable /> -->
       </ACol>
     </ARow>

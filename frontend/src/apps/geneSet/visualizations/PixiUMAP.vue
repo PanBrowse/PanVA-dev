@@ -27,6 +27,11 @@ import { defineComponent } from 'vue'
 
 import { useGenomeStore } from '@/stores/geneSet'
 
+export function customDistance(a, b) {
+  //   debugger
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+}
+
 export default defineComponent({
   name: 'PixiUMAP',
   emits: ['loaded'], // Declare the emitted event
@@ -36,14 +41,14 @@ export default defineComponent({
     CloseCircleOutlined,
   },
   props: {
-    // distanceMatrix: {
-    //   type: Array,
-    //   required: true,
-    // },
-    embedding: {
+    distanceMatrix: {
       type: Array,
       required: true,
     },
+    // embedding: {
+    //   type: Array,
+    //   required: true,
+    // },
   },
   data() {
     return {
@@ -112,6 +117,11 @@ export default defineComponent({
         const canvas = app.canvas
         console.log('Initial Canvas Size:', canvas.width, 'x', canvas.height)
 
+        const test_data = Array.from({ length: 25 }, (_, x) =>
+          Array.from({ length: 25 }, (_, y) => ({ x, y }))
+        ).flat()
+        console.log('test_data', test_data)
+
         // Set the canvas size dynamically
         this.resizeWindow(app)
 
@@ -119,17 +129,15 @@ export default defineComponent({
         console.log('devicePixelRatio', devicePixelRatio)
         const padding = 10
 
-        // const distanceFn: DistanceFn = this.precomputedDistance(
-        //   this.distanceMatrix
-        // )
-        // const umap = new UMAP({
-        //   nComponents: 2,
-        //   nNeighbors: 15,
-        //   learningRate: 1.0, // Explicitly set learning rate
-        //   minDist: 0.1, // Optional, can adjust as needed
-        //   distanceFn: distanceFn,
-        // })
-        // const embedding = umap.fit(this.distanceMatrix)
+        const umap = new UMAP({
+          nComponents: 2,
+          nNeighbors: 3,
+          learningRate: 1.0, // Explicitly set learning rate
+          minDist: 0.1,
+          distanceFn: customDistance,
+        })
+        const embedding = umap.fit(test_data)
+        console.log('embedding', embedding)
 
         const circleRadius = 5 * devicePixelRatio
         this.createCircleTexture(circleRadius, app)
@@ -142,8 +150,8 @@ export default defineComponent({
         console.log('canvasHeight', canvasHeight)
 
         // Calculate the min and max values for x and y in the embedding
-        const xValues = this.embedding.map(([x]) => x)
-        const yValues = this.embedding.map(([, y]) => y)
+        const xValues = embedding.map(([x]) => x)
+        const yValues = embedding.map(([, y]) => y)
         const minX = Math.min(...xValues)
         const maxX = Math.max(...xValues)
         const minY = Math.min(...yValues)
@@ -154,7 +162,7 @@ export default defineComponent({
         const scaleY = (canvasHeight - 10 * padding) / (maxY - minY)
         const scale = Math.min(scaleX, scaleY) // Use the smaller scale to maintain aspect ratio
 
-        this.embedding.forEach(([x, y], index) => {
+        embedding.forEach(([x, y], index) => {
           console.log('x', x, 'y', y)
           // Scale x and y based on the range of coordinates in the embedding
           //   const scaledX =
@@ -193,23 +201,6 @@ export default defineComponent({
     })
   },
   methods: {
-    precomputedDistance(
-      distanceMatrix: number[][]
-    ): (x: number, y: number) => number {
-      return (x: number, y: number): number => {
-        // Validate that x and y are within bounds
-        if (
-          x >= distanceMatrix.length ||
-          y >= distanceMatrix.length ||
-          x < 0 ||
-          y < 0
-        ) {
-          throw new Error('Indices are out of bounds of the distance matrix.')
-        }
-        // Return the precomputed distance from distanceMatrix
-        return distanceMatrix[x][y]
-      }
-    },
     createCircleTexture(circleRadius, app) {
       // Use PIXI.Graphics to draw a circle
       const graphics = new PIXI.Graphics()
