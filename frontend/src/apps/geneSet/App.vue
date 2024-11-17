@@ -167,13 +167,16 @@ export default defineComponent({
     <!-- Row 1: PixiCanvas Visualization -->
     <ARow type="flex" :gutter="8" class="row full-height">
       <ACol :span="12" class="col full-height">
-        <div class="content-overview" ref="parentElement">
-          <PixiCanvas v-if="showPixiScatter" @loaded="handlePixiLoaded" />
+        <div class="content-overview" ref="parentElementUMAP">
           <PixiUMAP
-            v-if="showPixiUMAP"
             :distanceMatrix="distanceMatrix"
+            :embedding="embedding"
             @loaded="handlePixiLoaded"
           />
+        </div>
+        <div class="gutter"></div>
+        <div class="content-overview" ref="parentElementGrid">
+          <PixiCanvas @loaded="handlePixiLoaded" />
         </div>
       </ACol>
       <ACol v-if="pixiLoaded" :span="12" class="col full-height">
@@ -254,5 +257,10 @@ export default defineComponent({
   overflow: hidden;
   width: 100%;
   height: 100%;
+}
+
+.gutter {
+  height: 16px; /* Adjust this for the vertical spacing */
+  width: 100%; /* Ensures it spans the column width */
 }
 </style>

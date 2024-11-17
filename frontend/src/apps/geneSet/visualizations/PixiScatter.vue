@@ -7,7 +7,7 @@
 
 <template>
   <ACard
-    title="Overview"
+    title="Grid Overview"
     :style="{
       width: `${100}%`,
       height: `${100}%`,
@@ -158,107 +158,143 @@ export default {
         // Create a foreground container for hover texts
         const foregroundContainer = new PIXI.Container()
         const circleContainer = new PIXI.Container()
+        this.circleContainer = circleContainer
 
         // Add the foreground container to the stage last
         app.stage.addChild(foregroundContainer)
         app.stage.addChild(circleContainer)
 
-        const devicePixelRatio = window.devicePixelRatio || 1
-        console.log('devicePixelRatio', devicePixelRatio)
-        const padding = 10
-        const circleRadius = 5 * devicePixelRatio
-        const circleSpacing = (3 * circleRadius) / devicePixelRatio
-        const chromPadding = 25 // Padding between chromosome grids
+        // const devicePixelRatio = window.devicePixelRatio || 1
+        // console.log('devicePixelRatio', devicePixelRatio)
+        // const padding = 10
+        // const circleRadius = 5 * devicePixelRatio
+        // const circleSpacing = (3 * circleRadius) / devicePixelRatio
+        // const chromPadding = 25 // Padding between chromosome grids
 
-        const containerWidth = this.$refs.pixi.clientWidth * devicePixelRatio
-        const containerHeight = this.$refs.pixi.clientHeight * devicePixelRatio
-        console.log('containerWidth', containerWidth)
-        console.log('containerHeight', containerHeight)
+        // const containerWidth = this.$refs.pixi.clientWidth * devicePixelRatio
+        // const containerHeight = this.$refs.pixi.clientHeight * devicePixelRatio
+        // console.log('containerWidth', containerWidth)
+        // console.log('containerHeight', containerHeight)
 
-        // load data
-        const genomes = genomeStore.genomeData.genomes
+        // // load data
+        // const genomes = genomeStore.genomeData.genomes
 
-        let numCols = Math.floor(
-          (containerWidth - 2 * padding) /
-            (2 * circleRadius + 2 * circleSpacing)
-        )
-        numCols = Math.floor(numCols / 5) * 5 // Make numCols a multiple of 5
-        // console.log('numCols', numCols, this.sequences.length)
-        console.log('numCols', numCols)
-
-        // Calculate the number of rows needed to fit all the points
-        // const numRows = Math.ceil(this.sequences.length / numCols)
-        const numRows = Math.ceil(genomes.length / numCols)
-        console.log('numRows', numRows)
-
-        // Calculate the total grid width and height
-        const totalGridWidth =
-          numCols * (2 * circleSpacing + 2 * circleRadius) + 2 * padding
-        const totalGridHeight =
-          numRows * (2 * circleSpacing + 2 * circleRadius) + 2 * padding
-        console.log('totalGridWidth', totalGridWidth)
-        console.log('totalGridHeight', totalGridHeight)
-
-        // test with old potato data
-        // console.log('sequences', this.sequences)
-        // const sequences_sorted = this.sequences.sort(
-        //   (a, b) => b.sequence_length - a.sequence_length
+        // let numCols = Math.floor(
+        //   (containerWidth - 2 * padding) /
+        //     (2 * circleRadius + 2 * circleSpacing)
         // )
-        // console.log('sequences sorted', sequences_sorted)
+        // // numCols = Math.floor(numCols / 5) * 5 // Make numCols a multiple of 5
+        // // console.log('numCols', numCols, this.sequences.length)
+        // console.log('numCols', numCols)
 
-        // const sequencesGrouped =
-        //   this.groupSequencesByChromosome(sequences_sorted)
-        // console.log('sequencesGrouped', sequencesGrouped)
+        // // Calculate the number of rows needed to fit all the points
+        // // const numRows = Math.ceil(this.sequences.length / numCols)
+        // const numRows = Math.ceil(genomes.length / numCols)
+        // console.log('numRows', numRows)
 
-        // <---------------------Create circle sprites ---------------->
-        this.createCircleTexture(circleRadius, app)
+        // // Calculate the total grid width and height
+        // const totalGridWidth =
+        //   numCols * (2 * circleSpacing + 2 * circleRadius) + 2 * padding
+        // const totalGridHeight =
+        //   numRows * (2 * circleSpacing + 2 * circleRadius) + 2 * padding
+        // console.log('totalGridWidth', totalGridWidth)
+        // console.log('totalGridHeight', totalGridHeight)
 
-        let currentXOffset = padding
+        // debugger
 
-        // Loop through each genome and create a unit grid for its sequences
-        Object.entries(genomes).forEach(([_, genomeData]) => {
-          const sequences = genomeData.sequences
+        // // test with old potato data
+        // // console.log('sequences', this.sequences)
+        // // const sequences_sorted = this.sequences.sort(
+        // //   (a, b) => b.sequence_length - a.sequence_length
+        // // )
+        // // console.log('sequences sorted', sequences_sorted)
 
-          if (Array.isArray(sequences)) {
-            let numCols = Math.ceil(sequences.length / 10) // max 10 rows
+        // // const sequencesGrouped =
+        // //   this.groupSequencesByChromosome(sequences_sorted)
+        // // console.log('sequencesGrouped', sequencesGrouped)
 
-            sequences.forEach((sequence, index) => {
-              const row = index % 10
-              const col = Math.floor(index / 10)
+        // // <---------------------Create circle sprites ---------------->
+        // this.createCircleTexture(circleRadius, app)
 
-              const x =
-                (currentXOffset + col * circleSpacing + circleRadius) *
-                devicePixelRatio
-              const y =
-                (padding + row * circleSpacing + circleRadius) *
-                devicePixelRatio
+        // let currentXOffset = padding
 
-              console.log('x', x, 'y', y)
+        // // Loop through each genome and create a unit grid for its sequences
+        // Object.entries(genomes).forEach(([_, genomeData]) => {
+        //   const sequences = genomeData.sequences
 
-              this.createSprites(
-                x,
-                y,
-                genomeData.name,
-                sequence.sequence_length_nuc,
-                sequence.name,
-                sequence.id,
-                app,
-                foregroundContainer,
-                circleContainer,
-                sequence.uid
-              )
-            })
+        //   if (Array.isArray(sequences)) {
+        //     let numCols = Math.ceil(sequences.length / 10) // max 10 rows
 
-            // After placing the grid for this chromosome, move the horizontal offset
-            currentXOffset += numCols * circleSpacing + chromPadding
-          } else {
-            console.warn(
-              `Expected sequences to be an array for genome ${genomeData.name}, but got:`,
-              sequences
-            )
-          }
-        })
-        app.render()
+        //     sequences.forEach((sequence, index) => {
+        //       const row = index % 10
+        //       const col = Math.floor(index / 10)
+
+        //       const x =
+        //         (currentXOffset + col * circleSpacing + circleRadius) *
+        //         devicePixelRatio
+        //       const y =
+        //         (padding + row * circleSpacing + circleRadius) *
+        //         devicePixelRatio
+
+        //       // console.log('x', x, 'y', y)
+
+        //       this.createSprites(
+        //         x,
+        //         y,
+        //         genomeData.name,
+        //         sequence.sequence_length_nuc,
+        //         sequence.name,
+        //         sequence.id,
+        //         app,
+        //         foregroundContainer,
+        //         circleContainer,
+        //         sequence.uid
+        //       )
+        //     })
+
+        //     // After placing the grid for this chromosome, move the horizontal offset
+        //     currentXOffset += numCols * circleSpacing + chromPadding
+        //   } else {
+        //     console.warn(
+        //       `Expected sequences to be an array for genome ${genomeData.name}, but got:`,
+        //       sequences
+        //     )
+        //   }
+        // })
+        // app.render()
+
+        this.drawGrid()
+
+        // Add watcher for selectedSequencesLasso
+        this.$watch(
+          () => this.genomeStore.selectedSequencesLasso,
+          (newSelectedSequences) => {
+            console.log('Lasso selection updated:', newSelectedSequences)
+
+            if (circleContainer) {
+              circleContainer.children.forEach((sprite: any) => {
+                const isSelected = newSelectedSequences.includes(
+                  sprite.sequence_uid
+                )
+                const isTracked = this.genomeStore.selectedSequencesTracker.has(
+                  sprite.sequence_uid
+                )
+                // Update sprite styles based on its state
+                if (isSelected) {
+                  sprite.tint = 0x007bff // Blue for selected
+                  sprite.alpha = 1 // Full opacity
+                } else if (isTracked) {
+                  sprite.tint = 0xa9a9a9 // Dark grey for tracked
+                  sprite.alpha = 0.75 // Slightly dimmer
+                } else {
+                  sprite.tint = 0xd3d3d3 // Default gray for unselected
+                  sprite.alpha = 0.5 // Dimmed
+                }
+              })
+            }
+          },
+          { immediate: true }
+        )
 
         // --- Lasso Setup ---
         const svg = d3
@@ -306,6 +342,65 @@ export default {
     })
   },
   methods: {
+    drawGrid() {
+      const app = this.app
+      const circleContainer = this.circleContainer
+      const devicePixelRatio = window.devicePixelRatio || 1
+      const padding = 10
+      const circleRadius = 5 * devicePixelRatio
+      const circleSpacing = (2 * circleRadius) / devicePixelRatio
+      const genomeGap = 20 * devicePixelRatio // Extra gap between genomes
+
+      // Create the circle texture
+      this.createCircleTexture(circleRadius, app)
+
+      // Get canvas dimensions
+      const canvasWidth = app.renderer.width
+      const canvasHeight = app.renderer.height
+
+      // Calculate grid dimensions
+      const maxCols = Math.floor(
+        (canvasWidth - 2 * padding) / (2 * circleRadius + circleSpacing)
+      )
+
+      console.log('Canvas dimensions:', canvasWidth, canvasHeight)
+      console.log('Max columns:', maxCols)
+
+      let currentX = padding
+      let currentY = padding
+
+      // Iterate over genomes
+      this.genomeStore.genomeData.genomes.forEach((genomeData) => {
+        const sequences = genomeData.sequences
+
+        sequences.forEach((sequence, index) => {
+          // Create sprite for each sequence
+          const circleSprite = new PIXI.Sprite(this.circleTexture)
+          circleSprite.tint = 0xd3d3d3 // Default color
+          circleSprite.alpha = 0.5
+          circleSprite.sequence_uid = sequence.uid
+
+          circleSprite.x = currentX
+          circleSprite.y = currentY
+
+          circleContainer.addChild(circleSprite)
+
+          // Move to the next column
+          currentX += 2 * circleRadius + circleSpacing
+
+          // Wrap to the next row if maxCols is reached
+          if ((index + 1) % maxCols === 0) {
+            currentX = padding
+            currentY += 2 * circleRadius + circleSpacing
+          }
+        })
+
+        // Add extra gap for the next genome group
+        currentX = padding
+        currentY += 2 * circleRadius + circleSpacing + genomeGap
+      })
+      app.render()
+    },
     lassoStart() {
       const genomeStore = useGenomeStore()
       console.log('Lasso selection started', genomeStore.selectedSequencesLasso)
@@ -384,6 +479,7 @@ export default {
       // Apply effects to selected sprites
       selectedSprites.forEach((sprite) => {
         sprite.tint = 0x007bff // Set sprite color to blue
+        sprite.alpha = 1
       })
 
       console.log('Selected sprites:', selectedSprites)

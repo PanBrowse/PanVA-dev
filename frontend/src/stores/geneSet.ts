@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue'
 
 import {
   fetchDistanceMatrix,
+  fetchDistanceMatrixLabels,
   fetchEmbedding,
   fetchGenomeData,
 } from '@/api/geneSet'
@@ -67,12 +68,15 @@ export const useGenomeStore = defineStore({
       string,
       { id: number; uid: string }[]
     >,
+    sequenceToMrnaLookup: new Map<string, string[]>(),
+    mrnaScoreMatrix: [] as number[][],
     selectedSequencesTracker: new Set(DEFAULT_SEQUENCE_UIDS),
     genomeUids: [] as string[], // Array to store genome numbers in the loading order
     genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
     sequenceUids: [] as string[], // Array to store genome numbers in the loading order
     sequenceUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
     distanceMatrix: [],
+    distanceMatrixLabels: {},
     embedding: [],
     isInitialized: false,
   }),
@@ -105,9 +109,24 @@ export const useGenomeStore = defineStore({
         this.geneToLocusSequenceLookup = createGeneToLociAndSequenceLookup(
           this.genomeData
         )
+
+        this.generateMrnaScoreMatrix()
+
         // Fetch and set the distance matrix
         const matrix = await fetchDistanceMatrix()
         this.setDistanceMatrix(matrix)
+
+        const labels = await fetchDistanceMatrixLabels()
+        if (labels && labels.length > 0) {
+          // Transform the labels array into a lookup with the index
+          this.distanceMatrixLabels = labels.reduce((lookup, label, index) => {
+            lookup[label] = index
+            return lookup
+          }, {})
+        } else {
+          this.distanceMatrixLabels = {} // Set as an empty object if no labels are found
+        }
+        // this.distanceMatrixLabels = labels || []
 
         // Fetch and set the embedding matrix
         const embedding = await fetchEmbedding()
@@ -122,9 +141,89 @@ export const useGenomeStore = defineStore({
       // Set initialized flag only after all API calls complete successfully
       this.isInitialized = true
     },
+    generateMrnaScoreMatrix() {
+      // Step 1: Gather all unique mrna_uids from groups that contain more than one mRNA
+      const uniqueMrnaUids = new Set<string>()
+      this.genomeData.groups.forEach((group) => {
+        if (group.mrnas.length > 1) {
+          group.mrnas.forEach((mrna) => uniqueMrnaUids.add(mrna))
+        }
+      })
+
+      const mrnaUids = Array.from(uniqueMrnaUids)
+      this.mrnaUidIndexLookup = mrnaUids.reduce((lookup, uid, index) => {
+        lookup[uid] = index
+        return lookup
+      }, {} as Record<string, number>)
+
+      const size = mrnaUids.length
+
+      // Step 2: Initialize the matrix with NaN values
+      this.mrnaScoreMatrix = Array.from({ length: size }, () =>
+        Array(size).fill(NaN)
+      )
+
+      // // Step 3: Populate the matrix with normalized identity scores from links
+      // this.genomeData.links.forEach((link) => {
+      //   const queryUid = link.query.uid
+      //   const targetUid = link.target.uid
+      //   const identityScore = link.identity
+
+      //   if (
+      //     this.mrnaUidIndexLookup.hasOwnProperty(queryUid) &&
+      //     this.mrnaUidIndexLookup.hasOwnProperty(targetUid)
+      //   ) {
+      //     const queryIndex = this.mrnaUidIndexLookup[queryUid]
+      //     const targetIndex = this.mrnaUidIndexLookup[targetUid]
+      //     const normalizedScore = identityScore ? identityScore / 100 : 0
+
+      //     this.mrnaScoreMatrix[queryIndex][targetIndex] = normalizedScore
+      //     this.mrnaScoreMatrix[targetIndex][queryIndex] = normalizedScore
+      //   }
+      // })
+
+      // Step 4: Replace any remaining NaN values with 0
+      this.mrnaScoreMatrix = this.mrnaScoreMatrix.map((row) =>
+        row.map((value) => (isNaN(value) ? 0 : value))
+      )
+      // // Step 3: Create a map of links to batch updates
+      // const linkMap = new Map<string, Map<string, number>>()
+
+      // this.genomeData.links.forEach((link) => {
+      //   const queryUid = link.query.uid
+      //   const targetUid = link.target.uid
+      //   const identityScore = link.identity ?? 0 // Default to 0 if undefined
+
+      //   if (!linkMap.has(queryUid)) {
+      //     linkMap.set(queryUid, new Map<string, number>())
+      //   }
+      //   if (!linkMap.has(targetUid)) {
+      //     linkMap.set(targetUid, new Map<string, number>())
+      //   }
+
+      //   // Update both [query -> target] and [target -> query]
+      //   linkMap.get(queryUid)!.set(targetUid, identityScore)
+      //   linkMap.get(targetUid)!.set(queryUid, identityScore)
+      // })
+
+      // // Step 4: Populate the matrix using the precomputed linkMap
+      // linkMap.forEach((targets, queryUid) => {
+      //   if (!this.mrnaUidIndexLookup.hasOwnProperty(queryUid)) return
+      //   const queryIndex = this.mrnaUidIndexLookup[queryUid]
+
+      //   targets.forEach((identityScore, targetUid) => {
+      //     if (!this.mrnaUidIndexLookup.hasOwnProperty(targetUid)) return
+      //     const targetIndex = this.mrnaUidIndexLookup[targetUid]
+
+      //     const normalizedScore = identityScore / 100
+      //     this.mrnaScoreMatrix[queryIndex][targetIndex] = normalizedScore
+      //     this.mrnaScoreMatrix[targetIndex][queryIndex] = normalizedScore
+      //   })
+      // })
+    },
     generateIndicesAndLookup() {
-      this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid) // Populate genomeNrs array
-      this.sequenceUids = this.genomeData.sequences.map((seq) => seq.uid) // Populate genomeNrs array
+      this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid) // Populate genome array
+      this.sequenceUids = this.genomeData.sequences.map((seq) => seq.uid) // Populate sequence array
 
       // Populate genomeNrLookup with uid as key and index as value
       this.genomeUidLookup = this.genomeData.genomes.reduce(
@@ -171,6 +270,24 @@ export const useGenomeStore = defineStore({
         },
         {} as Record<string, { id: number; uid: string }[]>
       )
+
+      // Populate sequenceToMrnaLookup
+      this.sequenceToMrnaLookup = this.genomeData.genes.reduce(
+        (lookup, gene) => {
+          const sequenceUid = this.geneToLocusSequenceLookup.get(
+            gene.uid
+          )?.sequence
+          if (sequenceUid) {
+            if (!lookup[sequenceUid]) {
+              lookup[sequenceUid] = []
+            }
+            lookup[sequenceUid].push(...gene.mrnas) // Add mRNA UIDs for this gene
+          }
+          return lookup
+        },
+        new Map<string, string[]>()
+      )
+
       // Extend each gene object in genomeData.genes with its homology groups
       this.genomeData.genes = this.genomeData.genes.map((gene) => ({
         ...gene,

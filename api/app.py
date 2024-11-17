@@ -92,7 +92,7 @@ def get_dendrogram(id):
 @app.route('/geneSet/yeast_embeddings_test/protein_umap_embedding', methods=['GET'])
 def get_umap_embedding():
     # Define the path to the UMAP embedding JSON file
-    embedding_path = os.path.join(db_path, "geneSet", "yeast_embeddings_test", "umap_embedding_protein.json")
+    embedding_path = os.path.join(db_path, "geneSet", "yeast_embeddings_test", "embedding_neighbors10_minDist0.1_seed42.json")
     print("Loading embedding from:", embedding_path)
     
     # Load the JSON embedding
@@ -107,24 +107,48 @@ def get_umap_embedding():
         print("Error loading embedding:", e)
         return jsonify({"error": "Failed to load embedding"}), 500
     
+@app.route('/geneSet/yeast_matrices_test/protein_labels', methods=['GET'])
+def get_labels():
+    try:
+        labels_path = os.path.join(
+            db_path, "geneSet", "yeast_matrices_test", "protein_distance_labels.json"
+        )
+        print("Loading labels from:", labels_path)
+
+        # Load the labels from the JSON file
+        with open(labels_path, "r") as f:
+            labels = json.load(f)
+
+        print("Labels loaded:", labels)
+
+        # Return the labels as JSON
+        return jsonify({"labels": labels})
+    except Exception as e:
+        print("Error loading labels:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+    
 @app.route('/geneSet/yeast_matrices_test/protein_distance_matrix', methods=['GET'])
 def get_distance_matrix():
     # Load the .npy file
     matrix_path = os.path.join(db_path, "geneSet", "yeast_matrices_test", "protein_distance_matrix.npy")
     print("Loading matrix from:", matrix_path)
-    
-    
-    # Load the matrix and encode it in base64
-    matrix = np.load(matrix_path)
-    print("Matrix shape:", matrix.shape)
-    print("Total elements:", matrix.size)
-    print("Data type:", matrix.dtype)
 
-    matrix_bytes = matrix.tobytes()
-    matrix_base64 = base64.b64encode(matrix_bytes).decode("utf-8")  # Convert to base64 string
-    
-    # Return as JSON
-    return jsonify({"matrix": matrix_base64})
+    try:
+        # Load the matrix from the .npy file
+        matrix = np.load(matrix_path)
+        print("Matrix shape:", matrix.shape)
+        print("Total elements:", matrix.size)
+        print("Data type:", matrix.dtype)
+
+        # Convert the numpy array to a nested list for JSON compatibility
+        matrix_list = matrix.tolist()
+        
+        # Return the matrix as JSON
+        return jsonify({"matrix": matrix_list})
+    except Exception as e:
+        print("Error loading distance matrix:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/geneSet/clustering.json", methods=["GET", "POST"])
 def get_clustering_order():
