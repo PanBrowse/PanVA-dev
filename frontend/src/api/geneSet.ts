@@ -1,4 +1,5 @@
 import * as d3 from 'd3'
+import { identity } from 'lodash'
 
 import {
   parseBool,
@@ -7,11 +8,25 @@ import {
   parseString,
 } from '@/helpers/parse'
 import { useConfigStore } from '@/stores/config'
+// import { Config } from './../types'
 import type {
   ConfigMetadata,
   GroupInfo,
   Homology,
   SequenceMetrics,
+} from '@/types'
+import type {
+  Cds,
+  Domain,
+  Exon,
+  Gene,
+  Genome,
+  GenomeData,
+  HomologyGroup,
+  HomologyLink,
+  Locus,
+  Mrna,
+  SequenceInfo,
 } from '@/types'
 
 export const fetchHomologies = async () => {
@@ -38,6 +53,142 @@ export const fetchHomologies = async () => {
 
     return homology
   })
+}
+
+export const fetchGenomeData = async (): Promise<GenomeData> => {
+  const config = useConfigStore()
+  const data = await d3.json<GenomeData>(
+    `${config.apiUrl}geneSet/yeast_test.json`
+  )
+
+  // Combine all sequences into a flat array for the standalone `sequences` property
+  const sequences =
+    data?.genomes?.flatMap((genome) =>
+      genome.sequences.map((sequence) => ({
+        uid: sequence.uid,
+        sequence_length_nuc: sequence.sequence_length_nuc,
+        gene_count: sequence.gene_count,
+        phasing: sequence.phasing,
+        name: sequence.name,
+        id: sequence.id,
+        loci: sequence.loci,
+      }))
+    ) || []
+
+  return {
+    genomes:
+      data?.genomes?.map(
+        (genome): Genome => ({
+          uid: genome.uid,
+          name: genome.name,
+          sequences: genome.sequences.map(
+            (sequence): SequenceInfo => ({
+              uid: sequence.uid,
+              sequence_length_nuc: sequence.sequence_length_nuc,
+              gene_count: sequence.gene_count,
+              phasing: sequence.phasing,
+              name: sequence.name,
+              id: sequence.id,
+              loci: sequence.loci,
+            })
+          ),
+        })
+      ) || [],
+
+    sequences, // Assign the flat array of sequences
+
+    loci:
+      data?.loci?.map(
+        (locus): Locus => ({
+          uid: locus.uid,
+          loci_length_nuc: locus.loci_length_nuc,
+          genes: locus.genes,
+          name: locus.name,
+          start: locus.start,
+          end: locus.end,
+        })
+      ) || [],
+
+    genes:
+      data?.genes?.map(
+        (gene): Gene => ({
+          uid: gene.uid,
+          names: gene.names,
+          strand: gene.strand,
+          noncoding_rnas: gene.noncoding_rnas,
+          start: gene.start,
+          sequence_id: gene.sequence_id,
+          end: gene.end,
+          label: gene.label,
+          gene_length_nuc: gene.gene_length_nuc,
+          mrnas: gene.mrnas,
+        })
+      ) || [],
+
+    mrnas:
+      data?.mrnas?.map(
+        (mrna): Mrna => ({
+          uid: mrna.uid,
+          label: mrna.label,
+          exons: mrna.exons,
+          cds_length_nuc: mrna.cds_length_nuc,
+          mrna_length_nuc: mrna.mrna_length_nuc,
+          protein_length_aa: mrna.protein_length_aa,
+          start: mrna.start,
+          end: mrna.end,
+          functional_domains: mrna.functional_domains,
+          cdss: mrna.cdss,
+        })
+      ) || [],
+
+    exons:
+      data?.exons?.map(
+        (exon): Exon => ({
+          uid: exon.uid,
+          start: exon.start,
+          end: exon.end,
+        })
+      ) || [],
+
+    cds:
+      data?.cds?.map(
+        (cds): Cds => ({
+          uid: cds.uid,
+          start: cds.start,
+          end: cds.end,
+        })
+      ) || [],
+
+    functional_domains:
+      data?.functional_domains?.map(
+        (domain): Domain => ({
+          uid: domain.uid,
+          domain_id: domain.domain_id,
+          domain_type: domain.domain_type,
+          name: domain.name,
+        })
+      ) || [],
+
+    groups:
+      data?.groups?.map(
+        (hg): HomologyGroup => ({
+          uid: hg.uid,
+          hidden: hg.hidden,
+          label: hg.label,
+          mrnas: hg.mrnas,
+        })
+      ) || [],
+
+    links:
+      data?.links?.map(
+        (hl): HomologyLink => ({
+          uid: hl.uid,
+          identity: hl.identity,
+          query: hl.query,
+          target: hl.target,
+        })
+      ) || [],
+  }
 }
 
 export const fetchSequences = async () => {

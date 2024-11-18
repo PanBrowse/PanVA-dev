@@ -252,7 +252,7 @@ export default {
     :columns="tableColumns"
     :dataSource="groupInfo"
     rowKey="mRNA_id"
-    size="small"
+    size="large"
     :scroll="{ x: true }"
   />
 </template>

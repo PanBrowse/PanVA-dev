@@ -1,6 +1,6 @@
 <template>
   <div
-    id="contentChr"
+    id="content-focus"
     style="
       width: 100%;
       height: 100%;
@@ -8,12 +8,12 @@
       justify-content: space-between;
     "
   >
-    <SequencesDetails
+    <FocusView
       v-bind:key="`chr${chrFocus}_focus`"
-      :chromosomeNr="chrFocus"
+      :chromosomeNr="String(chrFocus)"
       :name="`chr${chrFocus}_focus`"
-      :data="getChromosome(chrFocus)"
-      :dataGenes="getGroupInfo(chrFocus)"
+      :data="getChromosome(String(chrFocus))"
+      :dataGenes="getGroupInfo(String(chrFocus))"
       :dataMin="dataMin"
       :dataMax="dataMax"
       :maxGC="GCcontentMax"
@@ -31,11 +31,13 @@ import { useGeneSetStore } from '@/stores/geneSet'
 import { useGlobalStore } from '@/stores/global'
 import type { SequenceMetrics } from '@/types'
 
+import FocusView from './FocusView.vue'
 import SequencesDetails from './SequencesDetails.vue'
 
 export default {
   components: {
-    SequencesDetails,
+    // SequencesDetails,
+    FocusView,
   },
   data: () => ({
     svgWidth: 0,
@@ -59,20 +61,20 @@ export default {
     ]),
 
     dataMax() {
-      return d3.max(this.sequences, (d) => d.sequence_length)
+      return d3.max(this.sequences, (d) => d.sequence_length) ?? 0
     },
     dataMin() {
-      return d3.min(this.sequences, (d) => d.sequence_length)
+      return d3.min(this.sequences, (d) => d.sequence_length) ?? 0
     },
-    GCfiltered() {
+    GCfiltered(): number[] {
       const CGcontentArray = this.sequences.map((d) => d.GC_content_percent)
-      return filterOutliers(CGcontentArray)
+      return filterOutliers(CGcontentArray as number[])
     },
     GCcontentMax() {
-      return d3.max(this.GCfiltered, (d) => d)
+      return Number(d3.max(this.GCfiltered, (d) => d) ?? 0)
     },
     GCcontentMin() {
-      return d3.min(this.GCfiltered, (d) => d)
+      return Number(d3.min(this.GCfiltered, (d) => d) ?? 0)
     },
   },
   methods: {
@@ -84,12 +86,13 @@ export default {
   },
   created() {},
   mounted() {
-    this.svgWidth =
-      document.getElementById('content').offsetWidth * this.svgWidthScaleFactor
+    // console.log('Chromosome details mounted')
 
+    const contentElement = document.getElementById('content-focus')
+    this.svgWidth =
+      (contentElement?.offsetWidth || 0) * this.svgWidthScaleFactor
     this.svgHeight =
-      document.getElementById('content').offsetHeight *
-      this.svgHeightScaleFactor
+      (contentElement?.offsetHeight || 0) * this.svgHeightScaleFactor
   },
   watch: {},
 }

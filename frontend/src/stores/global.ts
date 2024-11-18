@@ -5,6 +5,7 @@ import type { App, AppError } from '@/types'
 
 import { useConfigStore } from './config'
 import { useGeneSetStore } from './geneSet'
+import { useGenomeStore } from './geneSet'
 import { useHomologyStore } from './homology'
 
 export const useGlobalStore = defineStore('global', {
@@ -68,7 +69,9 @@ export const useGlobalStore = defineStore('global', {
       this.selectedApp = 'geneSet'
 
       const geneSet = useGeneSetStore()
+      const genomeData = useGenomeStore()
       await geneSet.initialize()
+      await genomeData.loadGenomeData()
     },
   },
 })

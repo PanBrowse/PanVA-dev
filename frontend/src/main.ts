@@ -1,11 +1,11 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import './assets/main.scss'
+
 import { createHead, VueHeadMixin } from '@vueuse/head'
+import { createPinia } from 'pinia'
+import { createApp } from 'vue'
 
 import App from './App.vue'
-
 import { registerErrorHandlers } from './errors'
-import './assets/main.scss'
 
 const pinia = createPinia()
 const head = createHead()
