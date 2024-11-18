@@ -24,6 +24,7 @@ import {
   sortedGroupInfosLookup,
   sortedSequenceIdsLookup,
 } from '@/helpers/chromosome'
+import { runSpringSimulation } from '@/helpers/springSimulation'
 import type { Gene, GenomeData, Locus } from '@/types'
 import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
@@ -222,8 +223,8 @@ export const useGenomeStore = defineStore({
       // })
     },
     generateIndicesAndLookup() {
-      this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid) // Populate genome array
-      this.sequenceUids = this.genomeData.sequences.map((seq) => seq.uid) // Populate sequence array
+      this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid) // Populate genomeNrs array
+      this.sequenceUids = this.genomeData.sequences.map((seq) => seq.uid) // Populate genomeNrs array
 
       // Populate genomeNrLookup with uid as key and index as value
       this.genomeUidLookup = this.genomeData.genomes.reduce(
@@ -297,7 +298,7 @@ export const useGenomeStore = defineStore({
       // Extend each gene object in genomeData.genes with its sequence uid
       this.genomeData.genes = this.genomeData.genes.map((gene) => ({
         ...gene,
-        sequence_uid: this.geneToLocusSequenceLookup[gene.uid]?.sequence,
+        sequence_uid: this.geneToLocusSequenceLookup.get(gene.uid)?.sequence,
       }))
     },
     getGenesForSelectedLasso(): string[] {
@@ -379,6 +380,14 @@ export const useGeneSetStore = defineStore('geneSet', {
     percentageGC: true,
     allSequences: true,
     colorGenomes: false,
+
+    // Spring simulation forces
+    scaleXForce: 1,
+    scaleYForce: 1000,
+    scaleContraction: 100,
+    scaleRepulsion: 1,
+    minimumDistance: 1000,
+    rerunSimulation: false,
 
     //Graphics
     overviewArrows: false,
@@ -635,6 +644,14 @@ export const useGeneSetStore = defineStore('geneSet', {
     },
     getGroupInfo(key: string) {
       return this.groupInfoLookup[key]
+    },
+    updateSimulation() {
+      this.rerunSimulation = true
+      // [newGenePositions, nodeGroups, heat] = runSpringSimulation(newGenePositions, this.data ?? [], 1000, 100, 232273529)
+      // currentHeat.value = heat
+      // crossingHomologyGroups.value = crossDetection(newGenePositions)
+
+      // currentGraphNodeGroups.value = nodeGroups
     },
   },
   getters: {

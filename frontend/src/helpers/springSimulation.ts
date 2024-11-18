@@ -68,7 +68,7 @@ export const runSpringSimulation = (
       heat = heat * 0.99
       currentHeatNIterations = 0
     }
-    if (terminate) {
+    if (terminate || heat <= toHeat) {
       // uncomment to center final nodes on the initializeHomologygroup
       // if(initializeOnHomologygroup !== undefined) {
       //   let anchor = 0
@@ -84,10 +84,11 @@ export const runSpringSimulation = (
       // }
 
       console.log(nIterations, 'iterations in simulation')
-      return [
+      const answer = [
         nodeGroups.flatMap((nodeGroup) => nodeGroup.nodes),
         nodeGroups,
       ] as [GraphNode[], GraphNodeGroup[]]
+      return answer
     }
   }
 }

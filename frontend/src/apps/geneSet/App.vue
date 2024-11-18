@@ -26,6 +26,8 @@ import ChromosomeDetails from './visualizations/ChromosomeDetails.vue'
 import ChromosomeOverview from './visualizations/ChromosomeOverview.vue'
 import Density from './visualizations/Density.vue'
 import GroupInfoTable from './visualizations/GroupInfoTable.vue'
+import SpringTuning from './sidebar/SpringTuning.vue';
+// import Homologies from './visualizations/Homologies.vue'
 import PixiCanvas from './visualizations/PixiScatter.vue'
 import PixiUMAP from './visualizations/PixiUMAP.vue'
 
@@ -46,8 +48,10 @@ export default defineComponent({
     PixiUMAP,
     ARow: Row,
     ACol: Col,
-    AButton: Button,
+  	AButton: Button,
     ARadioGroup: RadioGroup,
+    HomologyOverview,
+    SpringTuning,
   },
   setup() {
     const geneSetStore = useGeneSetStore()
@@ -159,6 +163,7 @@ export default defineComponent({
       <OverviewFilters />
       <Filters />
       <Sorting />
+      <SpringTuning />
       <GraphicsOptions />
       <ContextOptions />
       <Unphased />
@@ -180,7 +185,7 @@ export default defineComponent({
         </div>
       </ACol>
       <ACol v-if="pixiLoaded" :span="12" class="col full-height">
-        <!-- <ChromosomeDetails /> -->
+        <ChromosomeDetails />
         <!-- <GroupInfoTable /> -->
       </ACol>
     </ARow>
