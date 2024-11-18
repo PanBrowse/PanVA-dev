@@ -1,4 +1,4 @@
-import type { Gene, GroupInfo, SequenceInfo, SequenceMetrics } from '@/types'
+import type { Gene, GroupInfo, SequenceInfo, SequenceMetrics } from '@/types';
 
 import {
   applyMinimumdistanceOnSequence,
@@ -7,7 +7,7 @@ import {
   GraphNode,
   GraphNodeGroup,
   updateHighStressNodeGroup,
-} from './springSimulationUtils'
+} from './springSimulationUtils';
 
 export const runSpringSimulation = (
   genes: Gene[],
@@ -18,57 +18,58 @@ export const runSpringSimulation = (
 ) => {
   // simulates forces applied to all nodes in the graph
   // if tuning of the evaluateForces function is bad it can result in strange behaviour (ugly layout)
-  let heat = fromHeat
-  let nodeGroups: GraphNodeGroup[] = []
-  const nodes: GraphNode[] = genesToNodes(genes)
-  console.log('nodes simulation', nodes)
-  const excludedHomologyGroup = 0 // 232290464
-  const touchingDistance = 100
+  let heat = fromHeat;
+  let nodeGroups: GraphNodeGroup[] = [];
+  const nodes: GraphNode[] = genesToNodes(genes);
+  console.log('nodes simulation', nodes);
+  const excludedHomologyGroup = 0; // 232290464
+  const touchingDistance = 100;
 
   // initalize with centering on a specific homologygroup
   if (initializeOnHomologygroup !== undefined) {
-    let anchor = 0
+    let anchor = 0;
     sequences.forEach((sequence) => {
-      const sequenceMembers = nodes.filter((d) => d.sequenceId === sequence.uid)
-      console.log('sequenceMembers', sequenceMembers)
+      const sequenceMembers = nodes.filter((d) => d.sequenceId === sequence.uid);
+      console.log('sequenceMembers', sequenceMembers);
       const anchorElement = sequenceMembers.find(
         (d) => d.homologyGroup === initializeOnHomologygroup
-      )
-      console.log('anchorElement', anchorElement)
+      );
+      console.log('anchorElement', anchorElement);
       if (anchorElement === undefined) {
-        anchor = 0
+        anchor = 0;
       } else {
-        anchor = anchorElement.position
+        anchor = anchorElement.position;
       }
       sequenceMembers.forEach((gene) => {
-        gene.position = gene.position - anchor
-      })
-    })
+        gene.position = gene.position - anchor;
+      });
+    });
   }
 
   // Form grous of overlappiung nodes
-  nodeGroups = createNodeGroups(nodes)
-  console.log('nodeGroups', nodeGroups)
+  nodeGroups = createNodeGroups(nodes);
+  console.log('nodeGroups', nodeGroups);
 
-  let terminate = false
-  let nIterations = 0
-  const largestStep = 0
-  let currentHeatNIterations = 0
+  let terminate = false;
+  let nIterations = 0;
+  const largestStep = 0;
+  let currentHeatNIterations = 0;
   while (true) {
     ;[nodeGroups, terminate] = updateHighStressNodeGroup(
       nodeGroups,
       heat,
       touchingDistance
-    )
+    );
 
-    nIterations = nIterations + 1
-    currentHeatNIterations = currentHeatNIterations + 1
+    nIterations = nIterations + 1;
+    currentHeatNIterations = currentHeatNIterations + 1;
     // repeat calculations for the same heat a few times (Davidson and Harel)
     if (currentHeatNIterations > 20) {
-      heat = heat * 0.99
-      currentHeatNIterations = 0
+      heat = heat * 0.99;
+      currentHeatNIterations = 0;
     }
-    if (terminate || heat <= toHeat) {
+    if (terminate || (heat <= toHeat)) {
+
       // uncomment to center final nodes on the initializeHomologygroup
       // if(initializeOnHomologygroup !== undefined) {
       //   let anchor = 0
@@ -83,15 +84,15 @@ export const runSpringSimulation = (
       //   })
       // }
 
-      console.log(nIterations, 'iterations in simulation')
+      console.log(nIterations, 'iterations in simulation');
       const answer = [
         nodeGroups.flatMap((nodeGroup) => nodeGroup.nodes),
         nodeGroups,
-      ] as [GraphNode[], GraphNodeGroup[]]
-      return answer
+      ] as [GraphNode[], GraphNodeGroup[]];
+      return answer;
     }
   }
-}
+};
 
 /////////////////// Previous spring simulation code: ///////////////////////////
 
