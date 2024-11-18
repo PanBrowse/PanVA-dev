@@ -27,7 +27,6 @@ import ChromosomeOverview from './visualizations/ChromosomeOverview.vue'
 import Density from './visualizations/Density.vue'
 import GroupInfoTable from './visualizations/GroupInfoTable.vue'
 import SpringTuning from './sidebar/SpringTuning.vue';
-// import Homologies from './visualizations/Homologies.vue'
 import PixiCanvas from './visualizations/PixiScatter.vue'
 import PixiUMAP from './visualizations/PixiUMAP.vue'
 
@@ -48,16 +47,12 @@ export default defineComponent({
     PixiUMAP,
     ARow: Row,
     ACol: Col,
-  	AButton: Button,
-    ARadioGroup: RadioGroup,
-    HomologyOverview,
     SpringTuning,
   },
   setup() {
     const geneSetStore = useGeneSetStore()
     const genomeStore = useGenomeStore()
     const pixiLoaded = ref(false)
-    // const showPixiScatter = ref(true) // true for PixiScatter, false for PixiUMAP
 
     const handlePixiLoaded = () => {
       try {
@@ -67,26 +62,6 @@ export default defineComponent({
         console.error('Error handling PixiScatter loaded event:', error)
       }
     }
-
-    // const toggleVisualization = () => {
-    //   showPixiScatter.value = !showPixiScatter.value
-    // }
-
-    const selectedVisualization = ref('PixiUMAP') // Default to PixiScatter
-
-    // Define options for Radio Group
-    const visualizationOptions = [
-      { label: 'Grid', value: 'PixiScatter' },
-      { label: 'UMAP', value: 'PixiUMAP' },
-    ]
-
-    // Computed properties to control which component to render
-    const showPixiScatter = computed(
-      () => selectedVisualization.value === 'PixiScatter'
-    )
-    const showPixiUMAP = computed(
-      () => selectedVisualization.value === 'PixiUMAP'
-    )
 
     // Trigger loading of genome data
     genomeStore.loadGenomeData()
@@ -134,11 +109,6 @@ export default defineComponent({
       chromosomeNr,
       pixiLoaded,
       handlePixiLoaded,
-      // toggleVisualization,
-      selectedVisualization,
-      visualizationOptions,
-      showPixiScatter,
-      showPixiUMAP,
 
       distanceMatrix,
       embedding,
@@ -150,16 +120,6 @@ export default defineComponent({
 <template>
   <Layout v-if="isInitialized && isInitializedGenome">
     <template #sidebar>
-      <!-- <AButton type="primary" @click="toggleVisualization">
-        Toggle Overview Visualization
-      </AButton> -->
-      <div class="radio-group-container">
-        <ARadioGroup
-          v-model:value="selectedVisualization"
-          option-type="button"
-          :options="visualizationOptions"
-        />
-      </div>
       <OverviewFilters />
       <Filters />
       <Sorting />

@@ -222,6 +222,7 @@ g.brush .selection {
 
 <template>
   <SidebarItem title="Filters Overview">
+  
     <div id="sequence-chart-container">
       <svg id="sequence-length-chart"></svg>
     </div>
@@ -240,6 +241,7 @@ g.brush .selection {
       :wrapperCol="{ span: 14 }"
       class="view-options"
     >
+     
       <AFormItem label="Filter genomes">
         <ASelect
           v-model:value="selectedGenomes"
@@ -263,13 +265,17 @@ g.brush .selection {
           showSearch
           showArrow
         />
+        
+      </AFormItem>
+      <AFormItem label="Filter empty">
+            <ASwitch size="small"/>
       </AFormItem>
     </AForm>
   </SidebarItem>
 </template>
 
 <script lang="ts">
-import { Form, FormItem, Select } from 'ant-design-vue'
+import { Form, FormItem, Select, Switch } from 'ant-design-vue'
 import * as d3 from 'd3'
 import { mapState, mapWritableState } from 'pinia'
 import { defineComponent } from 'vue'
@@ -289,6 +295,7 @@ export default defineComponent({
     AFormItem: FormItem,
     ASelect: Select,
     SidebarItem,
+    ASwitch: Switch,
   },
   computed: {
     ...mapWritableState(useGenomeStore, [
