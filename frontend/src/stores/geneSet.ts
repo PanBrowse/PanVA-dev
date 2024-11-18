@@ -29,7 +29,6 @@ import type { Gene, GenomeData, Locus } from '@/types'
 import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
 import { useGlobalStore } from './global';
-import { runSpringSimulation } from '@/helpers/springSimulation';
 
 // to-do: add this to config! this is data dependent
 const DEFAULT_SEQUENCE_UIDS = [
