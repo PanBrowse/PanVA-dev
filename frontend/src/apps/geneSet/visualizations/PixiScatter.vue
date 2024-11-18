@@ -128,6 +128,9 @@ export default {
         //   genomeStore.genomeData.genomes
         // )
 
+        let zoomLevel = 1 // Default zoom level
+        this.zoomLevel = zoomLevel
+
         // // Create a PIXI.Application instance
         const app = new PIXI.Application()
         this.app = app
@@ -325,6 +328,13 @@ export default {
 
         app.stage.addChild(foregroundContainer)
 
+        // Event listener for mouse wheel zoom
+        app.canvas.addEventListener('wheel', (event) => {
+          const delta = event.deltaY < 0 ? 0.1 : -0.1 // Zoom in/out
+          // zoomGrid(delta)
+          console.log('test zoom from Grid', delta)
+        })
+
         // Handle window resizing
         window.addEventListener('resize', () => {
           this.resizeWindow(app)
@@ -342,12 +352,17 @@ export default {
     })
   },
   methods: {
+    zoomGrid(delta: number) {
+      this.zoomLevel += delta
+      this.zoomLevel = Math.max(1, Math.min(5, this.zoomLevel)) // Clamp zoom level between 1 and 5
+      this.drawGrid()
+    },
     drawGrid() {
       const app = this.app
       const circleContainer = this.circleContainer
       const devicePixelRatio = window.devicePixelRatio || 1
       const padding = 10
-      const circleRadius = 5 * devicePixelRatio
+      const circleRadius = 5 * devicePixelRatio * this.zoomLevel
       const circleSpacing = (2 * circleRadius) / devicePixelRatio
       const genomeGap = 20 * devicePixelRatio // Extra gap between genomes
 
