@@ -39,10 +39,11 @@ import { getSequenceIdByUid, groupInfoDensity } from '@/helpers/chromosome'
 import { crossDetection } from '@/helpers/crossDetection'
 import { getGeneSymbolSize, getGeneSymbolType } from '@/helpers/customSymbols'
 import { runSpringSimulation } from '@/helpers/springSimulation'
-import type { GraphNode, GraphNodeGroup } from '@/helpers/springSimulationUtils'
+import { type GraphNode, type GraphNodeGroup } from '@/helpers/springSimulationUtils'
 import { useGeneSetStore } from '@/stores/geneSet'
 import { useGenomeStore } from '@/stores/geneSet'
-import type { Gene, GroupInfo, SequenceInfo, SequenceMetrics } from '@/types'
+import type { Gene, GroupInfo, Locus, Sequence, SequenceInfo, SequenceMetrics } from '@/types'
+import { drawSquish } from './compressibleScale';
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0, 1])
@@ -83,6 +84,7 @@ export default {
     const indexMap = ref<Map<number, number>>(new Map())
     const mappedIndices = ref<number[]>([])
     const sequenceIndicesInLookup = ref<number[]>([])
+    const filteredSegments = ref<(Locus)[]>([])
     // const selectedGeneUids = ref<string[]>([])
     const selectedGeneUids = computed(() => genomeStore.selectedGeneUids)
     const geneToLocusSequenceLookup = genomeStore.geneToLocusSequenceLookup
@@ -119,10 +121,20 @@ export default {
           filteredSequences.value = genomeStore.genomeData.sequences.filter(
             (sequence) => newSelection.includes(sequence.uid)
           )
+
+          // Update filteredGenes based on the filtered sequences
+          filteredGenes.value = genomeStore.genomeData.genes.filter((gene) =>
+            newSelection.includes(gene.sequence_uid ?? '')
+          )
+
+          
           console.log('Filtered sequences:', filteredSequences.value)
+          console.log('Filtered genes:', filteredGenes.value)
         } else {
           // Reset or handle the case where no sequence is selected
           filteredSequences.value = []
+          filteredGenes.value = []
+          filteredSegments.value = []
         }
       },
       { immediate: true }
@@ -152,9 +164,59 @@ export default {
           (index) => indexMap.value.get(index) ?? 0
         )
         console.log('mappedIndices: ', mappedIndices.value, indexMap)
+
+        filteredSegments.value = filteredSequences.value.flatMap(sequence => {
+            const genes = filteredGenes.value.filter(d => d.sequence_uid === sequence.uid)
+            genes.sort((a,b) => a.start - b.start)
+            if(genes.length === 0) {
+              return [{
+              uid: sequence.uid ?? 0,
+              loci_length_nuc: length,
+              genes: [],
+              name: String(0),
+              start: 0,
+              end: sequence.sequence_length_nuc
+              } as Locus]
+            }
+
+            const segments = 
+            genes.map((gene, i) => {
+              let segmentEndPosition
+              if(i === genes.length - 1) { 
+                segmentEndPosition = sequence.sequence_length_nuc 
+              }
+              else {
+                const nextGene = genes[i+1]
+                segmentEndPosition = nextGene.start
+              }
+              const segmentStartPosition = gene.end
+              const length = segmentEndPosition - segmentStartPosition
+
+              return {
+              uid: gene.sequence_uid ?? 0,
+              loci_length_nuc: length,
+              genes: [],
+              name: String(i),
+              start: segmentStartPosition,
+              end: segmentEndPosition
+              } as Locus
+            })
+            const firstSegment: Locus = {
+              uid: sequence.uid ?? 0,
+              loci_length_nuc: length,
+              genes: [],
+              name: String(0),
+              start: 0,
+              end: genes[1].start
+              } 
+
+              return [firstSegment, ...segments]
+          })
+
       },
       { immediate: true }
     )
+
 
     return {
       filteredSequences,
@@ -165,7 +227,8 @@ export default {
       indexMap,
       selectedGeneUids,
       geneToLocusSequenceLookup,
-    }
+      filteredSegments
+      }
   },
   data: () => ({
     svgWidth: 0,
@@ -186,9 +249,10 @@ export default {
     cardHeaderHeight: 40,
     transitionTime: 500,
     numberOfCols: 2,
-    barHeight: 6,
+    barHeight: 10,
     sortedSequenceIds: [],
     idleTimeout: { type: [null, Number] },
+    defaultConnectionThickness: 3,
   }),
   computed: {
     ...mapState(useGeneSetStore, [
@@ -292,9 +356,7 @@ export default {
     },
     geneToWindowScales() {
       let newScales: Dictionary<d3.ScaleLinear<number, number, never>> = {}
-      console.log('geneToCompressionScales', geneToCompressionScales.value)
       Object.entries(geneToCompressionScales.value).forEach((scaleEntry) => {
-        console.log(scaleEntry[1].domain(), scaleEntry[1].range())
         newScales[scaleEntry[0]] = updateViewportRangeBounds(
           scaleEntry[1],
           compressionViewWindowRange.value,
@@ -555,180 +617,17 @@ export default {
       this.draw()
     },
     ///////////////////////////////////////////////////////////////////////////////Draw bars ////////////////////////////////////
-    drawBars() {
-      let vis = this
-      this.svg()
-        .selectAll('rect.bar-chr')
-        .data(this.genomeStore.genomeData.sequences ?? [], (d: any) => d.sequence_id)
-        .join(
-          (enter) =>
-            enter
-              .append('rect')
-              .attr(
-                'transform',
-                `translate(${this.margin.yAxis + this.margin.left},${this.margin.top * 2})`
-              )
-              .attr('class', 'bar-chr')
-              .attr('x', this.xScale(0))
-              .attr(
-                'y',
-                (d, i) =>
-                  this.genomeStore.sequenceUidLookup[d.uid]  *
-                  (this.barHeight + 10)
-              )
-              .attr(
-                'width',
-                (d) => vis.xScale(d.sequence_length_nuc) - vis.xScale(0)
-              )
-              .attr('height', this.barHeight)
-
-              .attr('fill', (d) => {
-                let color: any
-                if (vis.colorGenomes == true) {
-                  color = vis.colorScaleGenome(String(d.uid))
-                } else {
-                  color = '#f0f2f5'
-                }
-                return color
-              })
-              .attr('opacity', function (d) {
-                let color
-                if (vis.colorGenomes == true) {
-                  color = 0.5
-                } else {
-                  color = 1
-                }
-                return color
-              })
-              .attr('clip-path', 'url(#clipDetails)'),
-          (update) =>
-            update
-              .transition()
-              .duration(this.transitionTime)
-              .attr('x', this.xScale(0))
-              .attr('fill', (d) => {
-                let color: any
-                if (vis.colorGenomes == true) {
-                  color = vis.colorScaleGenome(String(d.uid))
-                } else {
-                  color = '#f0f2f5'
-                  // color = '#fff'
-                }
-                return color
-              })
-              .attr('opacity', function (d) {
-                let color
-                if (vis.colorGenomes == true) {
-                  color = 0.5
-                } else {
-                  color = 1
-                }
-                return color
-              })
-              .attr(
-                'y',
-                (d, i) =>
-                  this.genomeStore.sequenceUidLookup[d.uid]  *
-                  (this.barHeight + 10)
-              )
-              .attr(
-                'width',
-                (d) => vis.xScale(d.sequence_length_nuc) - vis.xScale(0)
-              ),
-
-          (exit) => exit.remove()
-        )
-    },
+   
     ///////////////////////////////////////////////////////////////////////////////Draw context bars ////////////////////////////////////
-    drawContextBars() {
-      let vis = this
-      if (this.genomeStore.genomeData.sequences === undefined) {
-        return
-      }
-      this.svg()
-        .selectAll('rect.bar-chr-context')
-        .data(this.genomeStore.genomeData.sequences)
-        .join(
-          (enter) =>
-            enter
-              .append('rect')
-              .attr(
-                'transform',
-                `translate(${this.margin.yAxis + this.margin.left},${this.margin.top * 2})`
-              )
-              .attr('class', 'bar-chr-context')
-              .attr('x', this.anchor ? this.xScale(-35000000) : this.xScale(0))
-              .attr(
-                'y',
-                (d, i) =>
-                  this.genomeStore.sequenceUidLookup[d.uid]  *
-                  (this.barHeight + 10)
-              )
-              // .attr('width', function (d) {
-              //   return vis.xScale(d.sequence_length)
-              // })
-              .attr('width', (d) =>
-                this.anchor
-                  ? this.xScale(70000000)
-                  : vis.xScale(d.sequence_length_nuc)
-              )
-              .attr('height', this.barHeight / 4)
-              .attr('fill', function (d) {
-                let color
-                color = 'transparent'
-                return color
-              })
-              .attr('opacity', function (d) {
-                let color
-                if (vis.percentageGC == true) {
-                  color = 1
-                } else {
-                  color = 0
-                }
-                return color
-              })
-              .attr('clip-path', 'url(#clipDetails)'),
-          (update) =>
-            update
-              .transition()
-              .duration(this.transitionTime)
-              .attr('x', this.anchor ? this.xScale(-35000000) : this.xScale(0))
-              .attr('fill', function (d) {
-                let color
-                color = 'transparent'
-                return color
-              })
-              .attr('opacity', function (d) {
-                let color
-                if (vis.percentageGC == true) {
-                  color = 1
-                } else {
-                  color = 0
-                }
-                return color
-              })
-              .attr(
-                'y',
-                (d, i) =>
-                  this.genomeStore.sequenceUidLookup[d.uid]  *
-                  (this.barHeight + 10)
-              )
-              .attr('width', (d) =>
-                this.anchor
-                  ? this.xScale(70000000)
-                  : vis.xScale(d.sequence_length_nuc)
-              ),
-          (exit) => exit.remove()
-        )
-    },
+
     drawSquishBars() {
       let vis = this
-      if (this.genomeStore.genomeData.genes === undefined) {
+      if (this.filteredGenes === undefined) {
         return
       }
       this.svg()
         .selectAll('path.bar-chr-context')
-        .data(this.genomeStore.genomeData.genes ?? [])
+        .data(vis.filteredSegments ?? [])
         .join(
           (enter) =>
             enter
@@ -740,80 +639,38 @@ export default {
               .attr('class', 'bar-chr-context')
               .attr('d', (d) => {
                  
-                const key: string = d.sequence_uid ?? ''
+                const key: string = d.uid ?? ''
                 const position = d.end
 
-                const geneIndex = this.genomeStore.sequenceUidLookup[d.uid]
+                const geneIndex = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
                 const ypos =
                   geneIndex  *
                   (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
+
+                if(currentGeneToWindowScale === undefined || currentGeneToWindowScale === null) {
+                  return ''
+                }
                 const currentGeneToCompressionScale =
                   geneToCompressionScales.value[key]
-                const width = calculateWidth(
+                
+                  const width = currentGeneToWindowScale(d.end) - currentGeneToWindowScale(d.start)
+                console.log(globalCompressionFactor.value)
+                return drawSquish(
                   currentGeneToCompressionScale,
                   currentGeneToWindowScale,
-                  this.windowRange,
-                  position
+                  position,
+                  d.end,
+                  this.barHeight,
+                  ypos,
+                  this.defaultConnectionThickness,
+                  globalCompressionFactor.value
                 )
-                const defaultConnectionThickness = 8
-
-                const x0 = this.geneToWindowScales[key](position)
-                const x1controlStart = x0 + (width * 3) / 7
-                const x1controlEnd = x0 + (width * 4) / 7
-                const x1 = x0 + width / 2
-                const x2 = x0 + width
-                const x3 = x2
-                const x4 = x1
-                const x5 = x0
-                const x6 = x0
-
-                const y0 =
-                  ypos + this.barHeight / 2 - defaultConnectionThickness / 2
-                const y1 = y0 - 10
-                const y2 = y0
-                const y3 =
-                  ypos + this.barHeight / 2 + defaultConnectionThickness / 2
-                const y4 = y3 + 10
-                const y5 = y3
-                const y6 = y0
-
-                const compressionFactor = calculateCompressionFactor(
-                  currentGeneToCompressionScale,
-                  position
-                ) // globalCompressionFactor.value
-                const beta = Math.min(Math.sqrt(compressionFactor) / 10, 1)
-                const lineUpper: string =
-                  d3.line().curve(d3.curveBundle.beta(beta))([
-                    [x0, y0],
-                    [x1controlStart, y0],
-                    [x1, y1],
-                    [x1controlEnd, y0],
-                    [x2, y2],
-                  ]) ?? ''
-                const lineConnect = d3.line()([
-                  [x6, y6],
-                  [x2, y2],
-                  [x3, y3],
-                  [x5, y5],
-                  [x6, y6],
-                ])
-                const lineLower: string =
-                  d3.line().curve(d3.curveBundle.beta(beta))([
-                    [x3, y3],
-                    [x1controlEnd, y3],
-                    [x4, y4],
-                    [x1controlStart, y3],
-                    [x5, y5],
-                  ]) ?? ''
-
-                const line = lineUpper + lineLower + lineConnect
-                return line
               })
               .attr('fill', (d) => {
                 if (vis.colorGenomes == true) {
-                  return vis.colorScaleGenome(String(d.sequence_id)) as string
+                  return vis.colorScaleGenome(String(d.uid)) as string
                 }
                 return 'lightgray'
               })
@@ -829,103 +686,31 @@ export default {
               .transition()
               .duration(this.transitionTime)
               .attr('d', (d) => {
-                const key: string = d.sequence_uid ?? ''
-                const position = d.end
-                const compressionPosition =
-                  geneToCompressionScales.value[key](position)
-                // const compressionPosition = genePositionCompression
-                const genePosition =
-                  geneToCompressionScales.value[key].invert(compressionPosition)
+                const key: string = d.uid ?? ''
+                const position = d.start
                 const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
                 const ypos = index * (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 const currentGeneToCompressionScale =
                   geneToCompressionScales.value[key]
-                const width = calculateWidth(
+
+                console.log(globalCompressionFactor.value)
+                return drawSquish(
                   currentGeneToCompressionScale,
                   currentGeneToWindowScale,
-                  this.windowRange,
-                  position
+                  position,
+                  d.end,
+                  this.barHeight,
+                  ypos,
+                  this.defaultConnectionThickness,
+                  globalCompressionFactor.value
                 )
-                const defaultConnectionThickness = 2
-                const x0 = this.geneToWindowScales[key](genePosition)
-                const x1controlStart = x0 + (width * 3) / 7
-                const x1controlEnd = x0 + (width * 4) / 7
-                const x1 = x0 + width / 2
-                const x2 = x0 + width
-                const x3 = x2
-                const x4 = x1
-                const x5 = x0
-                const x6 = x0
-
-                const y0 =
-                  ypos + this.barHeight / 2 - defaultConnectionThickness / 2
-                const y1 = y0 - 10
-                const y2 = y0
-                const y3 =
-                  ypos + this.barHeight / 2 + defaultConnectionThickness / 2
-                const y4 = y3 + 10
-                const y5 = y3
-                const y6 = y0
-
-                const compressionFactor =
-                  calculateCompressionFactor(
-                    currentGeneToCompressionScale,
-                    position
-                  ) / globalCompressionFactor.value
-                if (compressionFactor < 1) {
-                  const yTopMod =
-                    ypos +
-                    Math.min(1 - compressionFactor, 1) *
-                      (defaultConnectionThickness / 2)
-                  const yBottomMod =
-                    y3 -
-                    Math.min(1 - compressionFactor, 1) *
-                      (defaultConnectionThickness / 2)
-
-                  const lineConnect = d3.line()([
-                    [x6, yTopMod],
-                    [x2, yTopMod],
-                    [x3, yBottomMod],
-                    [x5, yBottomMod],
-                    [x6, yTopMod],
-                  ])
-
-                  return lineConnect
-                }
-                const beta = Math.min(Math.sqrt(compressionFactor) / 10, 1)
-                const lineUpper: string =
-                  d3.line().curve(d3.curveBundle.beta(beta))([
-                    [x0, y0],
-                    [x1controlStart, y0],
-                    [x1, y1],
-                    [x1controlEnd, y0],
-                    [x2, y2],
-                  ]) ?? ''
-                const lineConnect = d3.line()([
-                  [x6, y6],
-                  [x2, y2],
-                  [x3, y3],
-                  [x5, y5],
-                  [x6, y6],
-                ])
-                const lineLower: string =
-                  d3.line().curve(d3.curveBundle.beta(beta))([
-                    [x3, y3],
-                    [x1controlEnd, y3],
-                    [x4, y4],
-                    [x1controlStart, y3],
-                    [x5, y5],
-                  ]) ?? ''
-
-                const line = lineUpper + lineLower + lineConnect
-
-                return line //lineUpper + d3.line()([[x2,y2], [x3,y3]]) + lineLower + d3.line()([[x5,y5], [x6,y6]]) // + lineConnect //+ lineConnectStart
               })
+
               .attr('fill', (d) => {
                 if (vis.colorGenomes == true) {
-                  return vis.colorScaleGenome(String(d.sequence_id)) as string
+                  return vis.colorScaleGenome(String(d.uid)) as string
                 }
                 return 'lightgray'
               })
@@ -1568,25 +1353,18 @@ export default {
     let newAnchorMax = d3.max(divergentScale)
     anchorMax.value = newAnchorMax ?? 0
 
-    // Create individual scales
-    ///
-    // let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] =
-    //   runSpringSimulation(
-    //     this.genomeStore.genomeData.genes ?? [],
-    //     this.genomeStore.genomeData.sequences ?? [],
-    //     currentHeat.value,
-    //     0.5,
-    //     232273529
-    //   )
-
     let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] =
       runSpringSimulation(
         this.filteredGenes ?? [],
         this.filteredSequences ?? [],
         currentHeat.value,
-        0.5,
+        1,
         736740
       )
+
+    // let newGenePositions = genesToNodes(this.filteredGenes)
+    //used for alignment
+    const anchorPoints = [newGenePositions[2], newGenePositions[3]]
 
     crossingHomologyGroups.value = crossDetection(newGenePositions)
 
@@ -1600,6 +1378,7 @@ export default {
     const sortedCompressionRangeGlobal = newGenePositions
       .map((d) => d.position)
       .sort((a, b) => a - b)
+
     const edgesOfNewRangeGlobal: [number, number] = [
       sortedCompressionRangeGlobal[0],
       sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length - 1],
@@ -1613,25 +1392,37 @@ export default {
       (edgesOfNewRangeGlobal[1] - edgesOfNewRangeGlobal[0])
     globalCompressionFactor.value = overallCompressionFactor
     compressionViewWindowRange.value = edgesOfNewRangeGlobal
+    const compressions: number[] = []
 
     this.genomeStore.genomeData.sequences.forEach((sequence) => {
+      //find gene positions
       const key = sequence.uid
-      const genePositionsOnSequence = newGenePositions
+      let genePositionsOnSequence = newGenePositions
         .filter((d) => String(d.sequenceId) === key)
         .sort((d) => d.originalPosition)
 
+        // create scales
       const [geneToCompression, scaleGeneToWindow] = calculateIndividualScales(
         genePositionsOnSequence,
         edgesOfNewRangeGlobal,
         this.windowRange
       )
-      const range = geneToCompression.range()
-      const domain = geneToCompression.domain()
       xScaleGeneToCompressionInit[key] = geneToCompression
       xScaleGeneToWindowInit[key] = scaleGeneToWindow
+
+      //  calculate compression
+      if(genePositionsOnSequence.length === 0) { return }
+      const compressedWidth = geneToCompression(sequence.sequence_length_nuc) - geneToCompression(0)
+      const compression = sequence.sequence_length_nuc / compressedWidth
+      compressions.push(compression)
     })
     //assign scale dictionaries
     geneToCompressionScales.value = xScaleGeneToCompressionInit
+    // find median compression
+    compressions.sort((a,b)  => a - b)
+
+    const medianCompression = compressions[Math.floor(compressions.length / 2)]
+    globalCompressionFactor.value = medianCompression
 
     this.drawXAxis() // draw axis once
     this.draw()
@@ -1727,6 +1518,7 @@ export default {
     filteredGenes: {
       handler(newVal) {
         console.log('filteredGenes updated:', newVal)
+        this.drawSquishBars()
         this.drawGenes()
       },
       deep: true,
@@ -1736,6 +1528,7 @@ export default {
       handler(newVal) {
         console.log('mappedIndices updated:', newVal)
         this.addLabels()
+        this.drawSquishBars()
         this.drawGenes()
       },
       deep: true,
@@ -1745,6 +1538,7 @@ export default {
       handler(newVal) {
         console.log('indexMap updated:', newVal)
         this.addLabels()
+        this.drawSquishBars()
         this.drawGenes()
       },
       deep: true,
@@ -1754,6 +1548,7 @@ export default {
       handler(newVal) {
         console.log('sequenceIndicesInLookup updated:', newVal)
         this.addLabels()
+        this.drawSquishBars()
         this.drawGenes()
       },
       deep: true,
@@ -1763,11 +1558,13 @@ export default {
       this.drawGenes()
     },
     showLinks() {
+      this.drawSquishBars()
       this.drawGenes()
     },
     anchor() {
       this.svg().select('g.x-axis').remove()
       this.drawXAxis() // redraw
+      this.drawSquishBars()
       this.drawGenes()
     },
     showNotificationsDetail() {
@@ -1775,12 +1572,13 @@ export default {
     },
     colorGenomes() {
       console.log('color genomes')
+      this.drawSquishBars()
       this.drawBars()
     },
-    percentageGC() {
-      console.log('show GC')
-      this.drawContextBars()
-    },
+    // percentageGC() {
+    //   console.log('show GC')
+    //   this.drawContextBars()
+    // },
     sortedChromosomeSequenceIndices() {
       this.draw()
     },
