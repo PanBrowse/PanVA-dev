@@ -30,19 +30,19 @@ import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
 import { useGlobalStore } from './global';
 
-// to-do: add this to config! this is data dependent
-const DEFAULT_SEQUENCE_UIDS = [
-  '405ddb34-205c-4f83-91ef-939a01140637', //1_1
-  '0eb86f3a-45e8-44c0-9c9f-0000bd3c8a1f', //2_1
-  '57af37c8-b8d1-48c8-8b01-bddaf0da31b4', //3_1
-  '85f65741-674b-48f7-a544-daff518247e9', //4_1
-  '9ef875b2-1f8b-4f9f-a641-e024a79ac3c0', //5_1
-  '4aa41269-bc58-48e2-9521-34f3e075e6ee', //6_1
-  'd9d31634-8177-4b3c-b9e8-e2be37bb894c', //7_1
-  '8b6da358-520e-434d-b205-a23dda1cef19', //8_1
-  '3f1d2bf9-aa72-4263-a95c-d1728bddff1b', //9_1
-  '1a03d037-0edf-4ab3-912d-af128f9fc53d', //10_1
-];
+// // to-do: add this to config! this is data dependent
+// const DEFAULT_SEQUENCE_UIDS = [
+//   '405ddb34-205c-4f83-91ef-939a01140637', //1_1
+//   '0eb86f3a-45e8-44c0-9c9f-0000bd3c8a1f', //2_1
+//   '57af37c8-b8d1-48c8-8b01-bddaf0da31b4', //3_1
+//   '85f65741-674b-48f7-a544-daff518247e9', //4_1
+//   '9ef875b2-1f8b-4f9f-a641-e024a79ac3c0', //5_1
+//   '4aa41269-bc58-48e2-9521-34f3e075e6ee', //6_1
+//   'd9d31634-8177-4b3c-b9e8-e2be37bb894c', //7_1
+//   '8b6da358-520e-434d-b205-a23dda1cef19', //8_1
+//   '3f1d2bf9-aa72-4263-a95c-d1728bddff1b', //9_1
+//   '1a03d037-0edf-4ab3-912d-af128f9fc53d', //10_1
+// ];
 
 export const useGenomeStore = defineStore({
   id: 'genome',
@@ -55,7 +55,7 @@ export const useGenomeStore = defineStore({
     } as unknown as GenomeData,
     selectedGenomes: [] as string[],
     selectedSequences: [] as string[],
-    selectedSequencesLasso: [...DEFAULT_SEQUENCE_UIDS],
+    selectedSequencesLasso: [] as string[],
     selectedGeneUids: [] as string[],
     sequenceToLociGenesLookup: new Map<
       string,
@@ -71,7 +71,7 @@ export const useGenomeStore = defineStore({
     >,
     sequenceToMrnaLookup: new Map<string, string[]>(),
     mrnaScoreMatrix: [] as number[][],
-    selectedSequencesTracker: new Set(DEFAULT_SEQUENCE_UIDS),
+    selectedSequencesTracker: new Set(),
     genomeUids: [] as string[], // Array to store genome numbers in the loading order
     genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
     sequenceUids: [] as string[], // Array to store genome numbers in the loading order
@@ -96,6 +96,11 @@ export const useGenomeStore = defineStore({
       state.genomeData?.genomes?.map((genome) => genome.name) || [],
     sequenceNames: (state) =>
       state.genomeData?.sequences?.map((sequence) => sequence.name) || [],
+    sequenceUidsWithLoci(state) {
+      return state.genomeData.sequences
+        .filter(sequence => sequence.loci && sequence.loci.length > 0)
+        .map(sequence => sequence.uid)
+    },
   },
   actions: {
     async loadGenomeData() {
@@ -139,9 +144,22 @@ export const useGenomeStore = defineStore({
         });
         throw error;
       }
+
+      this.initializeSelectedSequencesLasso();
+
       // Set initialized flag only after all API calls complete successfully
       this.isInitialized = true;
     },
+    initializeSelectedSequencesLasso() {
+      console.log('initializing lasso selection')
+
+      // Initialize lasso with non-emtpy sequences
+      this.selectedSequencesLasso = this.sequenceUidsWithLoci;
+
+      // Add to selectedSequencesTracker
+      this.sequenceUidsWithLoci.forEach(uid => this.selectedSequencesTracker.add(uid));
+    },
+
     generateMrnaScoreMatrix() {
       // Step 1: Gather all unique mrna_uids from groups that contain more than one mRNA
       const uniqueMrnaUids = new Set<string>()

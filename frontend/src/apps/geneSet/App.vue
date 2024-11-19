@@ -131,7 +131,7 @@ export default defineComponent({
 
     <!-- Row 1: PixiCanvas Visualization -->
     <ARow type="flex" :gutter="8" class="row full-height">
-      <ACol :span="12" class="col full-height">
+      <ACol :span="12" :gutter="8" class="col full-height">
         <div class="content-overview" ref="parentElementUMAP">
           <PixiUMAP
             :distanceMatrix="distanceMatrix"
@@ -225,7 +225,7 @@ export default defineComponent({
 }
 
 .gutter {
-  height: 16px; /* Adjust this for the vertical spacing */
+  height: 8px; /* Adjust this for the vertical spacing */
   width: 100%; /* Ensures it spans the column width */
 }
 </style>
