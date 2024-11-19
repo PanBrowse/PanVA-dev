@@ -44,7 +44,7 @@ export const filterUniquePosition = (genes: (GraphNode | GraphNodeGroup)[]) => {
 export const calculateIndividualScales = (
   genePositionsOnSequence: (GraphNode[] | GraphNodeGroup[]),
   newCompressionRangeEdges: [number, number],
-  windowRangeEdges: [number, number]
+  windowRangeEdges: [number, number] = [0, 1]
 ): [d3.ScaleLinear<number, number, never>, d3.ScaleLinear<number, number, never>] => {
   if (genePositionsOnSequence.length === 0) {
     const newRangeWidth = newCompressionRangeEdges[1] - newCompressionRangeEdges[0];
