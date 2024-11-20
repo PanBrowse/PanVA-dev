@@ -1377,7 +1377,7 @@ export default {
       this.drawXAxis() // redraw
       this.draw()
     },
-    geneToCompressionScales: { 
+    geneToWindowScales: { 
       handler(newVal) {
         this.draw()
       },
