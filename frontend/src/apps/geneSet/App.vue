@@ -147,10 +147,10 @@ export default defineComponent({
             @loaded="handlePixiLoaded"
           />
         </div>
-        <!-- <div class="gutter"></div>
+        <div class="gutter"></div>
         <div class="content-overview" ref="parentElementGrid">
           <PixiCanvas @loaded="handlePixiLoaded" />
-        </div> -->
+        </div>
       </ACol>
       <ACol v-if="pixiLoaded" :span="12" class="col full-height">
         <ChromosomeDetails />

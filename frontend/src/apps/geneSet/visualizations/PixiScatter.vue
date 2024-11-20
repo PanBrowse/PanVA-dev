@@ -41,14 +41,18 @@ import { useGenomeStore } from '@/stores/geneSet'
 import type { Gene, Genome, GenomeData } from '@/types'
 
 PIXI.Sprite.prototype.getBoundingClientRect = function () {
-  return {
-    left: this.x - this.width / 2,
-    top: this.y - this.height / 2,
-    width: this.width,
-    height: this.height,
-  }
-}
+  const devicePixelRatio = window.devicePixelRatio || 1;
 
+  const adjustedWidth =  devicePixelRatio > 1 ? this.width  : this.width * 2
+  const adjustedHeight =  devicePixelRatio > 1 ? this.height  : this.height * 2 
+
+  return {
+    left: (this.x - this.width ) / devicePixelRatio,
+    top:  (this.y - this.height) / devicePixelRatio,
+    width: adjustedWidth,
+    height: adjustedHeight,
+  };
+};
 export default {
   name: 'PixiCanvas',
   emits: ['loaded'], // Declare the emitted event
@@ -444,83 +448,117 @@ export default {
     lassoEnd() {
       console.log('lasso end')
 
-      // add the drawn path for the lasso
-      const dyn_path = d3
-        .select(this.$refs.lasso)
-        .select('g.lasso')
-        .select('g.lasso')
-        .select('path.drawn')
+      const selectedSprites = [];
+      
+      try {
+        console.log('Lasso end');
+      
+        this.lassoInstance.items().forEach((sprite) => {
+          if (sprite.__lasso.selected) {
+            sprite.tint = 0x007bff 
+            selectedSprites.push(sprite.sequence_uid);
+            // genomeStore.setSelectedSequencesTracker(sprite.sequence_uid)
+          }
+          else {
+            sprite.tint = 0xd3d3d3
+          }
 
-      // add a closed path
-      const close_path = d3
-        .select(this.$refs.lasso)
-        .select('g.lasso')
-        .select('g.lasso')
-        .select('path.loop_close')
+        });
 
-      // add an origin node
-      const origin_node = d3
-        .select(this.$refs.lasso)
-        .select('g.lasso')
-        .select('g.lasso')
-        .select('circle.origin')
+        this.app?.render();
 
-      const lassoPath = dyn_path.attr('d') // Get the current lasso path
-      // console.log('Lasso path data at end:', lassoPath)
+        // const boolSprites = this.lassoInstance.items().map(x => x.__lasso.selected);
+        // console.log('boolSprites', boolSprites)
+        // const selectedSprites = this.lassoInstance.items().filter((sprite, index) => boolSprites[index] === true).map(
+        // (sprite) => sprite.sequence_uid
+      // );
+        console.log('Selected sprites:', selectedSprites);
+        this.selectedSprites = selectedSprites;
+        const genomeStore = useGenomeStore();
+        genomeStore.setSelectedSequencesLasso(selectedSprites);
 
-      if (!lassoPath || lassoPath.length < 3) {
-        // console.warn('Lasso selection is empty or too small.')
-        return // Exit early
+        // this.$forceUpdate();
+      } catch (error) {
+        console.error('Error in lassoEnd:', error);
       }
 
-      const polygonPoints = this.getPolygonFromPath(dyn_path.node())
+      // // add the drawn path for the lasso
+      // const dyn_path = d3
+      //   .select(this.$refs.lasso)
+      //   .select('g.lasso')
+      //   .select('g.lasso')
+      //   .select('path.drawn')
 
-      // Log the points to the console
-      console.log('Polygon Points:', polygonPoints)
-      const selectedSprites = this.lassoInstance.items().filter((sprite) => {
-        const { x, y } = sprite.position
-        // console.log('{ x, y } ', { x, y })
-        return this.isPointInPolygon(x, y, polygonPoints) // Check if sprite is inside the lasso polygon
-      })
+      // // add a closed path
+      // const close_path = d3
+      //   .select(this.$refs.lasso)
+      //   .select('g.lasso')
+      //   .select('g.lasso')
+      //   .select('path.loop_close')
 
-      setTimeout(() => {
-        dyn_path.attr('d', null) // Clear the lasso path after a delay if needed
-        close_path.attr('d', null) // Clear the close path after a delay if needed
-      }, 1000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
-      origin_node.attr('display', 'none')
+      // // add an origin node
+      // const origin_node = d3
+      //   .select(this.$refs.lasso)
+      //   .select('g.lasso')
+      //   .select('g.lasso')
+      //   .select('circle.origin')
 
-      console.log('Lasso path cleared in drawEnd.')
+      // const lassoPath = dyn_path.attr('d') // Get the current lasso path
+      // // console.log('Lasso path data at end:', lassoPath)
 
-      // Apply effects to selected sprites
-      selectedSprites.forEach((sprite) => {
-        sprite.tint = 0x007bff // Set sprite color to blue
-        sprite.alpha = 1
-      })
+      // if (!lassoPath || lassoPath.length < 3) {
+      //   // console.warn('Lasso selection is empty or too small.')
+      //   return // Exit early
+      // }
 
-      console.log('Selected sprites:', selectedSprites)
-      this.selectedSprites = selectedSprites
-      // Flattening the array and extracting UIDs
-      const flattenedSequenceUids = selectedSprites
-        .flat()
-        .map((sprite) => sprite.sequence_uid)
+      // const polygonPoints = this.getPolygonFromPath(dyn_path.node())
 
-      console.log(flattenedSequenceUids)
+      // // Log the points to the console
+      // console.log('Polygon Points:', polygonPoints)
+      // const selectedSprites = this.lassoInstance.items().filter((sprite) => {
+      //   const { x, y } = sprite.position
+      //   // console.log('{ x, y } ', { x, y })
+      //   return this.isPointInPolygon(x, y, polygonPoints) // Check if sprite is inside the lasso polygon
+      // })
 
-      const genomeStore = useGenomeStore() // Create an instance of the store
-      // Save UIDs to the store
-      genomeStore.setSelectedSequencesLasso(flattenedSequenceUids)
-      // console.log(
-      //   'Updated store with current lasso selection:',
-      //   genomeStore.selectedSequencesLasso
-      // )
+      // setTimeout(() => {
+      //   dyn_path.attr('d', null) // Clear the lasso path after a delay if needed
+      //   close_path.attr('d', null) // Clear the close path after a delay if needed
+      // }, 1000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
+      // origin_node.attr('display', 'none')
 
-      genomeStore.setSelectedSequencesTracker(flattenedSequenceUids)
-      // console.log(
-      //   'Updated store lasso selection tracker:',
-      //   genomeStore.selectedSequencesTracker
-      // )
+      // console.log('Lasso path cleared in drawEnd.')
 
-      this.$forceUpdate() // might not need this?
+      // // Apply effects to selected sprites
+      // selectedSprites.forEach((sprite) => {
+      //   sprite.tint = 0x007bff // Set sprite color to blue
+      //   sprite.alpha = 1
+      // })
+
+      // console.log('Selected sprites:', selectedSprites)
+      // this.selectedSprites = selectedSprites
+      // // Flattening the array and extracting UIDs
+      // const flattenedSequenceUids = selectedSprites
+      //   .flat()
+      //   .map((sprite) => sprite.sequence_uid)
+
+      // console.log(flattenedSequenceUids)
+
+      // const genomeStore = useGenomeStore() // Create an instance of the store
+      // // Save UIDs to the store
+      // genomeStore.setSelectedSequencesLasso(flattenedSequenceUids)
+      // // console.log(
+      // //   'Updated store with current lasso selection:',
+      // //   genomeStore.selectedSequencesLasso
+      // // )
+
+      // genomeStore.setSelectedSequencesTracker(flattenedSequenceUids)
+      // // console.log(
+      // //   'Updated store lasso selection tracker:',
+      // //   genomeStore.selectedSequencesTracker
+      // // )
+
+      // this.$forceUpdate() // might not need this?
     },
     getPolygonFromPath(pathElement) {
       const pathLength = pathElement.getTotalLength()

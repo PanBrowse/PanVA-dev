@@ -346,7 +346,11 @@ export default defineComponent({
     })
   },
   watch: {
-    // filterEmpty: 'updateCharts', // Recompute charts when the filterEmpty state changes
+    filterEmpty(newValue) {
+      const genomeStore = useGenomeStore();
+      console.log('Filter empty changed:', newValue);
+      genomeStore.initializeSelectedSequencesLasso(); // Reinitialize lasso selection
+    },
   },
   methods: {
     getSequenceLengths() {

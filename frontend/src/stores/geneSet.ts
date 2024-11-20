@@ -70,6 +70,7 @@ export const useGenomeStore = defineStore({
     embedding: [],
     embeddingFiltered: [],
     filterEmpty: false,
+    filteredSequences: [],
     isInitialized: false,
   }),
   getters: {
@@ -97,6 +98,9 @@ export const useGenomeStore = defineStore({
     toggleFilterEmpty() {
       this.filterEmpty = !this.filterEmpty
     },
+    updateFilteredSequences() {
+      this.filteredSequences = this.genomeData.sequences.filter(sequence => sequence.loci && sequence.loci.length > 0)
+    },
     async loadGenomeData() {
       const global = useGlobalStore();
 
@@ -109,6 +113,8 @@ export const useGenomeStore = defineStore({
         this.geneToLocusSequenceLookup = createGeneToLociAndSequenceLookup(
           this.genomeData
         )
+
+        this.updateFilteredSequences()
 
         this.generateMrnaScoreMatrix()
 
@@ -148,14 +154,58 @@ export const useGenomeStore = defineStore({
       // Set initialized flag only after all API calls complete successfully
       this.isInitialized = true;
     },
+    // initializeSelectedSequencesLasso() {
+    //   console.log('initializing lasso selection')
+
+    //   // Initialize lasso with non-emtpy sequences
+    //   this.selectedSequencesLasso = this.sequenceUidsWithLoci;
+
+    //   // Add to selectedSequencesTracker
+    //   this.sequenceUidsWithLoci.forEach(uid => this.selectedSequencesTracker.add(uid));
+    // },
     initializeSelectedSequencesLasso() {
-      console.log('initializing lasso selection')
-
-      // Initialize lasso with non-emtpy sequences
-      this.selectedSequencesLasso = this.sequenceUidsWithLoci;
-
-      // Add to selectedSequencesTracker
-      this.sequenceUidsWithLoci.forEach(uid => this.selectedSequencesTracker.add(uid));
+      console.log('initializing lasso selection');
+    
+      // Check the filterEmpty flag
+      if (this.filterEmpty) {
+        // Filter sequences with loci lengths > 0
+        const nonEmptySequences = this.genomeData.sequences.filter(
+          (sequence) => sequence.loci && sequence.loci.length > 0
+        );
+    
+        if (nonEmptySequences.length === 0) {
+          console.warn('No non-empty sequences found.');
+          this.selectedSequencesLasso = [];
+          this.selectedSequencesTracker.clear(); // Clear tracker as well
+          return;
+        }
+    
+        // Take a percentage of the non-empty sequences
+        const percentage = 0.3;
+        const selectionCount = Math.ceil(nonEmptySequences.length * percentage);
+    
+        // Initialize lasso with a subset
+        this.selectedSequencesLasso = nonEmptySequences
+          .slice(0, selectionCount)
+          .map((sequence) => sequence.uid);
+    
+        // Add to selectedSequencesTracker
+        this.selectedSequencesTracker.clear(); // Clear previous tracker
+        this.selectedSequencesLasso.forEach((uid) =>
+          this.selectedSequencesTracker.add(uid)
+        );
+      } else {
+        // Default behavior: Include all sequences with loci
+        this.selectedSequencesLasso = this.sequenceUidsWithLoci;
+    
+        // Add to selectedSequencesTracker
+        this.selectedSequencesTracker.clear(); // Clear previous tracker
+        this.sequenceUidsWithLoci.forEach((uid) =>
+          this.selectedSequencesTracker.add(uid)
+        );
+      }
+    
+      console.log('Initialized selectedSequencesLasso:', this.selectedSequencesLasso);
     },
 
     generateMrnaScoreMatrix() {
@@ -360,8 +410,8 @@ export const useGenomeStore = defineStore({
       this.selectedGeneUids = uids;
     },
   },
+  
 });
-
 export const useGeneSetStore = defineStore('geneSet', {
   state: () => ({
     // Data from API

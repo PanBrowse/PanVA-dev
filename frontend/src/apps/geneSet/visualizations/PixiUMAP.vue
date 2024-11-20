@@ -263,6 +263,7 @@ export default defineComponent({
         () => this.embedding,
         (newEmbedding) => {
           console.log('Embedding changed in PixiUMAP watcher:', newEmbedding);
+
           this.renderEmbedding(newEmbedding);
         },
         { immediate: true, deep: true }
@@ -370,6 +371,8 @@ export default defineComponent({
 
         //  Reinitialize the lasso
         this.initializeLasso(canvas);
+
+        console.log(this.lassoInstance.items())
 
 
 
