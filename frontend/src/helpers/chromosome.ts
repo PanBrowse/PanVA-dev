@@ -39,11 +39,11 @@ export const createSequenceToLociGenesLookup = (
 
 export const createGeneToLociAndSequenceLookup = (
   genomeData: GenomeData
-): Record<string, { loci: string; sequence: string }> => {
-  const geneToLociAndSequence: Record<
+): Map<string, { loci: string; sequence: string }> => {
+  const geneToLociAndSequence = new Map<
     string,
     { loci: string; sequence: string }
-  > = {}
+  >()
 
   // Loop through each sequence in genomeData
   genomeData.sequences.forEach((sequence) => {
@@ -54,10 +54,10 @@ export const createGeneToLociAndSequenceLookup = (
       if (locus) {
         // Map each gene within this locus to its locus and sequence UID
         locus.genes.forEach((geneUid) => {
-          geneToLociAndSequence[geneUid] = {
+          geneToLociAndSequence.set(geneUid, {
             loci: locus.uid,
             sequence: sequence.uid,
-          }
+          })
         })
       } else {
         console.warn(`Locus with UID ${locusUid} not found in genomeData.loci`)
@@ -65,7 +65,7 @@ export const createGeneToLociAndSequenceLookup = (
     })
   })
 
-  console.log('geneToLociAndSequence', geneToLociAndSequence)
+  console.log('geneToLociAndSequence Map:', geneToLociAndSequence)
   return geneToLociAndSequence
 }
 

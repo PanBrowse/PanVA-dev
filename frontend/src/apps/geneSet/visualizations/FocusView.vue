@@ -361,7 +361,10 @@ export default {
       return this.svgHeight
     },
     windowRange(): [number, number] {
-      return [this.margin.yAxis + this.margin.left, this.visWidth - this.margin.yAxis - this.margin.left]
+      return [
+        this.margin.yAxis + this.margin.left,
+        this.visWidth - this.margin.yAxis - this.margin.left,
+      ]
     },
     xScale() {
       return this.anchor
@@ -489,7 +492,11 @@ export default {
     },
 
     ///////////////////////////////////////////////////////////////////////////////Update chart////////////////////////////////////
-    updateChartBrushing({ selection }: { selection: [number, number] }): NodeJS.Timeout | undefined {
+    updateChartBrushing({
+      selection,
+    }: {
+      selection: [number, number]
+    }): NodeJS.Timeout | undefined {
       console.log('brush selection', selection)
 
       // If no selection, back to initial coordinate. Otherwise, update X axis domain
@@ -509,7 +516,7 @@ export default {
       const rangeWidth = this.windowRange[1] - this.windowRange[0]
       const selectionPercentages = [
         (selection[0] - this.margin.yAxis - this.margin.left) / rangeWidth,
-        (selection[1] - this.margin.yAxis - this.margin.left ) / rangeWidth,
+        (selection[1] - this.margin.yAxis - this.margin.left) / rangeWidth,
       ]
       const newRangeBoundsGlobal: [number, number] = [
         currentGlobalRangeBounds[0] +
@@ -642,7 +649,8 @@ export default {
       const percentageZoomLeft =
         (zoomCenterX -
           this.windowRange[0] -
-          this.margin.yAxis - this.margin.left) /
+          this.margin.yAxis -
+          this.margin.left) /
         (this.windowRange[1] - this.windowRange[0])
       const currentRangeBounds: [number, number] = [
         this.xScale.range()[0],
@@ -708,10 +716,7 @@ export default {
           (enter) =>
             enter
               .append('path')
-              .attr(
-                'transform',
-                `translate(${0} ,${this.margin.top * 2})`
-              )
+              .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
               .attr('class', 'bar-chr-context')
               .attr('d', (d) => {
                  
@@ -899,7 +904,7 @@ export default {
               .attr(
                 'y',
                 (d, i) =>
-                  this.genomeStore.sequenceUidLookup[d.uid]  *
+                  this.genomeStore.sequenceUidLookup[d.uid] *
                   (this.barHeight + 10)
               ),
           (exit) => exit.remove()
@@ -914,7 +919,12 @@ export default {
         .attr('class', 'x-axis')
         .attr(
           'transform',
-          'translate(' + this.margin.left + this.margin.yAxis + ',' + this.margin.top * 2 + ')'
+          'translate(' +
+            this.margin.left +
+            this.margin.yAxis +
+            ',' +
+            this.margin.top * 2 +
+            ')'
         )
         .call(
           d3
@@ -964,7 +974,7 @@ export default {
           )
         })
 
-        let connectionsLine = (sortedPath: (Gene)[]) => {
+        let connectionsLine = (sortedPath: Gene[]) => {
           const currentPath = d3.path()
           let previousWasRendered = false
           sortedPath.forEach((node, i) => {
@@ -973,7 +983,7 @@ export default {
             const nodePosition =
               (currentGeneToWindow(node.start) +
                 currentGeneToWindow(node.end)) /
-                2
+              2
             const y =
               vis.margin.top * 2 +
               vis.barHeight / 2 +
@@ -1018,7 +1028,7 @@ export default {
           const key = d.sequence_uid ?? ''
 
           const currentGeneToWindow = this.geneToWindowScales[key]
-          if(currentGeneToWindow === undefined){
+          if (currentGeneToWindow === undefined) {
             return 0
           }
           const size = getGeneSymbolSize(
@@ -1055,14 +1065,18 @@ export default {
               .append('path')
               .attr('d', geneSymbol)
               .attr('transform', function (d, i) {
-
-                const sequence = d.sequence_uid 
-                let xTransform = vis.geneToWindowScales[sequence ?? ''](d.start + (d.end - d.start) / 2)
+                const sequence = d.sequence_uid
+                let xTransform = vis.geneToWindowScales[sequence ?? ''](
+                  d.start + (d.end - d.start) / 2
+                )
                 let drawingIndex =
                   vis.indexMap.get(
                     vis.genomeStore.sequenceUidLookup[sequence ?? '']
                   ) ?? 0
-                let yTransform =  drawingIndex * (vis.barHeight + 10) + 2 * vis.margin.top + vis.barHeight/2
+                let yTransform =
+                  drawingIndex * (vis.barHeight + 10) +
+                  2 * vis.margin.top +
+                  vis.barHeight / 2
                 let rotation = d.strand === 0 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
@@ -1081,23 +1095,26 @@ export default {
               .duration(this.transitionTime)
               .attr('transform', (d) => {
                 const key = d.sequence_uid ?? '' //vis.geneToLocusSequenceLookup.get(d.uid)?.sequence
-                let xTransform = this.geneToWindowScales[key](d.start + (d.end - d.start) / 2)
+                let xTransform = this.geneToWindowScales[key](
+                  d.start + (d.end - d.start) / 2
+                )
                 let drawingIndex =
-                  vis.indexMap.get(
-                    vis.genomeStore.sequenceUidLookup[key]
-                  ) ?? 0
-                let yTransform = drawingIndex * (vis.barHeight + 10) + 2 * this.margin.top + this.barHeight/2
+                  vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+                let yTransform =
+                  drawingIndex * (vis.barHeight + 10) +
+                  2 * this.margin.top +
+                  this.barHeight / 2
                 let rotation = d.strand === 0 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('d', geneSymbol)
               .attr('z-index', 1000)
-              .attr('fill', d => {
-              return vis.colorGenes
-              ? vis.colorScale(String(d.homology_groups[0].uid)) as string
-              : 'gray'
+              .attr('fill', (d) => {
+                return vis.colorGenes
+                  ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                  : 'gray'
               }),
-              // .attr('fill', colors['gray-7']),
+          // .attr('fill', colors['gray-7']),
           (exit) => exit.remove()
         )
       }
@@ -1218,10 +1235,7 @@ export default {
       .brushX() // Add the brush feature using the d3.brush function
       .extent([
         [this.windowRange[0], 0],
-        [
-          this.windowRange[1] ,
-          this.visHeight,
-        ],
+        [this.windowRange[1], this.visHeight],
       ])
       .on('end', this.updateChartBrushing)
 
@@ -1248,7 +1262,7 @@ export default {
           k1: number,
           focus = [0, 0]
 
-        function fisheye(d: { x: number; y: number; }) {
+        function fisheye(d: { x: number; y: number }) {
           var dx = d.x - focus[0],
             dy = d.y - focus[1],
             dd = Math.sqrt(dx * dx + dy * dy)

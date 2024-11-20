@@ -1,3 +1,4 @@
+import { decode } from 'base64-arraybuffer'
 import * as d3 from 'd3'
 import { identity } from 'lodash'
 
@@ -28,6 +29,8 @@ import type {
   Mrna,
   SequenceInfo,
 } from '@/types'
+
+import { useGenomeStore } from './../stores/geneSet'
 
 export const fetchHomologies = async () => {
   const config = useConfigStore()
@@ -188,6 +191,180 @@ export const fetchGenomeData = async (): Promise<GenomeData> => {
           target: hl.target,
         })
       ) || [],
+  }
+}
+
+// // Function to fetch and process the `.npy` distance matrix
+// export const fetchDistanceMatrix = async () => {
+//   const config = useConfigStore()
+//   try {
+//     // Fetch the base64-encoded `.npy` data from the API
+//     const response = await fetch(
+//       `${config.apiUrl}geneSet/yeast_matrices_test/protein_distance_matrix`
+//     )
+//     if (!response.ok) {
+//       throw new Error(`Failed to fetch distance matrix: ${response.statusText}`)
+//     }
+//     const { matrix: base64Matrix } = await response.json()
+
+//     // Decode the base64 string to an ArrayBuffer
+//     const arrayBuffer = decode(base64Matrix)
+//     console.log('Decoded array buffer:', arrayBuffer)
+
+//     // Convert the ArrayBuffer to a Float64Array (since we expect float64 type)
+//     const flatMatrix = new Float64Array(arrayBuffer)
+//     console.log('Total elements:', flatMatrix.length)
+
+//     // Convert the flat array to a 2D array (square matrix)
+//     const size = Math.sqrt(flatMatrix.length) // Calculate matrix size
+
+//     const distanceMatrix = []
+//     for (let i = 0; i < size; i++) {
+//       distanceMatrix.push(
+//         Array.from(flatMatrix.slice(i * size, (i + 1) * size))
+//       )
+//     }
+//     console.log('Matrix shape:', [
+//       distanceMatrix.length,
+//       distanceMatrix[0].length,
+//     ])
+//     console.log('Data type:', flatMatrix.constructor.name) // Should be Float64Array
+//     console.log('Formatted distance matrix:', distanceMatrix)
+
+//     return distanceMatrix
+//   } catch (error) {
+//     console.error('Error fetching and decoding distance matrix:', error)
+//   }
+// }
+
+// Function to fetch and process the JSON distance matrix
+export const fetchDistanceMatrix = async () => {
+  const config = useConfigStore()
+  try {
+    // Fetch the JSON-encoded distance matrix from the API
+    const response = await fetch(
+      `${config.apiUrl}geneSet/yeast_matrices_test/protein_distance_matrix`
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to fetch distance matrix: ${response.statusText}`)
+    }
+
+    // Parse the JSON response
+    const { matrix } = await response.json()
+
+    // Validate the matrix format
+    if (!Array.isArray(matrix) || !Array.isArray(matrix[0])) {
+      throw new Error('Invalid matrix format: Expected a 2D array')
+    }
+
+    console.log('Matrix shape:', [matrix.length, matrix[0].length])
+    console.log('Formatted distance matrix:', matrix)
+
+    // Ensure all numbers are floats
+    const floatMatrix = matrix.map(
+      (row) => row.map((value) => value * 1.0) // Multiplies by 1.0 to make it float
+    )
+
+    console.log(floatMatrix)
+
+    return floatMatrix // Return the 2D array
+  } catch (error) {
+    console.error('Error fetching and decoding distance matrix:', error)
+    return [] // Return an empty array in case of failure
+  }
+}
+
+export const fetchDistanceMatrixLabels = async () => {
+  const config = useConfigStore()
+  try {
+    // Fetch the JSON labels data from the API
+    const response = await fetch(
+      `${config.apiUrl}geneSet/yeast_matrices_test/protein_labels`
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to fetch labels: ${response.statusText}`)
+    }
+
+    // Parse the JSON response
+    const { labels } = await response.json()
+
+    // Log the labels for debugging
+    console.log('Fetched labels:', labels)
+
+    return labels // Directly return the labels array
+  } catch (error) {
+    console.error('Error fetching labels:', error)
+    return [] // Return an empty array in case of error
+  }
+}
+
+export const fetchFilteredLabels = async () => {
+  const config = useConfigStore()
+  try {
+    // Fetch the JSON labels data from the API
+    const response = await fetch(
+      `${config.apiUrl}geneSet/yeast_matrices_test/filtered_protein_labels`
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to fetch labels: ${response.statusText}`)
+    }
+
+    // Parse the JSON response
+    const { labels } = await response.json()
+
+    // Log the labels for debugging
+    console.log('Fetched labels:', labels)
+
+    return labels // Directly return the labels array
+  } catch (error) {
+    console.error('Error fetching labels:', error)
+    return [] // Return an empty array in case of error
+  }
+}
+
+// Function to fetch and process the UMAP embedding JSON
+export const fetchEmbedding = async () => {
+  const config = useConfigStore()
+  try {
+    // Fetch the UMAP embedding JSON from the API
+    const response = await fetch(
+      `${config.apiUrl}geneSet/yeast_embeddings_test/protein_umap_embedding`
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to fetch UMAP embedding: ${response.statusText}`)
+    }
+
+    // Parse the JSON response
+    const { embedding } = await response.json()
+    console.log('Loaded UMAP embedding with', embedding.length, 'points.')
+
+    // Each point is already in [x, y] format, so no further processing is needed
+    return embedding
+  } catch (error) {
+    console.error('Error fetching UMAP embedding:', error)
+  }
+}
+
+// Function to fetch and process the UMAP embedding JSON
+export const fetchFilteredEmbedding = async () => {
+  const config = useConfigStore()
+  try {
+    // Fetch the UMAP embedding JSON from the API
+    const response = await fetch(
+      `${config.apiUrl}geneSet/yeast_embeddings_test/filtered_protein_umap_embedding`
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to fetch UMAP embedding: ${response.statusText}`)
+    }
+
+    // Parse the JSON response
+    const { embedding } = await response.json()
+    console.log('Loaded UMAP embedding with', embedding.length, 'points.')
+
+    // Each point is already in [x, y] format, so no further processing is needed
+    return embedding
+  } catch (error) {
+    console.error('Error fetching UMAP embedding:', error)
   }
 }
 
