@@ -248,8 +248,8 @@ export const useGeneSetStore = defineStore('geneSet', {
 
     // Spring simulation forces
     scaleXForce: 1,
-    scaleYForce: 1000,
-    scaleContraction: 100,
+    scaleYForce: 1,
+    scaleContraction: 1,
     scaleRepulsion: 1,
     minimumDistance: 1000,
     rerunSimulation: false,

@@ -45,7 +45,7 @@ export default {
 </script>
 
 <template>
-  <SidebarItem title="Layout settings">
+  <SidebarItem title="Spring settings">
     <AForm
       layout="horizontal"
       :labelCol="{ span: 8 }"
@@ -58,14 +58,14 @@ export default {
       <AFormItem label="Repulsive force">
         <ASlider id="repulsive" v-model:value="scaleRepulsion"  :min=0 :max=1000> </ASlider>
       </AFormItem>
-      <AFormItem label="Deformation force">
-        <ASlider id="x-force" v-model:value="scaleXForce" type="range" :min=0 :max=10000> </ASlider>
+      <AFormItem label="Deformation resistance">
+        <ASlider id="x-force" v-model:value="scaleXForce" type="range" :min=0 :max=1000> </ASlider>
       </AFormItem>
-      <AFormItem label="Group force">
-        <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=10000> </ASlider>
+      <AFormItem label="Homology group force">
+        <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=1000> </ASlider>
       </AFormItem>
       <AFormItem label="Minimum distance">
-        <ASlider id="distance" v-model:value="minimumDistance"  :min=1 :max=10000> </ASlider>
+        <ASlider id="distance" v-model:value="minimumDistance"  :min=1 :max=1000> </ASlider>
       </AFormItem>
 
     </AForm>
@@ -77,7 +77,7 @@ export default {
             <ARow type="flex" :gutter="40">
               <ACol :span="16">
                 <AButton type="primary" ghost @click="updateSimulation()">
-                  Cluster
+                  Update simulation
                 </AButton>
               </ACol>
             </ARow>
