@@ -350,6 +350,7 @@ export default defineComponent({
       const genomeStore = useGenomeStore();
       console.log('Filter empty changed:', newValue);
       genomeStore.initializeSelectedSequencesLasso(); // Reinitialize lasso selection
+      // genomeStore.selectedSequencesLasso = [];
     },
   },
   methods: {

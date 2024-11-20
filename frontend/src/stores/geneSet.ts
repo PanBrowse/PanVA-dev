@@ -1,12 +1,12 @@
-
-import { ConsoleSqlOutlined } from '@ant-design/icons-vue';
-import { type Dictionary, sortBy } from 'lodash';
-import { defineStore } from 'pinia';
-import { computed, ref, watch } from 'vue';
+import { ConsoleSqlOutlined } from '@ant-design/icons-vue'
+import { type Dictionary, sortBy } from 'lodash'
+import { defineStore } from 'pinia'
+import { computed, ref, watch } from 'vue'
 
 import {
   fetchDistanceMatrix,
   fetchDistanceMatrixLabels,
+  fetchFilteredLabels,
   fetchEmbedding,
   fetchFilteredEmbedding,
   fetchGenomeData,
@@ -16,7 +16,7 @@ import {
   fetchGroupInfo,
   fetchHomologies,
   fetchSequences,
-} from '@/api/geneSet';
+} from '@/api/geneSet'
 import {
   chromosomesLookup,
   createGeneToLociAndSequenceLookup,
@@ -30,8 +30,8 @@ import { runSpringSimulation } from '@/helpers/springSimulation'
 import type { Gene, GenomeData, Locus } from '@/types'
 import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
-import { useGlobalStore } from './global';
-import { Sprite } from 'pixi.js';
+import { useGlobalStore } from './global'
+import { Sprite } from 'pixi.js'
 
 export const useGenomeStore = defineStore({
   id: 'genome',
@@ -48,15 +48,15 @@ export const useGenomeStore = defineStore({
     selectedGeneUids: [] as string[],
     sequenceToLociGenesLookup: new Map<
       string,
-      { loci: string[]; genes: string[]; }
+      { loci: string[]; genes: string[] }
     >(),
     geneToLocusSequenceLookup: new Map<
       string,
-      { loci: string; sequence: string; }
+      { loci: string; sequence: string }
     >(),
     geneToHomologyGroupLookup: {} as Record<
       string,
-      { id: number; uid: string; }[]
+      { id: number; uid: string }[]
     >,
     sequenceToMrnaLookup: new Map<string, string[]>(),
     mrnaScoreMatrix: [] as number[][],
@@ -67,6 +67,7 @@ export const useGenomeStore = defineStore({
     sequenceUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
     distanceMatrix: [],
     distanceMatrixLabels: {},
+    distanceMatrixLabelsFiltered: {},
     embedding: [],
     embeddingFiltered: [],
     filterEmpty: false,
@@ -90,8 +91,8 @@ export const useGenomeStore = defineStore({
       state.genomeData?.sequences?.map((sequence) => sequence.name) || [],
     sequenceUidsWithLoci(state) {
       return state.genomeData.sequences
-        .filter(sequence => sequence.loci && sequence.loci.length > 0)
-        .map(sequence => sequence.uid)
+        .filter((sequence) => sequence.loci && sequence.loci.length > 0)
+        .map((sequence) => sequence.uid)
     },
   },
   actions: {
@@ -99,17 +100,19 @@ export const useGenomeStore = defineStore({
       this.filterEmpty = !this.filterEmpty
     },
     updateFilteredSequences() {
-      this.filteredSequences = this.genomeData.sequences.filter(sequence => sequence.loci && sequence.loci.length > 0)
+      this.filteredSequences = this.genomeData.sequences.filter(
+        (sequence) => sequence.loci && sequence.loci.length > 0
+      )
     },
     async loadGenomeData() {
-      const global = useGlobalStore();
+      const global = useGlobalStore()
 
       try {
-        this.genomeData = await fetchGenomeData();
-        this.generateIndicesAndLookup();
+        this.genomeData = await fetchGenomeData()
+        this.generateIndicesAndLookup()
         this.sequenceToLociGenesLookup = createSequenceToLociGenesLookup(
           this.genomeData
-        );
+        )
         this.geneToLocusSequenceLookup = createGeneToLociAndSequenceLookup(
           this.genomeData
         )
@@ -132,7 +135,20 @@ export const useGenomeStore = defineStore({
         } else {
           this.distanceMatrixLabels = {} // Set as an empty object if no labels are found
         }
-        // this.distanceMatrixLabels = labels || []
+
+        const labelsFiltered = await fetchFilteredLabels()
+        if (labelsFiltered && labelsFiltered.length > 0) {
+          // Transform the labels array into a lookup with the index
+          this.distanceMatrixLabelsFiltered = labelsFiltered.reduce(
+            (lookup, label, index) => {
+              lookup[label] = index
+              return lookup
+            },
+            {}
+          )
+        } else {
+          this.distanceMatrixLabelsFiltered = {} // Set as an empty object if no labels are found
+        }
 
         // Fetch and set the embedding matrix
         const embedding = await fetchEmbedding()
@@ -140,74 +156,30 @@ export const useGenomeStore = defineStore({
 
         const embeddingFiltered = await fetchFilteredEmbedding()
         this.setFilteredEmbeddingMatrix(embeddingFiltered)
-
       } catch (error) {
         global.setError({
           message: 'Could not load or parse genome data.',
           isFatal: true,
-        });
-        throw error;
+        })
+        throw error
       }
 
-      this.initializeSelectedSequencesLasso();
+      this.initializeSelectedSequencesLasso()
 
       // Set initialized flag only after all API calls complete successfully
-      this.isInitialized = true;
+      this.isInitialized = true
     },
-    // initializeSelectedSequencesLasso() {
-    //   console.log('initializing lasso selection')
-
-    //   // Initialize lasso with non-emtpy sequences
-    //   this.selectedSequencesLasso = this.sequenceUidsWithLoci;
-
-    //   // Add to selectedSequencesTracker
-    //   this.sequenceUidsWithLoci.forEach(uid => this.selectedSequencesTracker.add(uid));
-    // },
     initializeSelectedSequencesLasso() {
-      console.log('initializing lasso selection');
-    
-      // Check the filterEmpty flag
-      if (this.filterEmpty) {
-        // Filter sequences with loci lengths > 0
-        const nonEmptySequences = this.genomeData.sequences.filter(
-          (sequence) => sequence.loci && sequence.loci.length > 0
-        );
-    
-        if (nonEmptySequences.length === 0) {
-          console.warn('No non-empty sequences found.');
-          this.selectedSequencesLasso = [];
-          this.selectedSequencesTracker.clear(); // Clear tracker as well
-          return;
-        }
-    
-        // Take a percentage of the non-empty sequences
-        const percentage = 0.3;
-        const selectionCount = Math.ceil(nonEmptySequences.length * percentage);
-    
-        // Initialize lasso with a subset
-        this.selectedSequencesLasso = nonEmptySequences
-          .slice(0, selectionCount)
-          .map((sequence) => sequence.uid);
-    
-        // Add to selectedSequencesTracker
-        this.selectedSequencesTracker.clear(); // Clear previous tracker
-        this.selectedSequencesLasso.forEach((uid) =>
-          this.selectedSequencesTracker.add(uid)
-        );
-      } else {
-        // Default behavior: Include all sequences with loci
-        this.selectedSequencesLasso = this.sequenceUidsWithLoci;
-    
-        // Add to selectedSequencesTracker
-        this.selectedSequencesTracker.clear(); // Clear previous tracker
-        this.sequenceUidsWithLoci.forEach((uid) =>
-          this.selectedSequencesTracker.add(uid)
-        );
-      }
-    
-      console.log('Initialized selectedSequencesLasso:', this.selectedSequencesLasso);
-    },
+      console.log('initializing lasso selection')
 
+      // Initialize lasso with non-emtpy sequences
+      this.selectedSequencesLasso = this.sequenceUidsWithLoci
+
+      // Add to selectedSequencesTracker
+      this.sequenceUidsWithLoci.forEach((uid) =>
+        this.selectedSequencesTracker.add(uid)
+      )
+    },
     generateMrnaScoreMatrix() {
       // Step 1: Gather all unique mrna_uids from groups that contain more than one mRNA
       const uniqueMrnaUids = new Set<string>()
@@ -289,51 +261,51 @@ export const useGenomeStore = defineStore({
       // })
     },
     generateIndicesAndLookup() {
-      this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid); // Populate genomeNrs array
-      this.sequenceUids = this.genomeData.sequences.map((seq) => seq.uid); // Populate genomeNrs array
+      this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid) // Populate genomeNrs array
+      this.sequenceUids = this.genomeData.sequences.map((seq) => seq.uid) // Populate genomeNrs array
 
       // Populate genomeNrLookup with uid as key and index as value
       this.genomeUidLookup = this.genomeData.genomes.reduce(
         (lookup, genome, index) => {
-          lookup[genome.uid] = index; // Use uid as key and index as value
-          return lookup;
+          lookup[genome.uid] = index // Use uid as key and index as value
+          return lookup
         },
         {} as Record<string, number>
-      );
+      )
 
       this.sequenceUidLookup = this.genomeData.sequences.reduce(
         (lookup, sequence, index) => {
-          lookup[sequence.uid] = index; // Use uid as key and index as value
-          return lookup;
+          lookup[sequence.uid] = index // Use uid as key and index as value
+          return lookup
         },
         {} as Record<string, number>
-      );
+      )
 
-      const mRNAToHomologyGroup: Record<string, { id: number; uid: string; }> =
-        {};
+      const mRNAToHomologyGroup: Record<string, { id: number; uid: string }> =
+        {}
 
       this.genomeData.groups.forEach((group) => {
         group.mrnas.forEach((mrna_uid) => {
           mRNAToHomologyGroup[mrna_uid] = {
             id: group.label,
             uid: group.uid,
-          };
-        });
-      });
+          }
+        })
+      })
       // Populate geneToHomologyGroupLookup using mRNA to homology group mapping
       this.geneToHomologyGroupLookup = this.genomeData.genes.reduce(
         (lookup, gene) => {
-          const homologyGroups = new Map<number, { id: number; uid: string; }>();
+          const homologyGroups = new Map<number, { id: number; uid: string }>()
 
           gene.mrnas.forEach((mRNA) => {
-            const homologyGroupInfo = mRNAToHomologyGroup[mRNA];
+            const homologyGroupInfo = mRNAToHomologyGroup[mRNA]
             if (homologyGroupInfo) {
-              homologyGroups.set(homologyGroupInfo.id, homologyGroupInfo);
+              homologyGroups.set(homologyGroupInfo.id, homologyGroupInfo)
             }
-          });
+          })
 
-          lookup[gene.uid] = Array.from(homologyGroups.values()); // Convert Map to array
-          return lookup;
+          lookup[gene.uid] = Array.from(homologyGroups.values()) // Convert Map to array
+          return lookup
         },
         {} as Record<string, { id: number; uid: string }[]>
       )
@@ -359,7 +331,7 @@ export const useGenomeStore = defineStore({
       this.genomeData.genes = this.genomeData.genes.map((gene) => ({
         ...gene,
         homology_groups: this.geneToHomologyGroupLookup[gene.uid] || [],
-      }));
+      }))
 
       // Extend each gene object in genomeData.genes with its sequence uid
       this.genomeData.genes = this.genomeData.genes.map((gene) => ({
@@ -368,22 +340,22 @@ export const useGenomeStore = defineStore({
       }))
     },
     getGenesForSelectedLasso(): string[] {
-      const genes: string[] = [];
-      const selectedSequenceUids = this.selectedSequencesLasso;
+      const genes: string[] = []
+      const selectedSequenceUids = this.selectedSequencesLasso
 
       // console.log('sequenceToLociGenesLookup', this.sequenceToLociGenesLookup)
       selectedSequenceUids.forEach((sequenceUid) => {
-        const lociAndGenes = this.sequenceToLociGenesLookup.get(sequenceUid);
+        const lociAndGenes = this.sequenceToLociGenesLookup.get(sequenceUid)
 
         if (lociAndGenes) {
           // Add loci genes to the main genes list
-          genes.push(...lociAndGenes.genes);
+          genes.push(...lociAndGenes.genes)
         } else {
-          console.warn(`No loci found for sequence UID: ${sequenceUid}`);
+          console.warn(`No loci found for sequence UID: ${sequenceUid}`)
         }
-      });
+      })
 
-      return genes;
+      return genes
     },
     setDistanceMatrix(matrix) {
       this.distanceMatrix = matrix // Set the matrix using an action
@@ -395,23 +367,22 @@ export const useGenomeStore = defineStore({
       this.embeddingFiltered = embedding_matrix // Set the matrix using an action
     },
     setSelectedGenomes(genomeNames: string[]) {
-      this.selectedGenomes = genomeNames;
+      this.selectedGenomes = genomeNames
     },
     setSelectedSequences(sequenceNames: string[]) {
-      this.selectedSequences = sequenceNames;
+      this.selectedSequences = sequenceNames
     },
     setSelectedSequencesLasso(sequenceUids: string[]) {
-      this.selectedSequencesLasso = sequenceUids;
+      this.selectedSequencesLasso = sequenceUids
     },
     setSelectedSequencesTracker(sequenceUid) {
-      this.selectedSequencesTracker.add(sequenceUid);
+      this.selectedSequencesTracker.add(sequenceUid)
     },
     setSelectedGeneUids(uids: string[]) {
-      this.selectedGeneUids = uids;
+      this.selectedGeneUids = uids
     },
   },
-  
-});
+})
 export const useGeneSetStore = defineStore('geneSet', {
   state: () => ({
     // Data from API
@@ -469,20 +440,20 @@ export const useGeneSetStore = defineStore('geneSet', {
   }),
   actions: {
     async initialize() {
-      const global = useGlobalStore();
+      const global = useGlobalStore()
 
-      this.chromosomes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 'unphased']; // to-do: get from data!
-      this.numberOfChromosomes = this.chromosomes.length;
+      this.chromosomes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 'unphased'] // to-do: get from data!
+      this.numberOfChromosomes = this.chromosomes.length
 
       //// GENE NEIGHBORS
       this.homologyGroups = [
         232273967, 232290249, 232273731, 232273868, 232273529, 232273685,
         232274335, 232292464, 232273544, 232290464,
-      ];
+      ]
       this.upstreamHomologies = [
         // 232273967, 232290249, 232273731, 232273868, 232273685, 232273529,
         232274335, 232292464, 232273544, 232290464,
-      ];
+      ]
 
       // //// GENE FAMILY
       // this.homologyGroups = [
@@ -490,69 +461,69 @@ export const useGeneSetStore = defineStore('geneSet', {
       // ]
 
       try {
-        this.genomeData = await fetchGenomeData();
+        this.genomeData = await fetchGenomeData()
       } catch (error) {
         global.setError({
           message: 'Could not load or parse genome data.',
           isFatal: true,
-        });
-        throw error;
+        })
+        throw error
       }
       try {
-        this.homologies = sortBy(await fetchHomologies(), 'id');
+        this.homologies = sortBy(await fetchHomologies(), 'id')
       } catch (error) {
         global.setError({
           message: 'Could not load or parse homologies.',
           isFatal: true,
-        });
-        throw error;
+        })
+        throw error
       }
 
       try {
-        this.sequences = await fetchSequences();
+        this.sequences = await fetchSequences()
       } catch (error) {
         global.setError({
           message: 'Could not load or parse sequence metrics.',
           isFatal: true,
-        });
-        throw error;
+        })
+        throw error
       }
 
       try {
-        this.groupInfo = await fetchGroupInfo();
+        this.groupInfo = await fetchGroupInfo()
       } catch (error) {
         global.setError({
           message: 'Could not load or parse group info.',
           isFatal: true,
-        });
-        throw error;
+        })
+        throw error
       }
 
       // constants
-      const chrLookup = chromosomesLookup(this.sequences);
-      const grInfoLookup = groupInfosLookup(this.groupInfo);
-      const seqLookup = sequencesIdLookup(chrLookup);
+      const chrLookup = chromosomesLookup(this.sequences)
+      const grInfoLookup = groupInfosLookup(this.groupInfo)
+      const seqLookup = sequencesIdLookup(chrLookup)
 
       try {
         // const chrLookup = chromosomesLookup(this.sequences)
         this.sortedChromosomeSequenceIndices =
-          sortedSequenceIdsLookup(chrLookup);
+          sortedSequenceIdsLookup(chrLookup)
       } catch (error) {
         global.setError({
           message: 'Could not parse sorted chromosome sequence ids.',
           isFatal: true,
-        });
-        throw error;
+        })
+        throw error
       }
 
       try {
-        this.sortedMrnaIndices = sortedGroupInfosLookup(grInfoLookup, seqLookup);
+        this.sortedMrnaIndices = sortedGroupInfosLookup(grInfoLookup, seqLookup)
       } catch (error) {
         global.setError({
           message: 'Could not parse sorted chromosome mrna ids.',
           isFatal: true,
-        });
-        throw error;
+        })
+        throw error
       }
 
       try {
@@ -564,34 +535,34 @@ export const useGeneSetStore = defineStore('geneSet', {
           this.size,
           this.location,
           this.jaccard
-        );
+        )
       } catch (error) {
         global.setError({
           message: 'Could not load or parse clustering result.',
           isFatal: true,
-        });
-        throw error;
+        })
+        throw error
       }
 
-      this.isInitialized = true;
+      this.isInitialized = true
     },
     async changeSorting(sorting: string) {
       // Update the sorting
-      this.sorting = sorting;
+      this.sorting = sorting
 
-      const chrLookup = chromosomesLookup(this.sequences);
-      const seqLookup = sequencesIdLookup(chrLookup);
-      const grInfoLookup = groupInfosLookup(this.groupInfo);
+      const chrLookup = chromosomesLookup(this.sequences)
+      const seqLookup = sequencesIdLookup(chrLookup)
+      const grInfoLookup = groupInfosLookup(this.groupInfo)
 
       // default sorting
       if (sorting === 'genome_number_asc') {
-        const grInfoLookup = groupInfosLookup(this.groupInfo);
+        const grInfoLookup = groupInfosLookup(this.groupInfo)
 
         this.sortedChromosomeSequenceIndices =
-          sortedSequenceIdsLookup(chrLookup);
-        this.sortedMrnaIndices = sortedGroupInfosLookup(grInfoLookup, seqLookup);
+          sortedSequenceIdsLookup(chrLookup)
+        this.sortedMrnaIndices = sortedGroupInfosLookup(grInfoLookup, seqLookup)
 
-        return;
+        return
       }
 
       // reverse sorting
@@ -599,37 +570,37 @@ export const useGeneSetStore = defineStore('geneSet', {
         const objectMap = (obj: any, fn: (v: any, k: any, i: any) => any) =>
           Object.fromEntries(
             Object.entries(obj).map(([k, v], i) => [k, fn(v, k, i)])
-          );
+          )
 
         this.sortedChromosomeSequenceIndices = objectMap(
           this.sortedChromosomeSequenceIndices,
           (v) => [...v].reverse()
-        );
+        )
         console.log(
           'reversed sortedChromosomeSequenceIndices',
           this.sortedChromosomeSequenceIndices[5]
-        );
+        )
 
         // update mrnaIdLookup
-        const seqLookupNew: Dictionary<Dictionary<number>> = {}; // need to update old?
+        const seqLookupNew: Dictionary<Dictionary<number>> = {} // need to update old?
         Object.keys(seqLookup).forEach((chr) => {
-          const chrObj: Dictionary<number> = {};
+          const chrObj: Dictionary<number> = {}
 
           Object.keys(seqLookup[chr]).forEach((key) => {
-            const idx = seqLookup[chr][key];
+            const idx = seqLookup[chr][key]
 
-            chrObj[key] = this.sortedChromosomeSequenceIndices[chr][idx];
-          });
-          seqLookupNew[chr] = chrObj;
-        });
+            chrObj[key] = this.sortedChromosomeSequenceIndices[chr][idx]
+          })
+          seqLookupNew[chr] = chrObj
+        })
 
         this.sortedMrnaIndices = sortedGroupInfosLookup(
           grInfoLookup,
           seqLookupNew
-        );
+        )
         // console.log('mrna new', this.sortedMrnaIndices)
 
-        return;
+        return
       }
 
       if (sorting === 'protein') {
@@ -641,75 +612,75 @@ export const useGeneSetStore = defineStore('geneSet', {
           this.size,
           this.location,
           this.jaccard
-        );
+        )
         // console.log('protein sorting', this.linkage, this.clusteringOrder)
         // console.log('sequenceLookup', seqLookup)
 
-        const lookup: Dictionary<number[]> = {};
+        const lookup: Dictionary<number[]> = {}
         Object.keys(seqLookup).forEach((chr) => {
-          const proteinArray: string[] = this.clusteringOrder[chr];
+          const proteinArray: string[] = this.clusteringOrder[chr]
 
           const newLookupProt = Object.fromEntries(
             proteinArray.map((sequenceID, dataIndex) => [sequenceID, dataIndex])
-          );
-          const proteinIndices: number[] = [];
+          )
+          const proteinIndices: number[] = []
           // console.log('newLookupProt', newLookupProt)
 
           Object.keys(seqLookup[chr]).forEach((key) => {
-            console.log(key, newLookupProt[key]);
-            proteinIndices.push(newLookupProt[key]);
-          });
+            console.log(key, newLookupProt[key])
+            proteinIndices.push(newLookupProt[key])
+          })
 
           // // Pass a function to map
           // const proteinIndices = proteinArray.map(
           //   (item) => this.sequenceIdLookup[chr][item]
           // )
           // console.log(proteinIndices)
-          lookup[chr] = proteinIndices;
-        });
-        console.log('lookup', lookup);
-        this.sortedChromosomeSequenceIndices = lookup;
+          lookup[chr] = proteinIndices
+        })
+        console.log('lookup', lookup)
+        this.sortedChromosomeSequenceIndices = lookup
 
         // update mrnaIdLookup
-        const seqLookupNew: Dictionary<Dictionary<number>> = {}; // need to update old?
+        const seqLookupNew: Dictionary<Dictionary<number>> = {} // need to update old?
         Object.keys(seqLookup).forEach((chr) => {
-          const chrObj: Dictionary<number> = {};
+          const chrObj: Dictionary<number> = {}
 
           Object.keys(seqLookup[chr]).forEach((key) => {
-            const idx = seqLookup[chr][key];
+            const idx = seqLookup[chr][key]
 
-            chrObj[key] = this.sortedChromosomeSequenceIndices[chr][idx];
-          });
-          seqLookupNew[chr] = chrObj;
-        });
+            chrObj[key] = this.sortedChromosomeSequenceIndices[chr][idx]
+          })
+          seqLookupNew[chr] = chrObj
+        })
 
         this.sortedMrnaIndices = sortedGroupInfosLookup(
           grInfoLookup,
           seqLookupNew
-        );
+        )
 
-        return;
+        return
       }
     },
     deleteChromosome(chr: string) {
-      console.log('delete chromosome', chr);
-      const chromosomesUpdated = [...this.chromosomes];
-      const value = parseInt(chr.split('chr')[1]);
-      const index = chromosomesUpdated.indexOf(value);
+      console.log('delete chromosome', chr)
+      const chromosomesUpdated = [...this.chromosomes]
+      const value = parseInt(chr.split('chr')[1])
+      const index = chromosomesUpdated.indexOf(value)
 
       if (index > -1) {
         // only splice array when item is found
-        chromosomesUpdated.splice(index, 1); // 2nd parameter means remove one item only
+        chromosomesUpdated.splice(index, 1) // 2nd parameter means remove one item only
       }
 
-      this.numberOfChromosomes = chromosomesUpdated.length;
-      this.chromosomes = chromosomesUpdated;
+      this.numberOfChromosomes = chromosomesUpdated.length
+      this.chromosomes = chromosomesUpdated
     },
     getChromosome(key: string) {
-      return this.chromosomeLookup[key];
+      return this.chromosomeLookup[key]
     },
     getGroupInfo(key: string) {
-      return this.groupInfoLookup[key];
+      return this.groupInfoLookup[key]
     },
     updateSimulation() {
       this.rerunSimulation = true
@@ -725,68 +696,68 @@ export const useGeneSetStore = defineStore('geneSet', {
       /**
        * Returns all sequences per chromosome
        */
-      const lookup: Dictionary<SequenceMetrics[]> = {};
+      const lookup: Dictionary<SequenceMetrics[]> = {}
       this.sequences.forEach((sequence) => {
-        const key = sequence.phasing_chromosome;
-        const rows = lookup[key] || [];
-        rows.push(sequence);
-        lookup[key] = rows;
-      });
-      return lookup;
+        const key = sequence.phasing_chromosome
+        const rows = lookup[key] || []
+        rows.push(sequence)
+        lookup[key] = rows
+      })
+      return lookup
     },
     sequenceIdLookup() {
       /**
        * Returns a mapping of sequence ids and their initial order per chromosome
        */
-      const lookup: Dictionary<Dictionary<number>> = {};
+      const lookup: Dictionary<Dictionary<number>> = {}
       Object.keys(this.chromosomeLookup).forEach((key) => {
         const object = this.chromosomeLookup[key].reduce(
           (obj, item, dataIndex) =>
             Object.assign(obj, { [item.sequence_id]: dataIndex }),
           {}
-        );
+        )
 
-        lookup[key] = object;
-      });
+        lookup[key] = object
+      })
 
-      return lookup;
+      return lookup
     },
     groupInfoLookup() {
       /**
        * Returns all mrNAs per chromosome
        */
-      const lookup: Dictionary<GroupInfo[]> = {};
+      const lookup: Dictionary<GroupInfo[]> = {}
       this.groupInfo.forEach((info: GroupInfo) => {
-        const key = info.phasing_chromosome;
-        const rows: GroupInfo[] = lookup[key] || [];
-        rows.push(info);
-        lookup[key] = rows;
-      });
-      return lookup;
+        const key = info.phasing_chromosome
+        const rows: GroupInfo[] = lookup[key] || []
+        rows.push(info)
+        lookup[key] = rows
+      })
+      return lookup
     },
     sortedGroupInfoLookup() {
       /**
        * Returns intitial sorting indices of gene set per chromosome
        */
-      const lookup: Dictionary<number | number[]> = {};
-      const that = this;
+      const lookup: Dictionary<number | number[]> = {}
+      const that = this
       Object.keys(this.groupInfoLookup).forEach((key) => {
-        const groupLookup = this.groupInfoLookup[key];
+        const groupLookup = this.groupInfoLookup[key]
         const ids =
           lookup[key] ||
           groupLookup.map(function (item) {
-            const newKey = `${item.genome_number}_${item.sequence_number}`;
+            const newKey = `${item.genome_number}_${item.sequence_number}`
             if (key != 'unphased') {
-              return that.sequenceIdLookup[key][newKey];
+              return that.sequenceIdLookup[key][newKey]
             } else {
-              return -99; //map unphased to -99
+              return -99 //map unphased to -99
             }
-          });
+          })
 
-        lookup[key] = ids;
-      });
+        lookup[key] = ids
+      })
 
-      return lookup;
+      return lookup
     },
   },
-});
+})

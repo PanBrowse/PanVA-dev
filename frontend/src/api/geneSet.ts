@@ -298,6 +298,30 @@ export const fetchDistanceMatrixLabels = async () => {
   }
 }
 
+export const fetchFilteredLabels = async () => {
+  const config = useConfigStore()
+  try {
+    // Fetch the JSON labels data from the API
+    const response = await fetch(
+      `${config.apiUrl}geneSet/yeast_matrices_test/filtered_protein_labels`
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to fetch labels: ${response.statusText}`)
+    }
+
+    // Parse the JSON response
+    const { labels } = await response.json()
+
+    // Log the labels for debugging
+    console.log('Fetched labels:', labels)
+
+    return labels // Directly return the labels array
+  } catch (error) {
+    console.error('Error fetching labels:', error)
+    return [] // Return an empty array in case of error
+  }
+}
+
 // Function to fetch and process the UMAP embedding JSON
 export const fetchEmbedding = async () => {
   const config = useConfigStore()

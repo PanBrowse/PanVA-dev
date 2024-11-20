@@ -41,18 +41,18 @@ import { useGenomeStore } from '@/stores/geneSet'
 import type { Gene, Genome, GenomeData } from '@/types'
 
 PIXI.Sprite.prototype.getBoundingClientRect = function () {
-  const devicePixelRatio = window.devicePixelRatio || 1;
+  const devicePixelRatio = window.devicePixelRatio || 1
 
-  const adjustedWidth =  devicePixelRatio > 1 ? this.width  : this.width * 2
-  const adjustedHeight =  devicePixelRatio > 1 ? this.height  : this.height * 2 
+  const adjustedWidth = devicePixelRatio > 1 ? this.width : this.width * 2
+  const adjustedHeight = devicePixelRatio > 1 ? this.height : this.height * 2
 
   return {
-    left: (this.x - this.width ) / devicePixelRatio,
-    top:  (this.y - this.height) / devicePixelRatio,
+    left: (this.x - this.width) / devicePixelRatio,
+    top: (this.y - this.height) / devicePixelRatio,
     width: adjustedWidth,
     height: adjustedHeight,
-  };
-};
+  }
+}
 export default {
   name: 'PixiCanvas',
   emits: ['loaded'], // Declare the emitted event
@@ -166,10 +166,6 @@ export default {
         const foregroundContainer = new PIXI.Container()
         const circleContainer = new PIXI.Container()
         this.circleContainer = circleContainer
-
-        // Add the foreground container to the stage last
-        app.stage.addChild(foregroundContainer)
-        app.stage.addChild(circleContainer)
 
         // const devicePixelRatio = window.devicePixelRatio || 1
         // console.log('devicePixelRatio', devicePixelRatio)
@@ -289,7 +285,7 @@ export default {
                 // Update sprite styles based on its state
                 if (isSelected) {
                   sprite.tint = 0x007bff // Blue for selected
-                  sprite.alpha = 1 // Full opacity
+                  // sprite.alpha = 1 // Full opacity
                 } else if (isTracked) {
                   sprite.tint = 0xa9a9a9 // Dark grey for tracked
                   sprite.alpha = 0.75 // Slightly dimmer
@@ -299,36 +295,10 @@ export default {
                 }
               })
             }
+            this.app.render();
           },
           { immediate: true }
         )
-
-        // --- Lasso Setup ---
-        const svg = d3
-          .select(this.$refs.lasso)
-          .attr('width', this.$el.parentElement.clientWidth)
-          .attr('height', this.$el.parentElement.clientHeight)
-          .style('position', 'absolute')
-          .style('top', '0')
-          .style('left', '0')
-          .style('pointer-events', 'none') // Ensure Pixi.js captures pointer events
-
-        // Lasso initialization
-        const lassoInstance = lasso()
-          .targetArea(d3.select(canvas)) // canvas as HTMLCanvasElement
-          .closePathDistance(150)
-          .on('start', this.lassoStart)
-          .on('draw', this.lassoDraw)
-          .on('end', this.lassoEnd)
-
-        // // Attach lasso to Pixi.js objects
-        lassoInstance.items(circleContainer.children)
-        // console.log('cicrleContainer.children', circleContainer.children)
-
-        this.lassoInstance = lassoInstance
-
-        // // Call lasso on SVG container
-        svg.select('g.lasso').call(lassoInstance) // d3 code
 
         app.stage.addChild(foregroundContainer)
 
@@ -338,6 +308,19 @@ export default {
           // zoomGrid(delta)
           console.log('test zoom from Grid', delta)
         })
+
+        // Watch for embedding changes
+        this.$watch(
+          () => this.genomeStore.filterEmpty,
+          (value) => {
+            console.log('Embedding changed in PixiUMAP watcher:', value)
+
+            // genomeStore.selectedSequencesLasso = [];
+
+            this.drawGrid()
+          },
+          { immediate: true, deep: true }
+        )
 
         // Handle window resizing
         window.addEventListener('resize', () => {
@@ -362,6 +345,19 @@ export default {
       this.drawGrid()
     },
     drawGrid() {
+      // Clear previous content
+      if (this.app) {
+        this.app.stage.removeChildren()
+      }
+
+      // Clear previous content
+      if (this.circleContainer) {
+        this.circleContainer.removeChildren() // Clear all children from the container
+      }
+
+      this.app.stage.addChild(this.circleContainer)
+      // this.app.stage.addChild(this.foregroundContainer)
+
       const app = this.app
       const circleContainer = this.circleContainer
       const devicePixelRatio = window.devicePixelRatio || 1
@@ -372,6 +368,13 @@ export default {
 
       // Create the circle texture
       this.createCircleTexture(circleRadius, app)
+
+      // Check and log canvas size
+      const canvas = this.app.canvas
+      console.log('Initial Canvas Size:', canvas.width, 'x', canvas.height)
+
+      // Set the canvas size dynamically
+      this.resizeWindow(this.app)
 
       // Get canvas dimensions
       const canvasWidth = app.renderer.width
@@ -388,21 +391,35 @@ export default {
       let currentX = padding
       let currentY = padding
 
+      const filterEmpty = this.genomeStore.filterEmpty
+
       // Iterate over genomes
       this.genomeStore.genomeData.genomes.forEach((genomeData) => {
         const sequences = genomeData.sequences
 
         sequences.forEach((sequence, index) => {
           // Create sprite for each sequence
-          const circleSprite = new PIXI.Sprite(this.circleTexture)
-          circleSprite.tint = 0xd3d3d3 // Default color
-          circleSprite.alpha = 0.5
-          circleSprite.sequence_uid = sequence.uid
 
-          circleSprite.x = currentX
-          circleSprite.y = currentY
+          const shouldDraw =
+            !filterEmpty || (sequence.loci && sequence.loci.length > 0)
 
-          circleContainer.addChild(circleSprite)
+          if (shouldDraw) {
+            const circleSprite = new PIXI.Sprite(this.circleTexture)
+
+             // Check if this sequence is part of the selectedSequencesLasso
+            const isSelected = this.genomeStore.selectedSequencesLasso.includes(
+              sequence.uid
+            )
+            circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3 // Blue if selected, gray otherwise
+            // circleSprite.tint = 0xd3d3d3 // Default color
+            circleSprite.alpha = 0.5
+            circleSprite.sequence_uid = sequence.uid
+
+            circleSprite.x = currentX
+            circleSprite.y = currentY
+
+            circleContainer.addChild(circleSprite)
+          }
 
           // Move to the next column
           currentX += 2 * circleRadius + circleSpacing
@@ -418,7 +435,43 @@ export default {
         currentX = padding
         currentY += 2 * circleRadius + circleSpacing + genomeGap
       })
+
+      this.app.stage.addChild(this.circleContainer)
+
       app.render()
+
+      //  Reinitialize the lasso
+      this.initializeLasso(canvas)
+
+      console.log(this.lassoInstance.items())
+    },
+    initializeLasso(canvas) {
+      // Ensure lasso SVG and elements are properly set up
+      const svg = d3
+        .select(this.$refs.lasso)
+        .attr('width', canvas.clientWidth)
+        .attr('height', canvas.clientHeight)
+        .style('position', 'absolute')
+        .style('top', '0')
+        .style('left', '0')
+        .style('pointer-events', 'none') // Ensure Pixi.js captures pointer events
+
+      // Set up the lasso instance
+      this.lassoInstance = lasso()
+        .targetArea(d3.select(canvas)) // Bind to the canvas
+        .closePathDistance(150)
+        .on('start', this.lassoStart)
+        .on('draw', this.lassoDraw)
+        .on('end', this.lassoEnd)
+
+      // Link lasso to the sprites in the container
+      this.lassoInstance.items(this.circleContainer.children as PIXI.Sprite[])
+      svg.select('g.lasso').call(this.lassoInstance)
+
+      // // Store lasso instance for further interaction
+      // this.lassoInstance = lassoInstance;
+
+      console.log('Lasso initialized and added.')
     },
     lassoStart() {
       const genomeStore = useGenomeStore()
@@ -448,38 +501,38 @@ export default {
     lassoEnd() {
       console.log('lasso end')
 
-      const selectedSprites = [];
-      
+      const selectedSprites = []
+
       try {
-        console.log('Lasso end');
-      
+        console.log('Lasso end')
+
         this.lassoInstance.items().forEach((sprite) => {
           if (sprite.__lasso.selected) {
-            sprite.tint = 0x007bff 
-            selectedSprites.push(sprite.sequence_uid);
+            sprite.tint = 0x007bff
+            selectedSprites.push(sprite.sequence_uid)
             // genomeStore.setSelectedSequencesTracker(sprite.sequence_uid)
-          }
-          else {
+          } else {
             sprite.tint = 0xd3d3d3
           }
+        })
 
-        });
-
-        this.app?.render();
+        this.app?.render()
 
         // const boolSprites = this.lassoInstance.items().map(x => x.__lasso.selected);
         // console.log('boolSprites', boolSprites)
         // const selectedSprites = this.lassoInstance.items().filter((sprite, index) => boolSprites[index] === true).map(
         // (sprite) => sprite.sequence_uid
-      // );
-        console.log('Selected sprites:', selectedSprites);
-        this.selectedSprites = selectedSprites;
-        const genomeStore = useGenomeStore();
-        genomeStore.setSelectedSequencesLasso(selectedSprites);
+        // );
+        console.log('Selected sprites:', selectedSprites)
+        this.selectedSprites = selectedSprites
+        const genomeStore = useGenomeStore()
+        genomeStore.setSelectedSequencesLasso(selectedSprites)
+
+        this.lassoInstance.reset();
 
         // this.$forceUpdate();
       } catch (error) {
-        console.error('Error in lassoEnd:', error);
+        console.error('Error in lassoEnd:', error)
       }
 
       // // add the drawn path for the lasso
@@ -632,7 +685,7 @@ export default {
       const isSelected =
         this.genomeStore.selectedSequencesLasso.includes(sequence_uid)
       circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3 // Blue if selected, gray otherwise
-      circleSprite.alpha = isSelected ? 1 : 0.5
+      // circleSprite.alpha = isSelected ? 1 : 0.5
 
       circleSprite.sequence_uid = sequence_uid
 

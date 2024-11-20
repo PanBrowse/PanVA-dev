@@ -124,6 +124,27 @@ def get_umap_embedding():
     except Exception as e:
         print("Error loading embedding:", e)
         return jsonify({"error": "Failed to load embedding"}), 500
+
+@app.route('/geneSet/yeast_matrices_test/filtered_protein_labels', methods=['GET'])
+def get_labels_filtered():
+    try:
+        labels_path = os.path.join(
+            db_path, "geneSet", "yeast_matrices_test", "filtered_protein_distance_labels.json"
+        )
+        print("Loading labels from:", labels_path)
+
+        # Load the labels from the JSON file
+        with open(labels_path, "r") as f:
+            labels = json.load(f)
+
+        print("Labels loaded:", labels)
+
+        # Return the labels as JSON
+        return jsonify({"labels": labels})
+    except Exception as e:
+        print("Error loading labels:", str(e))
+        return jsonify({"error": str(e)}), 500
+
     
 @app.route('/geneSet/yeast_matrices_test/protein_labels', methods=['GET'])
 def get_labels():
