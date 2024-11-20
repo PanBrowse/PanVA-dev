@@ -286,9 +286,9 @@ export default {
                 if (isSelected) {
                   sprite.tint = 0x007bff // Blue for selected
                   // sprite.alpha = 1 // Full opacity
-                } else if (isTracked) {
-                  sprite.tint = 0xa9a9a9 // Dark grey for tracked
-                  sprite.alpha = 0.75 // Slightly dimmer
+                // } else if (isTracked) {
+                //   sprite.tint = 0xa9a9a9 // Dark grey for tracked
+                //   sprite.alpha = 0.75 // Slightly dimmer
                 } else {
                   sprite.tint = 0xd3d3d3 // Default gray for unselected
                   sprite.alpha = 0.5 // Dimmed
@@ -483,11 +483,11 @@ export default {
         return trackerUids.has(sprite.sequence_uid) // Check if sprite's UID is in the tracker
       })
 
-      // Apply different tint to sprites in the tracker
-      trackedSprites.forEach((sprite) => {
-        sprite.tint = 0xa9a9a9 // darker tint for previously selected sprites
-        sprite.alpha = 0.5 // Set opacity to 50%
-      })
+      // // Apply different tint to sprites in the tracker
+      // trackedSprites.forEach((sprite) => {
+      //   sprite.tint = 0xa9a9a9 // darker tint for previously selected sprites
+      //   sprite.alpha = 0.5 // Set opacity to 50%
+      // })
       if (this.selectedSprites) {
         this.selectedSprites.forEach((sprite) => {
           if (!trackerUids.has(sprite.sequence_uid)) {
