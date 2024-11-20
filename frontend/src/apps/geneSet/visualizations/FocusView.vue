@@ -202,13 +202,14 @@ export default {
               end: segmentEndPosition
               } as Locus
             })
+
             const firstSegment: Locus = {
               uid: sequence.uid ?? 0,
-              loci_length_nuc: length,
+              loci_length_nuc: genes[0].start,
               genes: [],
               name: String(0),
               start: 0,
-              end: genes[1].start
+              end: genes[0].start
               } 
 
               return [firstSegment, ...segments]
@@ -1158,8 +1159,8 @@ export default {
 
     let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] =
       runSpringSimulation(
-        this.filteredGenes ?? [],
-        this.filteredSequences ?? [],
+        this.genomeStore.genomeData.genes ?? [],
+        this.genomeStore.genomeData.sequences ?? [],
         currentHeat.value,
         1,
         736740
