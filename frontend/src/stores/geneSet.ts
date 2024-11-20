@@ -173,7 +173,7 @@ export const useGenomeStore = defineStore({
       console.log('initializing lasso selection')
 
       // Initialize lasso with non-emtpy sequences
-      this.selectedSequencesLasso = this.sequenceUidsWithLoci
+      this.selectedSequencesLasso = this.sequenceUidsWithLoci.slice(0,3)
 
       // Add to selectedSequencesTracker
       this.sequenceUidsWithLoci.forEach((uid) =>

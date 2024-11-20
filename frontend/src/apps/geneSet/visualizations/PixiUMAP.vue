@@ -1,7 +1,7 @@
 <template>
   <ACard
     title="UMAP Embedding"
-    :style="{ width: '100%', height: '100%' }"
+    :style="{ width: '100%', height: '100%'}"
     :bordered="false"
     size="small"
   >
@@ -196,8 +196,6 @@ export default defineComponent({
       async (_newLassoSelection) => {
         console.log('lasso selection from watch pixi UMAP', _newLassoSelection)
         await updateSelectedGeneUids()
-
-        debugger
       },
       { immediate: true }
     )
@@ -559,8 +557,8 @@ export default defineComponent({
     },
     resizeWindow(app) {
       const devicePixelRatio = window.devicePixelRatio || 1
-      const parentWidth = this.$el.parentElement.clientWidth
-      const parentHeight = this.$el.parentElement.clientHeight
+      const parentWidth = this.$el.parentElement.clientWidth - 24 // 2x padding card body
+      const parentHeight = this.$el.parentElement.clientHeight - 41 - 24 // card head and padding 
       console.log(`${parentWidth} x ${parentHeight}`)
       console.log(`devicePixelRatio ${devicePixelRatio}`)
 
