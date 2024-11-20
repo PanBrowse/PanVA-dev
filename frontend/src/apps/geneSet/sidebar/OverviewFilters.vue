@@ -268,7 +268,7 @@ g.brush .selection {
         
       </AFormItem>
       <AFormItem label="Filter empty">
-            <ASwitch size="small"/>
+            <ASwitch size="small" v-model:checked="filterEmpty"/>
       </AFormItem>
     </AForm>
   </SidebarItem>
@@ -303,6 +303,8 @@ export default defineComponent({
       'selectedSequences',
     ]),
     ...mapState(useGenomeStore, ['genomeData']),
+    ...mapWritableState(useGenomeStore, ['filterEmpty']),
+
 
     genomeOptions() {
       const genomeStore = useGenomeStore()
@@ -342,6 +344,9 @@ export default defineComponent({
       yLabel: 'Sequence Loci count',
       tickFormat: (d) => d.toLocaleString(),
     })
+  },
+  watch: {
+    // filterEmpty: 'updateCharts', // Recompute charts when the filterEmpty state changes
   },
   methods: {
     getSequenceLengths() {

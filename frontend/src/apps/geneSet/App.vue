@@ -74,6 +74,13 @@ export default defineComponent({
 
     const distanceMatrix = computed(() => genomeStore.distanceMatrix)
     const embedding = computed(() => genomeStore.embedding)
+    const embeddingFiltered = computed(() => genomeStore.embeddingFiltered)
+
+     // Dynamically select the embedding based on filterEmpty
+     const filterEmpty = computed(() => genomeStore.filterEmpty)
+    const selectedEmbedding = computed(() =>
+      filterEmpty.value ? embeddingFiltered.value : embedding.value
+    )
 
     // Sample chromosome number for demonstration
     const chromosomeNr = 5
@@ -109,9 +116,10 @@ export default defineComponent({
       chromosomeNr,
       pixiLoaded,
       handlePixiLoaded,
-
       distanceMatrix,
       embedding,
+      embeddingFiltered,
+      selectedEmbedding,
     }
   },
 })
@@ -135,14 +143,14 @@ export default defineComponent({
         <div class="content-overview" ref="parentElementUMAP">
           <PixiUMAP
             :distanceMatrix="distanceMatrix"
-            :embedding="embedding"
+            :embedding="selectedEmbedding"
             @loaded="handlePixiLoaded"
           />
         </div>
-        <div class="gutter"></div>
+        <!-- <div class="gutter"></div>
         <div class="content-overview" ref="parentElementGrid">
           <PixiCanvas @loaded="handlePixiLoaded" />
-        </div>
+        </div> -->
       </ACol>
       <ACol v-if="pixiLoaded" :span="12" class="col full-height">
         <ChromosomeDetails />

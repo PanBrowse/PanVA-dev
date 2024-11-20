@@ -1,3 +1,4 @@
+
 import { ConsoleSqlOutlined } from '@ant-design/icons-vue';
 import { type Dictionary, sortBy } from 'lodash';
 import { defineStore } from 'pinia';
@@ -7,6 +8,7 @@ import {
   fetchDistanceMatrix,
   fetchDistanceMatrixLabels,
   fetchEmbedding,
+  fetchFilteredEmbedding,
   fetchGenomeData,
 } from '@/api/geneSet'
 import {
@@ -29,20 +31,7 @@ import type { Gene, GenomeData, Locus } from '@/types'
 import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
 import { useGlobalStore } from './global';
-
-// // to-do: add this to config! this is data dependent
-// const DEFAULT_SEQUENCE_UIDS = [
-//   '405ddb34-205c-4f83-91ef-939a01140637', //1_1
-//   '0eb86f3a-45e8-44c0-9c9f-0000bd3c8a1f', //2_1
-//   '57af37c8-b8d1-48c8-8b01-bddaf0da31b4', //3_1
-//   '85f65741-674b-48f7-a544-daff518247e9', //4_1
-//   '9ef875b2-1f8b-4f9f-a641-e024a79ac3c0', //5_1
-//   '4aa41269-bc58-48e2-9521-34f3e075e6ee', //6_1
-//   'd9d31634-8177-4b3c-b9e8-e2be37bb894c', //7_1
-//   '8b6da358-520e-434d-b205-a23dda1cef19', //8_1
-//   '3f1d2bf9-aa72-4263-a95c-d1728bddff1b', //9_1
-//   '1a03d037-0edf-4ab3-912d-af128f9fc53d', //10_1
-// ];
+import { Sprite } from 'pixi.js';
 
 export const useGenomeStore = defineStore({
   id: 'genome',
@@ -79,6 +68,8 @@ export const useGenomeStore = defineStore({
     distanceMatrix: [],
     distanceMatrixLabels: {},
     embedding: [],
+    embeddingFiltered: [],
+    filterEmpty: false,
     isInitialized: false,
   }),
   getters: {
@@ -103,6 +94,9 @@ export const useGenomeStore = defineStore({
     },
   },
   actions: {
+    toggleFilterEmpty() {
+      this.filterEmpty = !this.filterEmpty
+    },
     async loadGenomeData() {
       const global = useGlobalStore();
 
@@ -137,6 +131,10 @@ export const useGenomeStore = defineStore({
         // Fetch and set the embedding matrix
         const embedding = await fetchEmbedding()
         this.setEmbeddingMatrix(embedding)
+
+        const embeddingFiltered = await fetchFilteredEmbedding()
+        this.setFilteredEmbeddingMatrix(embeddingFiltered)
+
       } catch (error) {
         global.setError({
           message: 'Could not load or parse genome data.',
@@ -343,6 +341,9 @@ export const useGenomeStore = defineStore({
     setEmbeddingMatrix(embedding_matrix) {
       this.embedding = embedding_matrix // Set the matrix using an action
     },
+    setFilteredEmbeddingMatrix(embedding_matrix) {
+      this.embeddingFiltered = embedding_matrix // Set the matrix using an action
+    },
     setSelectedGenomes(genomeNames: string[]) {
       this.selectedGenomes = genomeNames;
     },
@@ -352,11 +353,8 @@ export const useGenomeStore = defineStore({
     setSelectedSequencesLasso(sequenceUids: string[]) {
       this.selectedSequencesLasso = sequenceUids;
     },
-    setSelectedSequencesTracker(sequenceUids: string[]) {
-      // Add each `sequenceUid` to `selectedSequencesLassoTracker`
-      sequenceUids.forEach((uid) => {
-        this.selectedSequencesTracker.add(uid);
-      });
+    setSelectedSequencesTracker(sequenceUid) {
+      this.selectedSequencesTracker.add(sequenceUid);
     },
     setSelectedGeneUids(uids: string[]) {
       this.selectedGeneUids = uids;

@@ -321,6 +321,29 @@ export const fetchEmbedding = async () => {
   }
 }
 
+// Function to fetch and process the UMAP embedding JSON
+export const fetchFilteredEmbedding = async () => {
+  const config = useConfigStore()
+  try {
+    // Fetch the UMAP embedding JSON from the API
+    const response = await fetch(
+      `${config.apiUrl}geneSet/yeast_embeddings_test/filtered_protein_umap_embedding`
+    )
+    if (!response.ok) {
+      throw new Error(`Failed to fetch UMAP embedding: ${response.statusText}`)
+    }
+
+    // Parse the JSON response
+    const { embedding } = await response.json()
+    console.log('Loaded UMAP embedding with', embedding.length, 'points.')
+
+    // Each point is already in [x, y] format, so no further processing is needed
+    return embedding
+  } catch (error) {
+    console.error('Error fetching UMAP embedding:', error)
+  }
+}
+
 export const fetchSequences = async () => {
   const config = useConfigStore()
   return await d3.csv<SequenceMetrics, string>(

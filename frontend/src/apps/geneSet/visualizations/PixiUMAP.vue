@@ -30,6 +30,32 @@ import { defineComponent, onMounted, ref, watch } from 'vue'
 import { lasso } from '@/components/Lasso.js'
 import { useGenomeStore } from '@/stores/geneSet'
 
+
+
+
+// PIXI.Sprite.prototype.getBoundingClientRect = function () {
+
+//   return {
+//     left: (this.x - this.width /2) /2,
+//     top: (this.y - this.height /2) /2,
+//     width: this.width,
+//     height: this.height,
+//   }
+// }
+
+PIXI.Sprite.prototype.getBoundingClientRect = function () {
+  const devicePixelRatio = window.devicePixelRatio || 1;
+
+  const adjustedWidth =  devicePixelRatio > 1 ? this.width  : this.width * 2
+  const adjustedHeight =  devicePixelRatio > 1 ? this.height  : this.height * 2 
+
+  return {
+    left: (this.x - this.width ) / devicePixelRatio,
+    top:  (this.y - this.height) / devicePixelRatio,
+    width: adjustedWidth,
+    height: adjustedHeight,
+  };
+};
 // export function customDistance(a, b) {
 //   //   to compute protein distance:
 //   // arguments: a, b, mrna_prot_sim_matrix, seq_to_mrna_lookup
@@ -147,7 +173,7 @@ export default defineComponent({
       selectedSprites: [] as PIXI.Sprite[],
     }
   },
-  setup() {
+  setup(props) {
     const genomeStore = useGenomeStore()
 
     const selectedGeneUids = ref<string[]>([])
@@ -187,38 +213,8 @@ export default defineComponent({
       try {
         const genomeStore = this.genomeStore
 
-        // // Create a PIXI.Application instance
-        const app = new PIXI.Application()
-        this.app = app
 
-        const foregroundContainer = new PIXI.Container()
-        const circleContainer = new PIXI.Container()
-
-        app.stage.addChild(circleContainer)
-        app.stage.addChild(foregroundContainer)
-
-        // Initialize the application
-        await app.init({
-          width: window.innerWidth,
-          height: window.innerHeight,
-          backgroundColor: 0xffffff,
-          // resolution: window.devicePixelRatio || 1,
-          antialias: true,
-          canvas: this.$refs.pixi,
-          resizeTo: this.$refs.view, // or window
-        })
-
-        // Check and log canvas size
-        const canvas = app.canvas
-        console.log('Initial Canvas Size:', canvas.width, 'x', canvas.height)
-
-        // Set the canvas size dynamically
-        this.resizeWindow(app)
-
-        const devicePixelRatio = window.devicePixelRatio || 1
-        console.log('devicePixelRatio', devicePixelRatio)
-        const padding = 10
-
+        //////////////// when using UMAP-js ///////////////////////////////
         // const seed = 42
         // const rng = seedrandom(seed.toString())
 
@@ -234,10 +230,97 @@ export default defineComponent({
         // })
 
         // const embedding = umap.fit(sequences) // here load the sequences
+ 
+        // preloaded embedding
         const embedding = this.embedding
         console.log('embedding', embedding)
 
+        // Create a PIXI.Application instance
+        const app = new PIXI.Application()
+        this.app = app
+
+        // Initialize the application
+        await app.init({
+          width: window.innerWidth,
+          height: window.innerHeight,
+          backgroundColor: 0xffffff,
+          // resolution: window.devicePixelRatio || 1,
+          antialias: true,
+          canvas: this.$refs.pixi,
+          resizeTo: this.$refs.view, // or window
+        })
+
+        const foregroundContainer = new PIXI.Container()
+        const circleContainer = new PIXI.Container()
+
+        this.foregroundContainer = foregroundContainer
+        this.circleContainer = circleContainer
+
+        this.renderEmbedding(embedding)
+
+      // Watch for embedding changes
+      this.$watch(
+        () => this.embedding,
+        (newEmbedding) => {
+          console.log('Embedding changed in PixiUMAP watcher:', newEmbedding);
+          this.renderEmbedding(newEmbedding);
+        },
+        { immediate: true, deep: true }
+      );
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+          this.resizeWindow(app)
+          //   app.renderer.resize(window.innerWidth, window.innerHeight)
+        })
+
+        // to-do: fix this workaround
+        // Emit the loaded event after everything is set up
+        console.log('PixiUMAP loaded event emitted')
+        this.$emit('loaded')
+      } catch (error) {
+        console.error('Error initializing Pixi.js:', error)
+      }
+    })
+  },
+  methods: {
+    renderEmbedding(embedding) {
+
+      console.log('Rendering embedding:', embedding)
+
+
+      //  // Clear lasso groups
+        d3.select(this.$refs.lasso_umap)
+          .selectAll('g.lasso *')
+          .remove();
+
+          // Clear previous content
+        if (this.app) {
+          this.app.stage.removeChildren();
+        }
+
+         // Clear previous content
+        if (this.circleContainer) {
+          this.circleContainer.removeChildren(); // Clear all children from the container
+        }
+
+        this.app.stage.addChild(this.circleContainer)
+        this.app.stage.addChild(this.foregroundContainer)
+
+        // Check and log canvas size
+        const canvas = this.app.canvas
+        console.log('Initial Canvas Size:', canvas.width, 'x', canvas.height)
+
+
+        // Set the canvas size dynamically
+        this.resizeWindow(this.app)
+
+        const devicePixelRatio = window.devicePixelRatio || 1
+        console.log('devicePixelRatio', devicePixelRatio)
+        const padding = 10
+
         const circleRadius = 5 * devicePixelRatio
+        const app = this.app
         this.createCircleTexture(circleRadius, app)
 
         const container = new PIXI.Container()
@@ -276,72 +359,49 @@ export default defineComponent({
             scaledX,
             scaledY,
             index,
-            foregroundContainer,
-            circleContainer
+            this.foregroundContainer,
+            this.circleContainer
           )
         })
 
-        app.stage.addChild(circleContainer)
+        this.app.stage.addChild(this.circleContainer)
 
-        app.render()
+        this.app.render()
 
-        // Add watcher for selectedSequencesLasso
-        this.$watch(
-          () => this.genomeStore.selectedSequencesLasso,
-          (newSelectedSequences) => {
-            console.log('Lasso selection updated:', newSelectedSequences)
+        //  Reinitialize the lasso
+        this.initializeLasso(canvas);
 
-            if (circleContainer) {
-              circleContainer.children.forEach((sprite: any) => {
-                const isSelected = newSelectedSequences.includes(
-                  sprite.sequence_uid
-                )
-                sprite.tint = isSelected ? 0x007bff : 0xd3d3d3 // Blue for selected, gray otherwise
-                sprite.alpha = isSelected ? 1 : 0.5 // Full opacity for selected, dim for unselected
-              })
-            }
-          },
-          { immediate: true }
-        )
 
-        // Lasso setup
-        const svg = d3
-          .select(this.$refs.lasso_umap)
-          .attr('width', canvas.clientWidth)
-          .attr('height', canvas.clientHeight)
-          .style('position', 'absolute')
-          .style('top', '0')
-          .style('left', '0')
-          .style('pointer-events', 'none') // Ensure Pixi.js captures pointer events
 
-        const lassoInstance = lasso()
-          .targetArea(d3.select(canvas)) // Bind to the canvas
-          .closePathDistance(150)
-          .on('start', this.lassoStart)
-          .on('draw', this.lassoDraw)
-          .on('end', this.lassoEnd)
+    },
+    initializeLasso(canvas) {
+    // Ensure lasso SVG and elements are properly set up
+    const svg = d3
+      .select(this.$refs.lasso_umap)
+      .attr('width', canvas.clientWidth)
+      .attr('height', canvas.clientHeight)
+      .style('position', 'absolute')
+      .style('top', '0')
+      .style('left', '0')
+      .style('pointer-events', 'none'); // Ensure Pixi.js captures pointer events
 
-        lassoInstance.items(circleContainer.children as PIXI.Sprite[])
-        svg.select('g.lasso').call(lassoInstance)
-        this.lassoInstance = lassoInstance
+    // Set up the lasso instance
+    this.lassoInstance = lasso()
+      .targetArea(d3.select(canvas)) // Bind to the canvas
+      .closePathDistance(150)
+      .on('start', this.lassoStart)
+      .on('draw', this.lassoDraw)
+      .on('end', this.lassoEnd);
 
-        // Handle window resizing
-        window.addEventListener('resize', () => {
-          this.resizeWindow(app)
-          //   app.renderer.resize(window.innerWidth, window.innerHeight)
-        })
+    // Link lasso to the sprites in the container
+    this.lassoInstance.items(this.circleContainer.children as PIXI.Sprite[]);
+    svg.select('g.lasso').call(this.lassoInstance);
 
-        // to-do: fix this workaround
-        // Emit the loaded event after everything is set up
+    // // Store lasso instance for further interaction
+    // this.lassoInstance = lassoInstance;
 
-        console.log('PixiUMAP loaded event emitted')
-        this.$emit('loaded')
-      } catch (error) {
-        console.error('Error initializing Pixi.js:', error)
-      }
-    })
+    console.log('Lasso initialized and added.');
   },
-  methods: {
     createCircleTexture(circleRadius, app) {
       // Use PIXI.Graphics to draw a circle
       const graphics = new PIXI.Graphics()
@@ -358,23 +418,7 @@ export default defineComponent({
       // Generate a texture from the Graphics object
       this.circleTexture = app.renderer.generateTexture(graphics)
     },
-    // createSprites(
-    //   x: number,
-    //   y: number,
-    //   index: number,
-    //   container: PIXI.Container
-    // ) {
-    //   if (!this.circleTexture) {
-    //     console.error('Circle texture is not created.')
-    //     return
-    //   }
 
-    //   const sprite = new PIXI.Sprite(this.circleTexture)
-    //   sprite.x = x
-    //   sprite.y = y
-    //   sprite.anchor.set(0.5) // Center the circle texture on (x, y)
-    //   container.addChild(sprite)
-    // },
     createReverseLookup(lookup) {
       const reverseLookup = {}
 
@@ -416,6 +460,7 @@ export default defineComponent({
         labels[index]
       )
       circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3 // Blue if selected, gray otherwise
+      // circleSprite.alpha = isSelected ? 1 : 0.5
 
       // Add interactivity to the sprite
       circleSprite.interactive = true
@@ -427,140 +472,73 @@ export default defineComponent({
       circleContainer.addChild(circleSprite)
     },
     lassoStart() {
-      const genomeStore = useGenomeStore()
-      console.log('Lasso selection started', genomeStore.selectedSequencesLasso)
-      const trackerUids = genomeStore.selectedSequencesTracker
+      // const genomeStore = useGenomeStore()
+  
+      // const trackerUids = genomeStore.selectedSequencesTracker
 
-      // Filter the sprites in lassoInstance based on sequence_uids in tracker
-      const trackedSprites = this.lassoInstance.items().filter((sprite) => {
-        return trackerUids.has(sprite.sequence_uid) // Check if sprite's UID is in the tracker
-      })
+      // // Filter the sprites in lassoInstance based on sequence_uids in tracker
+      // const trackedSprites = this.lassoInstance.items().filter((sprite) => {
+      //   return trackerUids.has(sprite.sequence_uid) // Check if sprite's UID is in the tracker
+      // })
 
-      // Apply different tint to sprites in the tracker
-      trackedSprites.forEach((sprite) => {
-        sprite.tint = 0xa9a9a9 // darker tint for previously selected sprites
-        sprite.alpha = 0.5 // Set opacity to 50%
-      })
-      if (this.selectedSprites) {
-        this.selectedSprites.forEach((sprite) => {
-          if (!trackerUids.has(sprite.sequence_uid)) {
-            sprite.tint = 0xd3d3d3 // default tint for unmatched sprites
-            sprite.alpha = 0.5 // Set opacity to 50%
-          }
+      // // Apply different tint to sprites in the tracker
+      // trackedSprites.forEach((sprite) => {
+      //   sprite.tint = 0xa9a9a9 // darker tint for previously selected sprites
+      //   sprite.alpha = 0.5 // Set opacity to 50%
+      // })
+      // if (this.selectedSprites) {
+      //   this.selectedSprites.forEach((sprite) => {
+      //     if (!trackerUids.has(sprite.sequence_uid)) {
+      //       sprite.tint = 0xd3d3d3 // default tint for unmatched sprites
+      //       sprite.alpha = 0.5 // Set opacity to 50%
+      //     }
+      //   })
+      // }
+
+      this.lassoInstance.items().forEach((sprite) => {
+            sprite.tint = 0xd3d3d3
         })
-      }
+        this.app.render();
     },
     lassoDraw() {
       console.log('Lasso drawing')
+
     },
     lassoEnd() {
-      console.log('lasso end')
 
-      // add the drawn path for the lasso
-      const dyn_path = d3
-        .select(this.$refs.lasso_umap)
-        .select('g.lasso')
-        .select('g.lasso')
-        .select('path.drawn')
+      const selectedSprites = [];
+      
+      try {
+        console.log('Lasso end');
+      
+        this.lassoInstance.items().forEach((sprite) => {
+          if (sprite.__lasso.selected) {
+            sprite.tint = 0x007bff 
+            selectedSprites.push(sprite.sequence_uid);
+            // genomeStore.setSelectedSequencesTracker(sprite.sequence_uid)
+          }
+          else {
+            sprite.tint = 0xd3d3d3
+          }
 
-      // add a closed path
-      const close_path = d3
-        .select(this.$refs.lasso_umap)
-        .select('g.lasso')
-        .select('g.lasso')
-        .select('path.loop_close')
+        });
 
-      // add an origin node
-      const origin_node = d3
-        .select(this.$refs.lasso_umap)
-        .select('g.lasso')
-        .select('g.lasso')
-        .select('circle.origin')
+        this.app?.render();
 
-      const lassoPath = dyn_path.attr('d') // Get the current lasso path
-      // console.log('Lasso path data at end:', lassoPath)
+        // const boolSprites = this.lassoInstance.items().map(x => x.__lasso.selected);
+        // console.log('boolSprites', boolSprites)
+        // const selectedSprites = this.lassoInstance.items().filter((sprite, index) => boolSprites[index] === true).map(
+        // (sprite) => sprite.sequence_uid
+      // );
+        console.log('Selected sprites:', selectedSprites);
+        this.selectedSprites = selectedSprites;
+        const genomeStore = useGenomeStore();
+        genomeStore.setSelectedSequencesLasso(selectedSprites);
 
-      if (!lassoPath || lassoPath.length < 3) {
-        // console.warn('Lasso selection is empty or too small.')
-        return // Exit early
+        // this.$forceUpdate();
+      } catch (error) {
+        console.error('Error in lassoEnd:', error);
       }
-
-      const polygonPoints = this.getPolygonFromPath(dyn_path.node())
-
-      // Log the points to the console
-      console.log('Polygon Points:', polygonPoints)
-      const selectedSprites = this.lassoInstance.items().filter((sprite) => {
-        const { x, y } = sprite.position
-        // console.log('{ x, y } ', { x, y })
-        return this.isPointInPolygon(x, y, polygonPoints) // Check if sprite is inside the lasso polygon
-      })
-
-      setTimeout(() => {
-        dyn_path.attr('d', null) // Clear the lasso path after a delay if needed
-        close_path.attr('d', null) // Clear the close path after a delay if needed
-      }, 1000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
-      origin_node.attr('display', 'none')
-
-      console.log('Lasso path cleared in drawEnd.')
-
-      // Apply effects to selected sprites
-      selectedSprites.forEach((sprite) => {
-        sprite.tint = 0x007bff // Set sprite color to blue
-      })
-
-      console.log('Selected sprites:', selectedSprites)
-      this.selectedSprites = selectedSprites
-      // Flattening the array and extracting UIDs
-      const flattenedSequenceUids = selectedSprites
-        .flat()
-        .map((sprite) => sprite.sequence_uid)
-
-      console.log(flattenedSequenceUids)
-
-      const genomeStore = useGenomeStore() // Create an instance of the store
-      // Save UIDs to the store
-      genomeStore.setSelectedSequencesLasso(flattenedSequenceUids)
-      // console.log(
-      //   'Updated store with current lasso selection:',
-      //   genomeStore.selectedSequencesLasso
-      // )
-
-      genomeStore.setSelectedSequencesTracker(flattenedSequenceUids)
-      // console.log(
-      //   'Updated store lasso selection tracker:',
-      //   genomeStore.selectedSequencesTracker
-      // )
-
-      this.$forceUpdate() // might not need this?
-    },
-    getPolygonFromPath(pathElement) {
-      const pathLength = pathElement.getTotalLength()
-      const numPoints = 1000
-      const points = []
-
-      for (let i = 0; i <= numPoints; i++) {
-        const point = pathElement.getPointAtLength((i / numPoints) * pathLength)
-        points.push([point.x, point.y])
-      }
-
-      return points
-    },
-    isPointInPolygon(x, y, polygon) {
-      const dpr = window.devicePixelRatio || 1
-      x /= dpr
-      y /= dpr
-      let inside = false
-
-      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i][0],
-          yi = polygon[i][1]
-        const xj = polygon[j][0],
-          yj = polygon[j][1]
-        const intersect =
-          yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
-        if (intersect) inside = !inside
-      }
-      return inside
     },
     resizeWindow(app) {
       const devicePixelRatio = window.devicePixelRatio || 1

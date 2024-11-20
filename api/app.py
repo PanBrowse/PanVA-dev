@@ -89,6 +89,24 @@ def get_dendrogram(id):
     return create_dendrogram(linkage_matrix, labels)
 
 #### new route geneSets ####
+@app.route('/geneSet/yeast_embeddings_test/filtered_protein_umap_embedding', methods=['GET'])
+def get_umap_embedding_filtered():
+    # Define the path to the UMAP embedding JSON file
+    embedding_path = os.path.join(db_path, "geneSet", "yeast_embeddings_test", "filtered_embedding_yeast_neighbors2_minDist0.1_seed42.json")
+    print("Loading embedding from:", embedding_path)
+    
+    # Load the JSON embedding
+    try:
+        with open(embedding_path, "r") as f:
+            embedding = json.load(f)
+        print("Loaded embedding with", len(embedding), "points.")
+        
+        # Return the embedding as JSON
+        return jsonify({"embedding": embedding})
+    except Exception as e:
+        print("Error loading embedding:", e)
+        return jsonify({"error": "Failed to load embedding"}), 500
+    
 @app.route('/geneSet/yeast_embeddings_test/protein_umap_embedding', methods=['GET'])
 def get_umap_embedding():
     # Define the path to the UMAP embedding JSON file
