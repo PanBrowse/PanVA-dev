@@ -40,6 +40,10 @@ import { useGeneSetStore } from '@/stores/geneSet'
 import { useGenomeStore } from '@/stores/geneSet'
 import type { Gene, Genome, GenomeData } from '@/types'
 
+const globalSelectedSprites = ref<string[]>([])
+const circleTexture = ref<PIXI.Texture>()
+const lassoInstance = ref<lasso>()
+
 PIXI.Sprite.prototype.getBoundingClientRect = function () {
   const devicePixelRatio = window.devicePixelRatio || 1
 
@@ -404,7 +408,7 @@ export default {
             !filterEmpty || (sequence.loci && sequence.loci.length > 0)
 
           if (shouldDraw) {
-            const circleSprite = new PIXI.Sprite(this.circleTexture)
+            const circleSprite = new PIXI.Sprite(circleTexture.value)
 
              // Check if this sequence is part of the selectedSequencesLasso
             const isSelected = this.genomeStore.selectedSequencesLasso.includes(
@@ -443,7 +447,7 @@ export default {
       //  Reinitialize the lasso
       this.initializeLasso(canvas)
 
-      console.log(this.lassoInstance.items())
+      console.log(lassoInstance.value.items())
     },
     initializeLasso(canvas) {
       // Ensure lasso SVG and elements are properly set up
@@ -457,7 +461,7 @@ export default {
         .style('pointer-events', 'none') // Ensure Pixi.js captures pointer events
 
       // Set up the lasso instance
-      this.lassoInstance = lasso()
+      lassoInstance.value = lasso()
         .targetArea(d3.select(canvas)) // Bind to the canvas
         .closePathDistance(150)
         .on('start', this.lassoStart)
@@ -465,11 +469,11 @@ export default {
         .on('end', this.lassoEnd)
 
       // Link lasso to the sprites in the container
-      this.lassoInstance.items(this.circleContainer.children as PIXI.Sprite[])
-      svg.select('g.lasso').call(this.lassoInstance)
+      lassoInstance.value.items(this.circleContainer.children as PIXI.Sprite[])
+      svg.select('g.lasso').call(lassoInstance.value)
 
       // // Store lasso instance for further interaction
-      // this.lassoInstance = lassoInstance;
+      // lassoInstance.value = lassoInstance;
 
       console.log('Lasso initialized and added.')
     },
@@ -479,7 +483,7 @@ export default {
       const trackerUids = genomeStore.selectedSequencesTracker
 
       // Filter the sprites in lassoInstance based on sequence_uids in tracker
-      const trackedSprites = this.lassoInstance.items().filter((sprite) => {
+      const trackedSprites = lassoInstance.value.items().filter((sprite) => {
         return trackerUids.has(sprite.sequence_uid) // Check if sprite's UID is in the tracker
       })
 
@@ -488,8 +492,8 @@ export default {
       //   sprite.tint = 0xa9a9a9 // darker tint for previously selected sprites
       //   sprite.alpha = 0.5 // Set opacity to 50%
       // })
-      if (this.selectedSprites) {
-        this.selectedSprites.forEach((sprite) => {
+      if (trackedSprites) {
+       trackedSprites.forEach((sprite) => {
           if (!trackerUids.has(sprite.sequence_uid)) {
             sprite.tint = 0xd3d3d3 // default tint for unmatched sprites
             sprite.alpha = 0.5 // Set opacity to 50%
@@ -501,12 +505,12 @@ export default {
     lassoEnd() {
       console.log('lasso end')
 
-      const selectedSprites = []
+      const selectedSprites: string[] = []
 
       try {
         console.log('Lasso end')
 
-        this.lassoInstance.items().forEach((sprite) => {
+        lassoInstance.value.items().forEach((sprite) => {
           if (sprite.__lasso.selected) {
             sprite.tint = 0x007bff
             selectedSprites.push(sprite.sequence_uid)
@@ -518,17 +522,17 @@ export default {
 
         this.app?.render()
 
-        // const boolSprites = this.lassoInstance.items().map(x => x.__lasso.selected);
+        // const boolSprites = lassoInstance.value.items().map(x => x.__lasso.selected);
         // console.log('boolSprites', boolSprites)
-        // const selectedSprites = this.lassoInstance.items().filter((sprite, index) => boolSprites[index] === true).map(
+        // const selectedSprites = lassoInstance.value.items().filter((sprite, index) => boolSprites[index] === true).map(
         // (sprite) => sprite.sequence_uid
         // );
         console.log('Selected sprites:', selectedSprites)
-        this.selectedSprites = selectedSprites
+        globalSelectedSprites.value = selectedSprites
         const genomeStore = useGenomeStore()
         genomeStore.setSelectedSequencesLasso(selectedSprites)
 
-        this.lassoInstance.reset();
+        lassoInstance.value.reset();
 
         // this.$forceUpdate();
       } catch (error) {
@@ -568,7 +572,7 @@ export default {
 
       // // Log the points to the console
       // console.log('Polygon Points:', polygonPoints)
-      // const selectedSprites = this.lassoInstance.items().filter((sprite) => {
+      // const selectedSprites = lassoInstance.value.items().filter((sprite) => {
       //   const { x, y } = sprite.position
       //   // console.log('{ x, y } ', { x, y })
       //   return this.isPointInPolygon(x, y, polygonPoints) // Check if sprite is inside the lasso polygon
@@ -589,7 +593,7 @@ export default {
       // })
 
       // console.log('Selected sprites:', selectedSprites)
-      // this.selectedSprites = selectedSprites
+      // selectedSprites.value = selectedSprites
       // // Flattening the array and extracting UIDs
       // const flattenedSequenceUids = selectedSprites
       //   .flat()
@@ -656,7 +660,7 @@ export default {
       graphics.circle(totalRadius, totalRadius, circleRadius)
       graphics.fill(0xffffff)
       // Generate a texture from the Graphics object
-      this.circleTexture = app.renderer.generateTexture(graphics)
+      circleTexture.value = app.renderer.generateTexture(graphics)
     },
     createSprites(
       x,
@@ -670,13 +674,13 @@ export default {
       circleContainer,
       sequence_uid
     ) {
-      if (!this.circleTexture) {
+      if (!circleTexture.value) {
         console.error('Circle texture is not created.')
         return
       }
 
       // Create a sprite using the circle texture
-      const circleSprite = new PIXI.Sprite(this.circleTexture)
+      const circleSprite = new PIXI.Sprite(circleTexture.value)
 
       circleSprite.tint = 0xd3d3d3
       circleSprite.alpha = 0.5 // Set opacity to 50%
