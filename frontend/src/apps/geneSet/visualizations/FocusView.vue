@@ -44,6 +44,7 @@ import { useGeneSetStore } from '@/stores/geneSet'
 import { useGenomeStore } from '@/stores/geneSet'
 import type { Gene, GroupInfo, Locus, Sequence, SequenceInfo, SequenceMetrics } from '@/types'
 import { drawSquish } from './compressibleScale';
+import { arrayRange } from '@/helpers/arrayRange';
 
 // states
 const compressionViewWindowRange = ref<[number, number]>([0, 1])
@@ -331,6 +332,8 @@ export default {
     sortedSequenceIds: [],
     idleTimeout: { type: [null, Number] },
     defaultConnectionThickness: 3,
+    maxNTranscripts: 5,
+    transcriptSpacing: 2,
   }),
   computed: {
     ...mapState(useGeneSetStore, [
@@ -710,7 +713,11 @@ export default {
       if (this.filteredGenes === undefined) {
         return
       }
+      // this.svg().select('g.bar-context').remove()
       this.svg()
+        .select('g.bar-context')
+        // .append('g')
+        // .attr('class', 'bar-context')
         .selectAll('path.bar-chr-context')
         .data(vis.filteredSegments ?? [])
         .join(
@@ -762,6 +769,7 @@ export default {
                 }
                 return 1
               })
+              .attr('z-index', 100)
               .attr('clip-path', 'url(#clipDetails)'),
           (update) =>
             update
@@ -941,7 +949,6 @@ export default {
     ///////////////////////////////////////////////////////////////////////////// Draw genes ////////////////////////////////////////////////
     drawGenes() {
       let vis = this
-
       if (this.genomeStore.genomeData.genes === undefined) {
         return
       }
@@ -1058,6 +1065,7 @@ export default {
         })
 
       this.svg()
+        .select('g.gene-context')
         .selectAll('path.gene')
         .data(vis.filteredGenes)
         .join(
@@ -1086,9 +1094,9 @@ export default {
                 'hg',
                 (d: Gene) => d.homology_groups?.map((entry) => entry.id) ?? []
               )
-              .attr('z-index', 1000)
               .attr('stroke-width', '3px')
               .attr('fill', colors['gray-7'])
+              .attr('z-index', 1000)
               .attr('opacity', 0.8),
           (update) =>
             update
@@ -1117,6 +1125,47 @@ export default {
               }),
           // .attr('fill', colors['gray-7']),
           (exit) => exit.remove()
+        )
+
+        // draw transcripts///////////////////////////////////////////
+        this.svg()
+        .selectAll('path.mrna')
+        .data(vis.filteredGenes)
+        .join(
+          (enter) =>
+            enter.append('path')
+              .attr('d', d => {
+                const nTranscripts = d.mrnas.length
+                const renderedNTranscripts = Math.max(nTranscripts, this.maxNTranscripts)
+                let line = ''
+                arrayRange(0, renderedNTranscripts).forEach((element, i) => {
+                  const localLine = d3.line()
+                  .x(i*this.transcriptSpacing)
+                  .y(3)
+                  line = line + localLine
+                });
+                return line
+              })
+              .attr('transform', (d) => {
+                const key = d.sequence_uid ?? '' //vis.geneToLocusSequenceLookup.get(d.uid)?.sequence
+                let xTransform = this.geneToWindowScales[key](
+                  d.start + (d.end - d.start) / 2
+                )
+                let drawingIndex =
+                  vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+                let yTransform =
+                  drawingIndex * (vis.barHeight + 10) +
+                  2 * this.margin.top +
+                  this.barHeight / 2 +5
+                let rotation = d.strand === 0 ? 0 : 180
+                return `translate(${xTransform},${yTransform}) rotate(${rotation})`
+              })
+              .attr('strokeStyle', 'pink')
+              .attr('fill', 'pink')
+              .attr('class', 'mrna')
+              .attr('opacity', 0.8),
+              (update) => update,
+              (exit) => exit.remove()
         )
       }
   },
@@ -1249,6 +1298,9 @@ export default {
     // Add brushing
     this.svg().append('g').attr('class', 'brush').call(brush.value)
 
+    this.svg().append('g').attr('class', 'bar-context')
+    this.svg().append('g').attr('class', 'gene-context')
+
     this.addClipPath()
     this.resetZoom()
     this.pan()
@@ -1374,6 +1426,7 @@ export default {
     colorGenomes() {
       console.log('color genomes')
       this.drawSquishBars()
+      this.drawGenes()
     },
     // percentageGC() {
     //   console.log('show GC')
