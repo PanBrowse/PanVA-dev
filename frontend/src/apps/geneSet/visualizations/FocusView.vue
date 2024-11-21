@@ -334,6 +334,8 @@ export default {
     defaultConnectionThickness: 3,
     maxNTranscripts: 5,
     transcriptSpacing: 2,
+    transcriptHeight: 2,
+    transcriptWidth: 2,
   }),
   computed: {
     ...mapState(useGeneSetStore, [
@@ -534,7 +536,7 @@ export default {
       this.svg()
         .select('.x-axis')
         .transition()
-        .duration(1000)
+        .duration(this.transitionTime)
         .call(d3.axisTop(this.xScale))
         .call((g) => g.select('.domain').remove())
         .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
@@ -557,7 +559,7 @@ export default {
             .svg()
             .select('.x-axis')
             .transition()
-            .duration(1000)
+            .duration(vis.transitionTime)
             .call(d3.axisTop(vis.xScale).tickValues(vis.ticksXdomain))
             .call((g) => g.select('.domain').remove())
             .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
@@ -573,7 +575,7 @@ export default {
             .svg()
             .select('.x-axis')
             .transition()
-            .duration(1000)
+            .duration(vis.transitionTime)
             // .call(d3.axisTop(vis.xScale).tickValues(vis.ticksXdomain))
             .call((g) => g.select('.domain').remove())
             .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
@@ -697,7 +699,7 @@ export default {
       this.svg()
         .select('.x-axis')
         .transition()
-        .duration(300)
+        .duration(this.transitionTime)
         // .call(d3.axisTop(this.xScale))
         .call((g) => g.select('.domain').remove())
         .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
@@ -724,7 +726,6 @@ export default {
           (enter) =>
             enter
               .append('path')
-              .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
               .attr('class', 'bar-chr-context')
               .attr('d', (d) => {
                  
@@ -775,11 +776,19 @@ export default {
             update
               .transition()
               .duration(this.transitionTime)
+              .attr('transform', d => {
+                const key: string = d.uid ?? ''
+                const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+                const ypos = index * (this.barHeight + 10)
+
+                return `translate(0,${ypos})`
+              })
               .attr('d', (d) => {
                 const key: string = d.uid ?? ''
                 const position = d.start
-                const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
-                const ypos = index * (this.barHeight + 10)
+                const ypos = 0
+                // const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+                // const ypos = index * (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 const currentGeneToCompressionScale =
@@ -1083,9 +1092,7 @@ export default {
                     vis.genomeStore.sequenceUidLookup[sequence ?? '']
                   ) ?? 0
                 let yTransform =
-                  drawingIndex * (vis.barHeight + 10) +
-                  2 * vis.margin.top +
-                  vis.barHeight / 2
+                  drawingIndex * (vis.barHeight + 10) + vis.barHeight / 2
                 let rotation = d.strand === 0 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
@@ -1104,16 +1111,14 @@ export default {
               .duration(this.transitionTime)
               .attr('transform', (d) => {
                 const key = d.sequence_uid ?? '' //vis.geneToLocusSequenceLookup.get(d.uid)?.sequence
-                let xTransform = 
-                this.geneToWindowScales[key](
-                  d.start + (d.end - d.start) / 2
-                )
+                const scale = this.geneToWindowScales[key]
+                let xTransform = this.geneToWindowScales[key](
+                  d.start 
+                ) + (scale(d.end) - scale(d.start) ) /2
                 let drawingIndex =
                   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
-                  drawingIndex * (vis.barHeight + 10) +
-                  2 * this.margin.top +
-                  this.barHeight / 2
+                  drawingIndex * (vis.barHeight + 10) + this.barHeight / 2
                 let rotation = d.strand === 0 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
@@ -1130,19 +1135,31 @@ export default {
 
         // draw transcripts///////////////////////////////////////////
         this.svg()
+        .select('g.gene-context')
         .selectAll('path.mrna')
-        .data(vis.filteredGenes)
+        .data(vis.filteredGenes, (d:Gene) => d.uid + d.sequence)
         .join(
           (enter) =>
             enter.append('path')
               .attr('d', d => {
                 const nTranscripts = d.mrnas.length
-                const renderedNTranscripts = Math.max(nTranscripts, this.maxNTranscripts)
+                if(nTranscripts < 2) {return ''}
+                const key = d.sequence_uid ?? ''
+                const size = getGeneSymbolSize(d, this.geneToWindowScales[key], this.barHeight, true)
+                if(size <= this.barHeight * 4) {return ''}
+                const renderedNTranscripts = Math.min(nTranscripts, this.maxNTranscripts)
+                const transcriptsWidth = 
+                  (this.transcriptWidth + this.transcriptSpacing) * 
+                  renderedNTranscripts
+
                 let line = ''
-                arrayRange(0, renderedNTranscripts).forEach((element, i) => {
-                  const localLine = d3.line()
-                  .x(i*this.transcriptSpacing)
-                  .y(3)
+                arrayRange(0, renderedNTranscripts - 1).forEach((element, i) => {
+                  const x = i * (this.transcriptWidth + this.transcriptSpacing) - 
+                  transcriptsWidth / 2
+                  const yTop = this.barHeight / 2 + 1
+                  const localLine = d3.line()([
+                  [x, yTop],
+                  [x, yTop + this.transcriptHeight]])
                   line = line + localLine
                 });
                 return line
@@ -1150,22 +1167,73 @@ export default {
               .attr('transform', (d) => {
                 const key = d.sequence_uid ?? '' //vis.geneToLocusSequenceLookup.get(d.uid)?.sequence
                 let xTransform = this.geneToWindowScales[key](
-                  d.start + (d.end - d.start) / 2
+                  d.start + (d.end-d.start)/2
                 )
                 let drawingIndex =
                   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
-                  drawingIndex * (vis.barHeight + 10) +
-                  2 * this.margin.top +
-                  this.barHeight / 2 +5
+                  drawingIndex * (vis.barHeight + 10) + this.barHeight / 2 +5
                 let rotation = d.strand === 0 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
-              .attr('strokeStyle', 'pink')
-              .attr('fill', 'pink')
+              .attr('stroke', (d) => {
+                return vis.colorGenes
+                  ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                  : 'gray'
+              })
               .attr('class', 'mrna')
-              .attr('opacity', 0.8),
-              (update) => update,
+              .attr('opacity', 1)
+              .style('stroke-width', this.transcriptWidth),
+          (update) => 
+            update
+              .transition()
+              .duration(this.transitionTime)
+              .attr('d', d => {
+                const nTranscripts = d.mrnas.length
+                if(nTranscripts < 2) {return ''}
+
+                const key = d.sequence_uid ?? ''
+                const size = getGeneSymbolSize(d, this.geneToWindowScales[key], this.barHeight, true)
+                if(size <= this.barHeight *4) {return ''}
+
+                const renderedNTranscripts = Math.min(nTranscripts, this.maxNTranscripts)
+                
+                // draw ticks for each transcript
+                let line = ''
+                const transcriptsWidth = 
+                  (this.transcriptWidth + this.transcriptSpacing) * 
+                  renderedNTranscripts
+                arrayRange(0, renderedNTranscripts-1).forEach((element, i) => {
+                  const x = i * (this.transcriptWidth 
+                    + this.transcriptSpacing) 
+                    - transcriptsWidth / 2
+                  const yTop = this.barHeight / 2 + 1
+                  const localLine = d3.line()([
+                  [x, yTop],
+                  [x, yTop + this.transcriptHeight]])
+                  line = line + localLine
+                });
+                return line
+              })
+              .attr('transform', (d) => {
+                const key = d.sequence_uid ?? '' //vis.geneToLocusSequenceLookup.get(d.uid)?.sequence
+                let xTransform = this.geneToWindowScales[key](
+                  d.start + (d.end-d.start)/2
+                ) 
+                let rowNumber =
+                  vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+                let yTransform =
+                  rowNumber * (vis.barHeight + 10) + this.barHeight / 2
+
+                return `translate(${xTransform},${yTransform})`
+              })
+              .attr('stroke', (d) => {
+                return vis.colorGenes
+                  ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                  : 'gray'
+              })
+              .attr('opacity', 1)
+              .style('stroke-width', this.transcriptWidth),
               (exit) => exit.remove()
         )
       }
@@ -1299,8 +1367,11 @@ export default {
     // Add brushing
     this.svg().append('g').attr('class', 'brush').call(brush.value)
 
+    // create groups for focus view drawing
     this.svg().append('g').attr('class', 'bar-context')
+      .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
     this.svg().append('g').attr('class', 'gene-context')
+    .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
 
     this.addClipPath()
     this.resetZoom()

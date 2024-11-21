@@ -56,7 +56,8 @@ export const geneTriangleForward: d3.SymbolType = {
   draw(context, size) {
 
     const sqrt3 = Math.sqrt(3);
-    const x = Math.sqrt(size / (sqrt3 * 3));
+    const modSize = size * 4;
+    const x = Math.sqrt(modSize / (sqrt3 * 3));
 
     context.moveTo(2 * x, 0);
     context.lineTo(-x, -sqrt3 * x);
@@ -67,7 +68,8 @@ export const geneTriangleForward: d3.SymbolType = {
 export const geneTriangleReverse: d3.SymbolType = {
   draw(context: CanvasRenderingContext2D, size: number) {
     const sqrt3 = Math.sqrt(3);
-    const x = Math.sqrt(size / (sqrt3 * 3));
+    const modSize = size * 4;
+    const x = Math.sqrt(modSize / (sqrt3 * 3));
 
     context.moveTo(-x * 2, 0);
     context.lineTo(x, -sqrt3 * x);
@@ -159,5 +161,5 @@ export const getGeneSymbolSize = (
   showBars: boolean = true
 ) => {
   const geneSize = currentGeneToWindow(d.end) - currentGeneToWindow(d.start);
-  return geneSize > barHeight && showBars ? geneSize : barHeight * 4;
+  return geneSize > barHeight && showBars ? geneSize : barHeight;
 };
