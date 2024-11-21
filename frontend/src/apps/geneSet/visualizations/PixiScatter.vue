@@ -26,9 +26,7 @@
   </ACard>
 </template>
 
-
 <script lang="ts">
-
 import { CloseCircleOutlined } from '@ant-design/icons-vue'
 import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
@@ -74,7 +72,6 @@ export default {
   setup() {
     const genomeStore = useGenomeStore()
     const selectedGeneUids = ref<string[]>([])
-
 
     // Fetch default selection on mount if it's already set in the store
     onMounted(() => {
@@ -131,9 +128,10 @@ export default {
     this.$nextTick(async () => {
       try {
         const genomeStore = this.genomeStore
-        const isShiftPressed = ref(false);
-        this.isShiftPressed = isShiftPressed;
+        const isShiftPressed = ref(false)
+        this.isShiftPressed = isShiftPressed
         console.log(isShiftPressed.value)
+        const focusContainer = this.$refs.focusContainer;
 
         // const genomeStore = useGenomeStore()
         // console.log(
@@ -145,7 +143,6 @@ export default {
         const app = new PIXI.Application()
         this.app = app
 
-        
         // to-do:
         // - use auto detect renderer instead of graphics object
         // - resize listener when menu collapses
@@ -173,6 +170,7 @@ export default {
           autoResize: true,
           resolution: window.devicePixelRatio || 1,
           canvas: this.$refs.pixi,
+          resizeTo: this.$refs.view,
           events: app.renderer.events,
         })
         this.viewport = viewport
@@ -181,102 +179,112 @@ export default {
         app.stage.addChild(this.viewport)
         console.log('Viewport added to stage:', this.viewport)
 
-
-
         this.viewport.interactive = true
 
         this.viewport.drag({
-              pressDrag: false, // Enables dragging
-        });
+          pressDrag: false, // Enables dragging
+        })
 
         // Enable viewport plugins
-        this.viewport.wheel().decelerate(); // Enable mouse wheel zoom and panning
+        this.viewport.wheel().decelerate() // Enable mouse wheel zoom and panning
 
         const onFocusCanvas = () => {
-          console.log('Canvas focused, keyboard events will be captured');
+          console.log('Canvas focused, keyboard events will be captured')
 
           if (canvas) {
-            canvas.addEventListener('keydown', onKeyDown);
-            canvas.addEventListener('keyup', onKeyUp);
+            canvas.addEventListener('keydown', onKeyDown)
+            canvas.addEventListener('keyup', onKeyUp)
           }
-        };
+        }
 
         const onKeyDown = (event: KeyboardEvent) => {
           if (event.key === 'Shift') {
-     
             this.isShiftPressed.value = true
             this.viewport.drag({
               pressDrag: true, // Enables dragging
-            });
+            })
           }
-            if (this.lassoInstance) {
-              console.log('Removing lasso.');
+          if (this.lassoInstance) {
+            console.log('Removing lasso.')
 
-              // Clear lasso paths
-              d3.select(this.$refs.lasso).selectAll('path').remove();
-              d3.select(this.$refs.lasso).selectAll('circle').remove();
-
-            }
-            console.log('*** key shift pressed from canvas focus', this.isShiftPressed.value)
-          
-
+            // Clear lasso paths
+            d3.select(this.$refs.lasso).selectAll('path').remove()
+            d3.select(this.$refs.lasso).selectAll('circle').remove()
+          }
+          console.log(
+            '*** key shift pressed from canvas focus',
+            this.isShiftPressed.value
+          )
         }
 
         const onKeyUp = (event: KeyboardEvent) => {
           if (event.key === 'Shift') {
             this.isShiftPressed.value = false
-            console.log('*** key shift NOT pressed from canvas focus', this.isShiftPressed.value)
+            console.log(
+              '*** key shift NOT pressed from canvas focus',
+              this.isShiftPressed.value
+            )
 
             this.viewport.drag({
               pressDrag: false, // Enables dragging
-            });
+            })
 
             this.initializeLasso(canvas)
           }
-
         }
 
-
         const onBlurCanvas = () => {
-          console.log('Canvas blurred, keyboard events ignored');
-        };
+          if (canvas) {
+            canvas.blur(); // Explicitly remove focus
+            console.log('Canvas blurred, keyboard events ignored');
+          }
+        }
 
-        app.canvas.addEventListener('focus', onFocusCanvas);
-        app.canvas.addEventListener('blur', onBlurCanvas);
+        app.canvas.addEventListener('focus', onFocusCanvas)
+        app.canvas.addEventListener('blur', onBlurCanvas)
         // Make canvas focusable and auto-focus on click
-        app.canvas.setAttribute('tabindex', '0');
-        app.canvas.addEventListener('mouseover', () => {canvas.focus();})
-
+        app.canvas.setAttribute('tabindex', '0')
+        app.canvas.addEventListener('mouseover', () => {
+          canvas.focus({ preventScroll: true });
+        })
+        app.canvas.addEventListener('mouseleave', () => {
+          canvas.blur()
+        })
 
         viewport.on('wheel', (e) => {
           console.log('Wheel event detected on viewport:', e)
-       
         })
 
         viewport.on('drag', (e) => {
           console.log('Drag event detected on viewport:', e)
-       
         })
 
-          this.viewport.on('zoomed', () => {
-            const zoomLevel = this.viewport.scale.x;
-            const resolution = window.devicePixelRatio * zoomLevel;
+        this.viewport.on('zoomed', () => {
+          const zoomLevel = this.viewport.scale.x
+          const resolution = window.devicePixelRatio * zoomLevel
 
-            console.log('zoomed', this.circleTexture.source.resolution, this.viewport.scale.x)
+          console.log(
+            'zoomed',
+            this.circleTexture.source.resolution,
+            this.viewport.scale.x
+          )
 
-            const circleRadius = 5 * devicePixelRatio 
+          const circleRadius = 5 * devicePixelRatio
 
-            // Regenerate the circle texture
-            this.circleTexture = this.createCircleTexture(circleRadius, resolution);
+          // Regenerate the circle texture
+          this.circleTexture = this.createCircleTexture(
+            circleRadius,
+            resolution
+          )
 
-            // Update all sprites
-            this.viewport.children.forEach((sprite) => {
-                sprite.texture = this.circleTexture;
-            });
-            // this.drawGrid();
+          // Update all sprites
+          this.viewport.children.forEach((sprite) => {
+            sprite.texture = this.circleTexture
+          })
+          // this.drawGrid();
 
-            this.app.render();
-        });
+          this.app.render()
+        })
 
         app.canvas.addEventListener('wheel', (e) => {
           e.preventDefault() // Stop default browser scroll behavior
@@ -287,7 +295,7 @@ export default {
 
         app.canvas.addEventListener('drag', (e) => {
           e.preventDefault() // Stop default browser scroll behavior
-          console.log('Drag event on canvas:', e);
+          console.log('Drag event on canvas:', e)
 
           // Manually forward the event to the Viewport
           viewport.emit('drag', e)
@@ -403,12 +411,11 @@ export default {
       const circleRadius = 5 * devicePixelRatio
       const circleSpacing = (2 * circleRadius) / devicePixelRatio
       const genomeGap = 20 * devicePixelRatio // Extra gap between genomes
-      const zoomLevel = this.viewport.scale.x;
-      const resolution = window.devicePixelRatio * zoomLevel;
+      const zoomLevel = this.viewport.scale.x
+      const resolution = window.devicePixelRatio * zoomLevel
 
       // Create the circle texture
       this.circleTexture = this.createCircleTexture(circleRadius, resolution)
-
 
       // Check and log canvas size
       const canvas = this.app.canvas
@@ -489,7 +496,6 @@ export default {
       // console.log(this.lassoInstance.items())
     },
     initializeLasso(canvas) {
-
       // Ensure lasso SVG and elements are properly set up
       const svg = d3
         .select(this.$refs.lasso)
@@ -519,8 +525,8 @@ export default {
     },
     lassoStart() {
       if (this.isShiftPressed.value === true) {
-        console.log('Skipping lasso start due to Shift key being pressed.');
-        return;
+        console.log('Skipping lasso start due to Shift key being pressed.')
+        return
       }
 
       const genomeStore = useGenomeStore()
@@ -548,15 +554,14 @@ export default {
     },
     lassoDraw() {
       if (this.isShiftPressed.value === true) {
-        console.log('Skipping lasso draw due to Shift key being pressed.');
-        return;
+        console.log('Skipping lasso draw due to Shift key being pressed.')
+        return
       }
     },
     lassoEnd() {
-
       if (this.isShiftPressed.value === true) {
-        console.log('Skipping lasso end due to Shift key being pressed.');
-        return;
+        console.log('Skipping lasso end due to Shift key being pressed.')
+        return
       }
       console.log('lasso end')
 
@@ -702,9 +707,9 @@ export default {
       return inside
     },
     createCircleTexture(circleRadius, resolution) {
-
-      const res = Math.max(1, window.devicePixelRatio) * (this.viewport?.scale.x || 1);
-      console.log('Generating texture with resolution:', res);
+      const res =
+        Math.max(1, window.devicePixelRatio) * (this.viewport?.scale.x || 1)
+      console.log('Generating texture with resolution:', res)
 
       // Use PIXI.Graphics to draw a circle
       const graphics = new PIXI.Graphics()
@@ -729,15 +734,18 @@ export default {
       // return texture
       // Create a render texture for the circle
       const renderTexture = PIXI.RenderTexture.create({
-          width: circleRadius*2.5,
-          height: circleRadius*2.5,
-          resolution: Math.max(2, window.devicePixelRatio * this.viewport.scale.x), // Adjust resolution based on zoom  
-      });
+        width: circleRadius * 2.5,
+        height: circleRadius * 2.5,
+        resolution: Math.max(
+          2,
+          window.devicePixelRatio * this.viewport.scale.x
+        ), // Adjust resolution based on zoom
+      })
 
       // Render the graphics to the texture
-      this.app.renderer.render(graphics, { renderTexture });
+      this.app.renderer.render(graphics, { renderTexture })
 
-      return renderTexture;
+      return renderTexture
     },
     createSprites(
       x,
@@ -759,7 +767,7 @@ export default {
       // Create a sprite using the circle texture
       const circleSprite = new PIXI.Sprite()
       // Assign the texture
-      circleSprite.texture = this.circleTexture;
+      circleSprite.texture = this.circleTexture
 
       circleSprite.tint = 0xd3d3d3
       circleSprite.alpha = 0.5 // Set opacity to 50%
@@ -1100,16 +1108,33 @@ div {
   overflow: hidden;
   position: relative;
 }
-canvas {
-  pointer-events: auto;
-  z-index: 10;
+
+.ant-card-head {
+  pointer-events: none; /* Prevent header from triggering events */
 }
 
 .child-container {
   flex: 1; /* This will make it inherit the available width */
   width: 100%; /* Ensures full width */
+  height: calc(100% - 40px);
   pointer-events: auto;
   position: relative;
+}
+
+.focus-container {
+  position: relative; /* Position relative to card body */
+  width: 100%; /* Match the card body */
+  height: calc(100% - 40px); /* Exclude the card header */
+  outline: none; /* Prevent default outline */
+}
+
+canvas {
+  top: 0;
+  left: 0;
+  width: 100%; /* Fill the container */
+  height: 100%; /* Fill the container */
+  pointer-events: auto;
+  z-index: 10;
 }
 
 svg {
