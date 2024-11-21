@@ -247,7 +247,9 @@ export default defineComponent({
         })
 
         const foregroundContainer = new PIXI.Container()
-        const circleContainer = new PIXI.Container()
+        const circleContainer = new PIXI.Container({
+          isRenderGroup: true, // Enable GPU-accelerated rendering
+        })
 
         this.foregroundContainer = foregroundContainer
         this.circleContainer = circleContainer

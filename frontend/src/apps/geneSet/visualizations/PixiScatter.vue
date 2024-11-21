@@ -26,13 +26,16 @@
   </ACard>
 </template>
 
+
 <script lang="ts">
+
 import { CloseCircleOutlined } from '@ant-design/icons-vue'
 import { Button, Card } from 'ant-design-vue'
 import * as d3 from 'd3'
 import { mapActions, mapState } from 'pinia'
 import * as PIXI from 'pixi.js'
 import { DropShadowFilter } from 'pixi-filters'
+import { Viewport } from 'pixi-viewport'
 import { defineComponent, onMounted, ref, watch } from 'vue'
 
 import { lasso } from '@/components/Lasso.js'
@@ -53,6 +56,7 @@ PIXI.Sprite.prototype.getBoundingClientRect = function () {
     height: adjustedHeight,
   }
 }
+
 export default {
   name: 'PixiCanvas',
   emits: ['loaded'], // Declare the emitted event
@@ -70,6 +74,7 @@ export default {
   setup() {
     const genomeStore = useGenomeStore()
     const selectedGeneUids = ref<string[]>([])
+
 
     // Fetch default selection on mount if it's already set in the store
     onMounted(() => {
@@ -126,19 +131,21 @@ export default {
     this.$nextTick(async () => {
       try {
         const genomeStore = this.genomeStore
+        const isShiftPressed = ref(false);
+        this.isShiftPressed = isShiftPressed;
+        console.log(isShiftPressed.value)
+
         // const genomeStore = useGenomeStore()
         // console.log(
         //   'sequences from genomeStore: ',
         //   genomeStore.genomeData.genomes
         // )
 
-        let zoomLevel = 1 // Default zoom level
-        this.zoomLevel = zoomLevel
-
         // // Create a PIXI.Application instance
         const app = new PIXI.Application()
         this.app = app
 
+        
         // to-do:
         // - use auto detect renderer instead of graphics object
         // - resize listener when menu collapses
@@ -149,10 +156,141 @@ export default {
           width: window.innerWidth,
           height: window.innerHeight,
           backgroundColor: 0xffffff,
-          // resolution: window.devicePixelRatio || 1,
+          resolution: window.devicePixelRatio || 1,
+          autoResize: true,
           antialias: true,
+          autoDensity: true,
           canvas: this.$refs.pixi,
-          resizeTo: this.$refs.view, // or window
+          resizeTo: this.$refs.view,
+        })
+
+        // Create the viewport
+        const viewport = new Viewport({
+          screenWidth: window.innerWidth,
+          screenHeight: window.innerHeight,
+          worldWidth: 2000, // Adjust this value to fit your data
+          worldHeight: 2000,
+          autoResize: true,
+          resolution: window.devicePixelRatio || 1,
+          canvas: this.$refs.pixi,
+          events: app.renderer.events,
+        })
+        this.viewport = viewport
+
+        // Add the viewport to the PIXI stage
+        app.stage.addChild(this.viewport)
+        console.log('Viewport added to stage:', this.viewport)
+
+
+
+        this.viewport.interactive = true
+
+        this.viewport.drag({
+              pressDrag: false, // Enables dragging
+        });
+
+        // Enable viewport plugins
+        this.viewport.wheel().decelerate(); // Enable mouse wheel zoom and panning
+
+        const onFocusCanvas = () => {
+          console.log('Canvas focused, keyboard events will be captured');
+
+          if (canvas) {
+            canvas.addEventListener('keydown', onKeyDown);
+            canvas.addEventListener('keyup', onKeyUp);
+          }
+        };
+
+        const onKeyDown = (event: KeyboardEvent) => {
+          if (event.key === 'Shift') {
+     
+            this.isShiftPressed.value = true
+            this.viewport.drag({
+              pressDrag: true, // Enables dragging
+            });
+          }
+            if (this.lassoInstance) {
+              console.log('Removing lasso.');
+
+              // Clear lasso paths
+              d3.select(this.$refs.lasso).selectAll('path').remove();
+              d3.select(this.$refs.lasso).selectAll('circle').remove();
+
+            }
+            console.log('*** key shift pressed from canvas focus', this.isShiftPressed.value)
+          
+
+        }
+
+        const onKeyUp = (event: KeyboardEvent) => {
+          if (event.key === 'Shift') {
+            this.isShiftPressed.value = false
+            console.log('*** key shift NOT pressed from canvas focus', this.isShiftPressed.value)
+
+            this.viewport.drag({
+              pressDrag: false, // Enables dragging
+            });
+
+            this.initializeLasso(canvas)
+          }
+
+        }
+
+
+        const onBlurCanvas = () => {
+          console.log('Canvas blurred, keyboard events ignored');
+        };
+
+        app.canvas.addEventListener('focus', onFocusCanvas);
+        app.canvas.addEventListener('blur', onBlurCanvas);
+        // Make canvas focusable and auto-focus on click
+        app.canvas.setAttribute('tabindex', '0');
+        app.canvas.addEventListener('mouseover', () => {canvas.focus();})
+
+
+        viewport.on('wheel', (e) => {
+          console.log('Wheel event detected on viewport:', e)
+       
+        })
+
+        viewport.on('drag', (e) => {
+          console.log('Drag event detected on viewport:', e)
+       
+        })
+
+          this.viewport.on('zoomed', () => {
+            const zoomLevel = this.viewport.scale.x;
+            const resolution = window.devicePixelRatio * zoomLevel;
+
+            console.log('zoomed', this.circleTexture.source.resolution, this.viewport.scale.x)
+
+            const circleRadius = 5 * devicePixelRatio 
+
+            // Regenerate the circle texture
+            this.circleTexture = this.createCircleTexture(circleRadius, resolution);
+
+            // Update all sprites
+            this.viewport.children.forEach((sprite) => {
+                sprite.texture = this.circleTexture;
+            });
+            // this.drawGrid();
+
+            this.app.render();
+        });
+
+        app.canvas.addEventListener('wheel', (e) => {
+          e.preventDefault() // Stop default browser scroll behavior
+          // console.log('Wheel event on canvas:', e);
+          // Manually forward the event to the Viewport
+          viewport.emit('wheel', e)
+        })
+
+        app.canvas.addEventListener('drag', (e) => {
+          e.preventDefault() // Stop default browser scroll behavior
+          console.log('Drag event on canvas:', e);
+
+          // Manually forward the event to the Viewport
+          viewport.emit('drag', e)
         })
 
         // Check and log canvas size
@@ -162,109 +300,13 @@ export default {
         // Set the canvas size dynamically
         this.resizeWindow(app)
 
-        // Create a foreground container for hover texts
-        const foregroundContainer = new PIXI.Container()
-        const circleContainer = new PIXI.Container()
-        this.circleContainer = circleContainer
+        // // Create a foreground container for hover texts
+        // const foregroundContainer = new PIXI.Container()
+        // const circleContainer = new PIXI.Container()
+        // this.circleContainer = circleContainer
 
-        // const devicePixelRatio = window.devicePixelRatio || 1
-        // console.log('devicePixelRatio', devicePixelRatio)
-        // const padding = 10
-        // const circleRadius = 5 * devicePixelRatio
-        // const circleSpacing = (3 * circleRadius) / devicePixelRatio
-        // const chromPadding = 25 // Padding between chromosome grids
-
-        // const containerWidth = this.$refs.pixi.clientWidth * devicePixelRatio
-        // const containerHeight = this.$refs.pixi.clientHeight * devicePixelRatio
-        // console.log('containerWidth', containerWidth)
-        // console.log('containerHeight', containerHeight)
-
-        // // load data
-        // const genomes = genomeStore.genomeData.genomes
-
-        // let numCols = Math.floor(
-        //   (containerWidth - 2 * padding) /
-        //     (2 * circleRadius + 2 * circleSpacing)
-        // )
-        // // numCols = Math.floor(numCols / 5) * 5 // Make numCols a multiple of 5
-        // // console.log('numCols', numCols, this.sequences.length)
-        // console.log('numCols', numCols)
-
-        // // Calculate the number of rows needed to fit all the points
-        // // const numRows = Math.ceil(this.sequences.length / numCols)
-        // const numRows = Math.ceil(genomes.length / numCols)
-        // console.log('numRows', numRows)
-
-        // // Calculate the total grid width and height
-        // const totalGridWidth =
-        //   numCols * (2 * circleSpacing + 2 * circleRadius) + 2 * padding
-        // const totalGridHeight =
-        //   numRows * (2 * circleSpacing + 2 * circleRadius) + 2 * padding
-        // console.log('totalGridWidth', totalGridWidth)
-        // console.log('totalGridHeight', totalGridHeight)
-
-        // debugger
-
-        // // test with old potato data
-        // // console.log('sequences', this.sequences)
-        // // const sequences_sorted = this.sequences.sort(
-        // //   (a, b) => b.sequence_length - a.sequence_length
-        // // )
-        // // console.log('sequences sorted', sequences_sorted)
-
-        // // const sequencesGrouped =
-        // //   this.groupSequencesByChromosome(sequences_sorted)
-        // // console.log('sequencesGrouped', sequencesGrouped)
-
-        // // <---------------------Create circle sprites ---------------->
-        // this.createCircleTexture(circleRadius, app)
-
-        // let currentXOffset = padding
-
-        // // Loop through each genome and create a unit grid for its sequences
-        // Object.entries(genomes).forEach(([_, genomeData]) => {
-        //   const sequences = genomeData.sequences
-
-        //   if (Array.isArray(sequences)) {
-        //     let numCols = Math.ceil(sequences.length / 10) // max 10 rows
-
-        //     sequences.forEach((sequence, index) => {
-        //       const row = index % 10
-        //       const col = Math.floor(index / 10)
-
-        //       const x =
-        //         (currentXOffset + col * circleSpacing + circleRadius) *
-        //         devicePixelRatio
-        //       const y =
-        //         (padding + row * circleSpacing + circleRadius) *
-        //         devicePixelRatio
-
-        //       // console.log('x', x, 'y', y)
-
-        //       this.createSprites(
-        //         x,
-        //         y,
-        //         genomeData.name,
-        //         sequence.sequence_length_nuc,
-        //         sequence.name,
-        //         sequence.id,
-        //         app,
-        //         foregroundContainer,
-        //         circleContainer,
-        //         sequence.uid
-        //       )
-        //     })
-
-        //     // After placing the grid for this chromosome, move the horizontal offset
-        //     currentXOffset += numCols * circleSpacing + chromPadding
-        //   } else {
-        //     console.warn(
-        //       `Expected sequences to be an array for genome ${genomeData.name}, but got:`,
-        //       sequences
-        //     )
-        //   }
-        // })
-        // app.render()
+        // app.stage.addChild(circleContainer)
+        // this.viewport.addChild(circleContainer)
 
         this.drawGrid()
 
@@ -274,8 +316,8 @@ export default {
           (newSelectedSequences) => {
             console.log('Lasso selection updated:', newSelectedSequences)
 
-            if (circleContainer) {
-              circleContainer.children.forEach((sprite: any) => {
+            if (this.viewport) {
+              this.viewport.children.forEach((sprite: any) => {
                 const isSelected = newSelectedSequences.includes(
                   sprite.sequence_uid
                 )
@@ -286,28 +328,21 @@ export default {
                 if (isSelected) {
                   sprite.tint = 0x007bff // Blue for selected
                   // sprite.alpha = 1 // Full opacity
-                // } else if (isTracked) {
-                //   sprite.tint = 0xa9a9a9 // Dark grey for tracked
-                //   sprite.alpha = 0.75 // Slightly dimmer
+                  // } else if (isTracked) {
+                  //   sprite.tint = 0xa9a9a9 // Dark grey for tracked
+                  //   sprite.alpha = 0.75 // Slightly dimmer
                 } else {
                   sprite.tint = 0xd3d3d3 // Default gray for unselected
                   sprite.alpha = 0.5 // Dimmed
                 }
               })
             }
-            this.app.render();
+            this.app.render()
           },
           { immediate: true }
         )
 
-        app.stage.addChild(foregroundContainer)
-
-        // Event listener for mouse wheel zoom
-        app.canvas.addEventListener('wheel', (event) => {
-          const delta = event.deltaY < 0 ? 0.1 : -0.1 // Zoom in/out
-          // zoomGrid(delta)
-          console.log('test zoom from Grid', delta)
-        })
+        // app.stage.addChild(foregroundContainer)
 
         // Watch for embedding changes
         this.$watch(
@@ -339,35 +374,41 @@ export default {
     })
   },
   methods: {
-    zoomGrid(delta: number) {
-      this.zoomLevel += delta
-      this.zoomLevel = Math.max(1, Math.min(5, this.zoomLevel)) // Clamp zoom level between 1 and 5
-      this.drawGrid()
-    },
     drawGrid() {
       // Clear previous content
-      if (this.app) {
-        this.app.stage.removeChildren()
+      // if (this.app) {
+      //   this.app.stage.removeChildren()
+      // }
+
+      // // Clear previous content
+      // if (this.circleContainer) {
+      //   this.circleContainer.removeChildren() // Clear all children from the container
+      // }
+
+      // this.app.stage.addChild(this.circleContainer)
+      // // this.app.stage.addChild(this.foregroundContainer)
+
+      if (!this.viewport) {
+        console.error('Viewport is not initialized.')
+        return
       }
 
-      // Clear previous content
-      if (this.circleContainer) {
-        this.circleContainer.removeChildren() // Clear all children from the container
-      }
-
-      this.app.stage.addChild(this.circleContainer)
-      // this.app.stage.addChild(this.foregroundContainer)
+      // Clear the viewport
+      this.viewport.removeChildren()
 
       const app = this.app
-      const circleContainer = this.circleContainer
+      // const circleContainer = this.circleContainer
       const devicePixelRatio = window.devicePixelRatio || 1
       const padding = 10
-      const circleRadius = 5 * devicePixelRatio * this.zoomLevel
+      const circleRadius = 5 * devicePixelRatio
       const circleSpacing = (2 * circleRadius) / devicePixelRatio
       const genomeGap = 20 * devicePixelRatio // Extra gap between genomes
+      const zoomLevel = this.viewport.scale.x;
+      const resolution = window.devicePixelRatio * zoomLevel;
 
       // Create the circle texture
-      this.createCircleTexture(circleRadius, app)
+      this.circleTexture = this.createCircleTexture(circleRadius, resolution)
+
 
       // Check and log canvas size
       const canvas = this.app.canvas
@@ -406,7 +447,7 @@ export default {
           if (shouldDraw) {
             const circleSprite = new PIXI.Sprite(this.circleTexture)
 
-             // Check if this sequence is part of the selectedSequencesLasso
+            // Check if this sequence is part of the selectedSequencesLasso
             const isSelected = this.genomeStore.selectedSequencesLasso.includes(
               sequence.uid
             )
@@ -418,7 +459,8 @@ export default {
             circleSprite.x = currentX
             circleSprite.y = currentY
 
-            circleContainer.addChild(circleSprite)
+            // circleContainer.addChild(circleSprite)
+            this.viewport.addChild(circleSprite)
           }
 
           // Move to the next column
@@ -435,17 +477,19 @@ export default {
         currentX = padding
         currentY += 2 * circleRadius + circleSpacing + genomeGap
       })
-
-      this.app.stage.addChild(this.circleContainer)
+      this.app.stage.addChild(this.viewport)
 
       app.render()
 
       //  Reinitialize the lasso
-      this.initializeLasso(canvas)
+      if (!this.isDragging) {
+        this.initializeLasso(canvas)
+      }
 
-      console.log(this.lassoInstance.items())
+      // console.log(this.lassoInstance.items())
     },
     initializeLasso(canvas) {
+
       // Ensure lasso SVG and elements are properly set up
       const svg = d3
         .select(this.$refs.lasso)
@@ -465,7 +509,7 @@ export default {
         .on('end', this.lassoEnd)
 
       // Link lasso to the sprites in the container
-      this.lassoInstance.items(this.circleContainer.children as PIXI.Sprite[])
+      this.lassoInstance.items(this.viewport.children as PIXI.Sprite[])
       svg.select('g.lasso').call(this.lassoInstance)
 
       // // Store lasso instance for further interaction
@@ -474,6 +518,11 @@ export default {
       console.log('Lasso initialized and added.')
     },
     lassoStart() {
+      if (this.isShiftPressed.value === true) {
+        console.log('Skipping lasso start due to Shift key being pressed.');
+        return;
+      }
+
       const genomeStore = useGenomeStore()
       console.log('Lasso selection started', genomeStore.selectedSequencesLasso)
       const trackerUids = genomeStore.selectedSequencesTracker
@@ -497,8 +546,18 @@ export default {
         })
       }
     },
-    lassoDraw() {},
+    lassoDraw() {
+      if (this.isShiftPressed.value === true) {
+        console.log('Skipping lasso draw due to Shift key being pressed.');
+        return;
+      }
+    },
     lassoEnd() {
+
+      if (this.isShiftPressed.value === true) {
+        console.log('Skipping lasso end due to Shift key being pressed.');
+        return;
+      }
       console.log('lasso end')
 
       const selectedSprites = []
@@ -528,7 +587,7 @@ export default {
         const genomeStore = useGenomeStore()
         genomeStore.setSelectedSequencesLasso(selectedSprites)
 
-        this.lassoInstance.reset();
+        this.lassoInstance.reset()
 
         // this.$forceUpdate();
       } catch (error) {
@@ -642,7 +701,11 @@ export default {
       }
       return inside
     },
-    createCircleTexture(circleRadius, app) {
+    createCircleTexture(circleRadius, resolution) {
+
+      const res = Math.max(1, window.devicePixelRatio) * (this.viewport?.scale.x || 1);
+      console.log('Generating texture with resolution:', res);
+
       // Use PIXI.Graphics to draw a circle
       const graphics = new PIXI.Graphics()
       // Draw border
@@ -655,8 +718,26 @@ export default {
       // Draw the circle
       graphics.circle(totalRadius, totalRadius, circleRadius)
       graphics.fill(0xffffff)
-      // Generate a texture from the Graphics object
-      this.circleTexture = app.renderer.generateTexture(graphics)
+
+      // // Generate a texture from the Graphics object
+      // // const resolution = 10 * this.viewport.scale.x
+      // const texture = this.app.renderer.generateTexture(graphics, {
+      //   resolution: window.devicePixelRatio * (this.viewport?.scale.x || 1),
+      // })
+      // // texture.baseTexture.update();
+      // console.log('Base texture resolution:', texture.source.resolution, this.viewport?.scale.x);
+      // return texture
+      // Create a render texture for the circle
+      const renderTexture = PIXI.RenderTexture.create({
+          width: circleRadius*2.5,
+          height: circleRadius*2.5,
+          resolution: Math.max(2, window.devicePixelRatio * this.viewport.scale.x), // Adjust resolution based on zoom  
+      });
+
+      // Render the graphics to the texture
+      this.app.renderer.render(graphics, { renderTexture });
+
+      return renderTexture;
     },
     createSprites(
       x,
@@ -676,7 +757,9 @@ export default {
       }
 
       // Create a sprite using the circle texture
-      const circleSprite = new PIXI.Sprite(this.circleTexture)
+      const circleSprite = new PIXI.Sprite()
+      // Assign the texture
+      circleSprite.texture = this.circleTexture;
 
       circleSprite.tint = 0xd3d3d3
       circleSprite.alpha = 0.5 // Set opacity to 50%
@@ -1017,16 +1100,17 @@ div {
   overflow: hidden;
   position: relative;
 }
+canvas {
+  pointer-events: auto;
+  z-index: 10;
+}
 
 .child-container {
   flex: 1; /* This will make it inherit the available width */
   width: 100%; /* Ensures full width */
+  pointer-events: auto;
+  position: relative;
 }
-
-/* canvas {
-  height: 100%;
-  width: 100%;
-} */
 
 svg {
   height: 100%;
