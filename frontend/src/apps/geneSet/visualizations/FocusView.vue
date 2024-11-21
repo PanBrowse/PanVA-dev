@@ -712,45 +712,35 @@ export default {
     ///////////////////////////////////////////////////////////////////////////////Draw bars ////////////////////////////////////
     drawSquishBars() {
       let vis = this
-      if (this.filteredGenes === undefined) {
+      if (this.filteredSegments === undefined) {
         return
       }
-      // this.svg().select('g.bar-context').remove()
+
       this.svg()
         .select('g.bar-context')
-        // .append('g')
-        // .attr('class', 'bar-context')
         .selectAll('path.bar-chr-context')
-        .data(vis.filteredSegments ?? [], d => d.uid + d.start)
+        .data(vis.filteredSegments, d => d.uid + d.start)
         .join(
           (enter) =>
             enter
               .append('path')
               .attr('class', 'bar-chr-context')
               .attr('d', (d) => {
-                 
                 const key: string = d.uid ?? ''
-                const position = d.end
-
+                const xPos = d.start
                 const geneIndex = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
-                const ypos =
-                  geneIndex  *
-                  (this.barHeight + 10)
+                const ypos = geneIndex  * (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
-
                 if(currentGeneToWindowScale === undefined || currentGeneToWindowScale === null) {
                   return ''
                 }
-                const currentGeneToCompressionScale =
-                  geneToCompressionScales.value[key]
-                
-                  const width = currentGeneToWindowScale(d.end) - currentGeneToWindowScale(d.start)
-                console.log(globalCompressionFactor.value)
+                const currentGeneToCompressionScale = geneToCompressionScales.value[key]
+
                 return drawSquish(
                   currentGeneToCompressionScale,
                   currentGeneToWindowScale,
-                  position,
+                  xPos,
                   d.end,
                   this.barHeight,
                   ypos,
@@ -780,15 +770,12 @@ export default {
                 const key: string = d.uid ?? ''
                 const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
                 const ypos = index * (this.barHeight + 10)
-
                 return `translate(0,${ypos})`
               })
               .attr('d', (d) => {
                 const key: string = d.uid ?? ''
-                const position = d.start
-                const ypos = 0
-                // const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
-                // const ypos = index * (this.barHeight + 10)
+                const xPos = d.start
+                const yPos = 0
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 const currentGeneToCompressionScale =
@@ -797,15 +784,14 @@ export default {
                 return drawSquish(
                   currentGeneToCompressionScale,
                   currentGeneToWindowScale,
-                  position,
+                  xPos,
                   d.end,
                   this.barHeight,
-                  ypos,
+                  yPos,
                   this.defaultConnectionThickness,
                   globalCompressionFactor.value
                 )
               })
-
               .attr('fill', (d) => {
                 if (vis.colorGenomes == true) {
                   return vis.colorScaleGenome(String(d.uid)) as string
