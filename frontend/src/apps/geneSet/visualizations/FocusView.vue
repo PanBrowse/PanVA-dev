@@ -719,7 +719,7 @@ export default {
         // .append('g')
         // .attr('class', 'bar-context')
         .selectAll('path.bar-chr-context')
-        .data(vis.filteredSegments ?? [])
+        .data(vis.filteredSegments ?? [], d => d.uid + d.start)
         .join(
           (enter) =>
             enter
@@ -1067,7 +1067,7 @@ export default {
       this.svg()
         .select('g.gene-context')
         .selectAll('path.gene')
-        .data(vis.filteredGenes)
+        .data(vis.filteredGenes, d => d.uid)
         .join(
           (enter) =>
             enter
@@ -1104,7 +1104,8 @@ export default {
               .duration(this.transitionTime)
               .attr('transform', (d) => {
                 const key = d.sequence_uid ?? '' //vis.geneToLocusSequenceLookup.get(d.uid)?.sequence
-                let xTransform = this.geneToWindowScales[key](
+                let xTransform = 
+                this.geneToWindowScales[key](
                   d.start + (d.end - d.start) / 2
                 )
                 let drawingIndex =
