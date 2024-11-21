@@ -40,6 +40,7 @@ import { lasso } from '@/components/Lasso.js'
 import { useGeneSetStore } from '@/stores/geneSet'
 import { useGenomeStore } from '@/stores/geneSet'
 import type { Gene, Genome, GenomeData } from '@/types'
+import { parseSVG } from 'svg-path-parser';
 
 PIXI.Sprite.prototype.getBoundingClientRect = function () {
   const devicePixelRatio = window.devicePixelRatio || 1
@@ -53,7 +54,32 @@ PIXI.Sprite.prototype.getBoundingClientRect = function () {
     width: adjustedWidth,
     height: adjustedHeight,
   }
-}
+} 
+
+// PIXI.Sprite.prototype.getBoundingClientRect = function () {
+//   const devicePixelRatio = window.devicePixelRatio || 1;
+
+//   // Get the viewport's transformation matrix
+//   const viewportTransform = this.parent.worldTransform || { tx: 0, ty: 0, a: 1, d: 1 };
+//   const { tx, ty, a: scaleX, d: scaleY } = viewportTransform;
+
+//   // Adjust sprite's position and size according to translation and scaling
+//   const left = (this.x * scaleX + tx - this.width * scaleX) / 4* devicePixelRatio
+//   const top = (this.y * scaleY + ty - this.height * scaleY) / 4* devicePixelRatio;
+//   const adjustedWidth = this.width * scaleX / devicePixelRatio;
+//   const adjustedHeight = this.height * scaleY / devicePixelRatio;
+
+//   console.log('PIXI.Sprite.prototype.getBoundingClientRect', left, top, adjustedWidth, adjustedHeight)
+
+//   return {
+//     left,
+//     top,
+//     width: adjustedWidth,
+//     height: adjustedHeight,
+//   };
+// };
+
+
 
 export default {
   name: 'PixiCanvas',
@@ -153,7 +179,7 @@ export default {
           width: window.innerWidth,
           height: window.innerHeight,
           backgroundColor: 0xffffff,
-          resolution: window.devicePixelRatio || 1,
+          resolution: 3,
           autoResize: true,
           antialias: true,
           autoDensity: true,
@@ -168,7 +194,7 @@ export default {
           worldWidth: 2000, // Adjust this value to fit your data
           worldHeight: 2000,
           autoResize: true,
-          resolution: window.devicePixelRatio || 1,
+          resolution: 3,
           canvas: this.$refs.pixi,
           resizeTo: this.$refs.view,
           events: app.renderer.events,
@@ -230,6 +256,8 @@ export default {
             })
 
             this.initializeLasso(canvas)
+            //   // // Sync transformations
+            // this.syncLassoWithViewport();
           }
         }
 
@@ -259,15 +287,44 @@ export default {
           console.log('Drag event detected on viewport:', e)
         })
 
-        this.viewport.on('zoomed', () => {
+        this.viewport.on('moved', (event) => {
           const zoomLevel = this.viewport.scale.x
           const resolution = window.devicePixelRatio * zoomLevel
 
+          const { x: mouseWorldX, y: mouseWorldY } = this.viewport.toWorld(event.clientX, event.clientY);
+          console.log('mouse x and mouse y during zoom', {mouseWorldX, mouseWorldY})
+
+
           console.log(
-            'zoomed',
+            'moved',
             this.circleTexture.source.resolution,
             this.viewport.scale.x
           )
+
+          // const svg = d3.select(this.$refs.lasso);
+          // Translate and scale the lasso around the mouse world position
+          // svg.style(
+          //   'transform',
+          //   `translate(${tx + (mouseWorld.x - tx) * (scale - 1)}px, ${
+          //     ty + (mouseWorld.y - ty) * (scale - 1)
+          //   }px) scale(${scale})`
+          // );
+          // svg.style('transform-origin', `${mouseWorld.x}px ${mouseWorld.y}px`);
+          
+
+        // apply transform
+
+            // const svg = d3.select(this.$refs.lasso);
+            // const scale = this.viewport.scale.x; // Assumes uniform scaling
+            // const { tx:x, ty:y } = this.viewport.worldTransform;
+
+            // console.log('x,y', x, y, scale)
+
+            // // Apply scale and translation to the lasso SVG
+            // svg.style('transform', `translate(${x}px, ${y}px) scale(${scale})`);
+            // svg.style('transform-origin', '0 0'); // Set the origin to the top-left
+            
+          
 
           const circleRadius = 5 * devicePixelRatio
 
@@ -317,6 +374,10 @@ export default {
         // this.viewport.addChild(circleContainer)
 
         this.drawGrid()
+         // Sync transformations
+        // this.syncLassoWithViewport();
+
+
 
         // Add watcher for selectedSequencesLasso
         this.$watch(
@@ -496,6 +557,8 @@ export default {
       // console.log(this.lassoInstance.items())
     },
     initializeLasso(canvas) {
+
+      d3.select(this.$refs.lasso).selectAll('g.lasso *').remove()
       // Ensure lasso SVG and elements are properly set up
       const svg = d3
         .select(this.$refs.lasso)
@@ -505,13 +568,19 @@ export default {
         .style('top', '0')
         .style('left', '0')
         .style('pointer-events', 'none') // Ensure Pixi.js captures pointer events
+        
 
       // Set up the lasso instance
       this.lassoInstance = lasso()
         .targetArea(d3.select(canvas)) // Bind to the canvas
         .closePathDistance(150)
+        // .scale(this.viewport.scale.x)
+        // .translation({
+        //   x: this.viewport.worldTransform.tx,
+        //   y: this.viewport.worldTransform.ty,
+        // })
         .on('start', this.lassoStart)
-        .on('draw', this.lassoDraw)
+        .on('draw',this.lassoDraw)
         .on('end', this.lassoEnd)
 
       // Link lasso to the sprites in the container
@@ -521,7 +590,34 @@ export default {
       // // Store lasso instance for further interaction
       // this.lassoInstance = lassoInstance;
 
+      // // Sync transformations
+      // this.syncLassoWithViewport();
+
       console.log('Lasso initialized and added.')
+    },
+    syncLassoWithViewport() {
+      console.log('synicing lasso')
+      const applyTransform = () => {
+ 
+        const scale = this.viewport.scale.x; // Assumes uniform scaling
+        const { tx: translationX, ty: translationY } = this.viewport.worldTransform;
+        console.log('synicing lasso -- apply transform', scale, {translationX,translationY })
+
+        // Update lasso instance with the new scale and translation
+        if (this.lassoInstance) {
+          this.lassoInstance
+            .scale(scale)
+            .translation({ x: translationX, y: translationY });
+        }
+        console.log(this.lassoInstance.scale(), this.lassoInstance.translation())
+      };
+
+      // Apply transform on viewport events
+      this.viewport.on('zoomed', applyTransform);
+      this.viewport.on('moved', applyTransform);
+
+      // Initial transform
+      applyTransform();
     },
     lassoStart() {
       if (this.isShiftPressed.value === true) {
@@ -565,41 +661,191 @@ export default {
       }
       console.log('lasso end')
 
-      const selectedSprites = []
+      var selectedSprites = []
 
-      try {
-        console.log('Lasso end')
+      // Get the device pixel ratio
+      const dpr = window.devicePixelRatio || 1;
+
+      ///////////////////////////////////////////////////////////////////////////
+      // const scale = this.viewport.scale.x;
+      // const { tx: offsetX, ty: offsetY } = this.viewport.worldTransform;
+
+      const dyn_path = d3
+        .select(this.$refs.lasso)
+        .select('g.lasso')
+        .select('g.lasso')
+        .select('path.drawn')
+
+      const lassoPath = dyn_path.attr('d') // Get the current lasso path
+      console.log('Lasso path data at end:', lassoPath)
+      // Extract original lasso points
+      const parsedData = parseSVG(lassoPath);
+
+        // Extract only the `x` and `y` coordinates
+        const lassoPoints = parsedData
+          .filter((command) => command.code === 'M' || command.code === 'L') // MoveTo or LineTo commands
+          .map((command) => [command.x * dpr , command.y * dpr]);
+
+        console.log('Lasso Points:', lassoPoints);
+
+        // Get canvas transformation
+        const { tx: offsetX, ty: offsetY, a: scaleX, d: scaleY } = this.viewport.worldTransform;
+
+        const viewportCenterX = this.viewport.worldWidth / 2 * this.viewport.scale.x + this.viewport.worldTransform.tx;
+        const viewportCenterY = this.viewport.worldHeight / 2 * this.viewport.scale.y + this.viewport.worldTransform.ty;
+        console.log('Viewport center',viewportCenterX, viewportCenterY)
+
+
+       
+        // Transform lasso points to canvas space, incorporating the dynamic center offset
+        const transformedPoints = lassoPoints.map(([x, y]) => [
+          (x - viewportCenterX) * scaleX + offsetX,
+          (y - viewportCenterY) * scaleY + offsetY,
+        ]);
+
+        console.log('Transformed Points:', transformedPoints);
 
         this.lassoInstance.items().forEach((sprite) => {
-          if (sprite.__lasso.selected) {
-            sprite.tint = 0x007bff
-            selectedSprites.push(sprite.sequence_uid)
-            // genomeStore.setSelectedSequencesTracker(sprite.sequence_uid)
-          } else {
-            sprite.tint = 0xd3d3d3
-          }
+          const { x: itemX, y: itemY } = sprite;
+          const transformedItemX = (itemX - viewportCenterX) * scaleX + offsetX;
+          const transformedItemY = (itemY - viewportCenterY) * scaleY + offsetY;
+
+          console.log({ x: itemX, y: itemY }, transformedItemX, transformedItemY)
+          const point = [transformedItemX, transformedItemY];
+
+          const selected = this.isPointInPoly(transformedPoints, point);
+          
+          // Update selection state
+          sprite.__lasso.selectedTransformed = selected;
+
+          
         })
+        const selectedItems = this.lassoInstance.items().filter((item) => item.__lasso.selectedTransformed)
 
-        this.app?.render()
+        console.log('Selected items:', selectedItems);
+        
+        var selectedItemsGroupTransform = []
+        // checking groupTransform
+        this.lassoInstance.items().forEach((sprite) => {
+        // Get the sprite's position in the original data space using groupTransform
+        const { x: itemX, y: itemY } = sprite;
+        const { tx: spriteXl, ty: spriteYl } = sprite.localTransform
+        const { tx: spriteX, ty: spriteY } = sprite.groupTransform
+        const { tx: spriteXr, ty: spriteYr } = sprite.relativeGroupTransform
+        const { tx: spriteXw, ty: spriteYw } = sprite._worldTransform
+  
 
-        // const boolSprites = this.lassoInstance.items().map(x => x.__lasso.selected);
-        // console.log('boolSprites', boolSprites)
-        // const selectedSprites = this.lassoInstance.items().filter((sprite, index) => boolSprites[index] === true).map(
-        // (sprite) => sprite.sequence_uid
-        // );
-        console.log('Selected sprites:', selectedSprites)
-        this.selectedSprites = selectedSprites
-        const genomeStore = useGenomeStore()
-        genomeStore.setSelectedSequencesLasso(selectedSprites)
+        // console.log('lassoPoints', lassoPoints)
+        // Compute the bounding box, scaled for devicePixelRatio
+        const boundingBox = lassoPoints.reduce(
+          (box, [x, y]) => ({
+            minX: Math.min(box.minX, x * dpr),
+            minY: Math.min(box.minY, y * dpr),
+            maxX: Math.max(box.maxX, x * dpr),
+            maxY: Math.max(box.maxY, y * dpr),
+          }),
+          { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+        );
 
-        this.lassoInstance.reset()
+      // console.log('Bounding Box:', boundingBox);
+      // console.log('dpr', dpr)
+      // console.log(
+      //     `Sprite at (${itemX}, ${itemY})`
+      //   );
+      //   console.log(
+      //     `Sprite group at (${spriteX}, ${spriteY})`
+      //   );
+      //   console.log(
+      //     `Sprite local at (${spriteXl}, ${spriteYl})`
+      //   );
+      //   console.log(
+      //     `Sprite relative at (${spriteXr}, ${spriteYr})`
+      //   );
+      //   console.log(
+      //     `Sprite world at (${spriteXw}, ${spriteYw})`
+      //   );
 
-        // this.$forceUpdate();
-      } catch (error) {
-        console.error('Error in lassoEnd:', error)
-      }
+        // Check if sprite is inside the bounding box
+        const isInBoundingBox =
+        spriteXw * dpr >= boundingBox.minX &&
+        spriteXw * dpr <= boundingBox.maxX &&
+        spriteYw * dpr >= boundingBox.minY &&
+        spriteYw * dpr <= boundingBox.maxY;
 
-      // // add the drawn path for the lasso
+        if (isInBoundingBox) {
+          console.log(`Sprite at (${spriteXw * dpr}, ${spriteYw * dpr}) is within bounding box`);
+        } else {
+          console.log(`Sprite at (${spriteXw * dpr}, ${spriteYw * dpr}) is outside bounding box`);
+        }
+
+        // Create a point array for the sprite
+        const spritePoint = [spriteXw * dpr, spriteYw * dpr];
+        const lassoPointsDpr = lassoPoints.map(([x, y]) => [x * dpr, y * dpr]);
+
+        // Check if the point lies within the lasso polygon
+        const selected = this.isPointInPoly(lassoPointsDpr, spritePoint, dpr);
+        if (selected){
+          selectedItemsGroupTransform.push(sprite)
+        }
+        // // Update sprite's selection state
+        sprite.__lasso.selectedGroupTransform = selected;
+
+        console.log(
+        `Sprite at (${spriteXw * dpr}, ${spriteYw * dpr}) is ${
+          selected ? 'inside' : 'outside'
+        } the lasso`
+      );
+
+      });
+
+
+      console.log('selectedItemsGroupTransform', selectedItemsGroupTransform)
+      const selectedItemsGroupTransformUids = selectedItemsGroupTransform.map(
+        (sprite) => sprite.sequence_uid)
+      console.log(selectedItemsGroupTransformUids)
+      selectedItemsGroupTransform.forEach((sprite) => {
+        sprite.tint = 0x007bff // Set sprite color to blue
+        sprite.alpha = 1
+      })
+
+
+      
+      selectedSprites = selectedItemsGroupTransformUids;
+
+
+      // this.lassoInstance.items().forEach((sprite) => {
+      //   if (sprite.__lasso.selected) {
+      //     // // Adjust sprite positions based on viewport transformation
+      //     // const transformedX = (sprite.x - offsetX) / scale;
+      //     // const transformedY = (sprite.y - offsetY) / scale;
+      //     // console.log(`Sprite selected at (${transformedX}, ${transformedY})`);
+      //     sprite.tint = 0x007bff
+      //     selectedSprites.push(sprite.sequence_uid)
+      //     // genomeStore.setSelectedSequencesTracker(sprite.sequence_uid)
+      //   } else {
+      //     sprite.tint = 0xd3d3d3
+      //   }
+      // })
+
+      this.app?.render()
+      // debugger;
+
+      // const boolSprites = this.lassoInstance.items().map(x => x.__lasso.selected);
+      // console.log('boolSprites', boolSprites)
+      // const selectedSprites = this.lassoInstance.items().filter((sprite, index) => boolSprites[index] === true).map(
+      // (sprite) => sprite.sequence_uid
+      // );
+      console.log('Selected sprites:', selectedSprites)
+      this.selectedSprites = selectedSprites
+      const genomeStore = useGenomeStore()
+      genomeStore.setSelectedSequencesLasso(selectedSprites)
+
+      
+   
+      ///////////////////////////////////////////////////////////////////////////
+
+
+      // add the drawn path for the lasso
       // const dyn_path = d3
       //   .select(this.$refs.lasso)
       //   .select('g.lasso')
@@ -621,7 +867,7 @@ export default {
       //   .select('circle.origin')
 
       // const lassoPath = dyn_path.attr('d') // Get the current lasso path
-      // // console.log('Lasso path data at end:', lassoPath)
+      // console.log('Lasso path data at end:', lassoPath)
 
       // if (!lassoPath || lassoPath.length < 3) {
       //   // console.warn('Lasso selection is empty or too small.')
@@ -689,22 +935,44 @@ export default {
 
       return points
     },
-    isPointInPolygon(x, y, polygon) {
-      const dpr = window.devicePixelRatio || 1
-      x /= dpr
-      y /= dpr
-      let inside = false
+    // isPointInPolygon(x, y, polygon) {
+    //   const dpr = window.devicePixelRatio || 1
+    //   x /= dpr
+    //   y /= dpr
+    //   let inside = false
 
+    //   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    //     const xi = polygon[i][0],
+    //       yi = polygon[i][1]
+    //     const xj = polygon[j][0],
+    //       yj = polygon[j][1]
+    //     const intersect =
+    //       yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
+    //     if (intersect) inside = !inside
+    //   }
+    //   return inside
+    // },
+    isPointInPoly(polygon, point) {
+
+      // Scale the point by the devicePixelRatio
+      const [px, py] = [point[0], point[1]];
+      let isInside = false;
+
+      // Iterate through the polygon edges
       for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i][0],
-          yi = polygon[i][1]
-        const xj = polygon[j][0],
-          yj = polygon[j][1]
+        // Scale polygon points by the devicePixelRatio
+        const [xi, yi] = [polygon[i][0], polygon[i][1]];
+        const [xj, yj] = [polygon[j][0], polygon[j][1]];
+
+        // Check if the point is between the y-coordinates of the edge
         const intersect =
-          yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
-        if (intersect) inside = !inside
+          yi > py !== yj > py &&
+          px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+
+        if (intersect) isInside = !isInside;
       }
-      return inside
+
+      return isInside;
     },
     createCircleTexture(circleRadius, resolution) {
       const res =

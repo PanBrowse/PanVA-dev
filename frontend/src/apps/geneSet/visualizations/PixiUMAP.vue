@@ -53,6 +53,7 @@ PIXI.Sprite.prototype.getBoundingClientRect = function () {
     height: adjustedHeight,
   }
 }
+
 // export function customDistance(a, b) {
 //   //   to compute protein distance:
 //   // arguments: a, b, mrna_prot_sim_matrix, seq_to_mrna_lookup
