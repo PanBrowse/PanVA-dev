@@ -906,22 +906,22 @@ export function lasso() {
 
       // Clear lasso
       // Commenting out the lines that clear the path
-      // dyn_path.attr('d', null)
-      // close_path.attr('d', null)
-      // origin_node.attr('display', 'none')
+      dyn_path.attr('d', null)
+      close_path.attr('d', null)
+      origin_node.attr('display', 'none')
 
-      // dyn_path.attr('d', null);
-      // close_path.attr('d', null);
+      dyn_path.attr('d', null);
+      close_path.attr('d', null);
 
       // Optionally, if you want to clear the path later,
       // you can set a timeout to clear the path after a delay.
-      // setTimeout(() => {
-      //   dyn_path.attr('d', null) // Clear the lasso path after a delay if needed
-      //   close_path.attr('d', null) // Clear the close path after a delay if needed
-      // }, 1000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
+      setTimeout(() => {
+        dyn_path.attr('d', null) // Clear the lasso path after a delay if needed
+        close_path.attr('d', null) // Clear the close path after a delay if needed
+      }, 1000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
 
       // // Hide the origin node
-      // origin_node.attr('display', 'none')
+      origin_node.attr('display', 'none')
 
       // Run user defined end function
       on.end(event.sourceEvent)

@@ -27,6 +27,7 @@
     "@vueuse/head": "^1.0.19",
     "ajv": "^8.12.0",
     "ant-design-vue": "^3.2.15",
+    "base64-arraybuffer": "^1.0.2",
     "biojs-io-newick": "^1.5.0",
     "color-interpolate": "^1.0.5",
     "combinations": "^1.0.0",
@@ -38,7 +39,9 @@
     "pinia": "^2.0.23",
     "pixi-filters": "^6.0.5",
     "pixi.js": "^8.3.4",
+    "seedrandom": "^3.0.5",
     "string-natural-compare": "^3.0.1",
+    "umap-js": "^1.4.0",
     "vue": "^3.2.41",
     "vue3-runtime-template": "^1.0.2"
   },

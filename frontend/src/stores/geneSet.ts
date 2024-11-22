@@ -3,7 +3,14 @@ import { type Dictionary, sortBy } from 'lodash'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 
-import { fetchGenomeData } from '@/api/geneSet'
+import {
+  fetchDistanceMatrix,
+  fetchDistanceMatrixLabels,
+  fetchFilteredLabels,
+  fetchEmbedding,
+  fetchFilteredEmbedding,
+  fetchGenomeData,
+} from '@/api/geneSet'
 import {
   fetchClusteringOrder,
   fetchGroupInfo,
@@ -19,24 +26,12 @@ import {
   sortedGroupInfosLookup,
   sortedSequenceIdsLookup,
 } from '@/helpers/chromosome'
+import { runSpringSimulation } from '@/helpers/springSimulation'
 import type { Gene, GenomeData, Locus } from '@/types'
 import type { GroupInfo, Homology, SequenceMetrics } from '@/types'
 
 import { useGlobalStore } from './global'
-
-// to-do: add this to config! this is data dependent
-const DEFAULT_SEQUENCE_UIDS = [
-  '405ddb34-205c-4f83-91ef-939a01140637', //1_1
-  '0eb86f3a-45e8-44c0-9c9f-0000bd3c8a1f', //2_1
-  '57af37c8-b8d1-48c8-8b01-bddaf0da31b4', //3_1
-  '85f65741-674b-48f7-a544-daff518247e9', //4_1
-  '9ef875b2-1f8b-4f9f-a641-e024a79ac3c0', //5_1
-  '4aa41269-bc58-48e2-9521-34f3e075e6ee', //6_1
-  'd9d31634-8177-4b3c-b9e8-e2be37bb894c', //7_1
-  '8b6da358-520e-434d-b205-a23dda1cef19', //8_1
-  '3f1d2bf9-aa72-4263-a95c-d1728bddff1b', //9_1
-  '1a03d037-0edf-4ab3-912d-af128f9fc53d', //10_1
-]
+import { Sprite } from 'pixi.js'
 
 export const useGenomeStore = defineStore({
   id: 'genome',
@@ -49,7 +44,7 @@ export const useGenomeStore = defineStore({
     } as unknown as GenomeData,
     selectedGenomes: [] as string[],
     selectedSequences: [] as string[],
-    selectedSequencesLasso: [...DEFAULT_SEQUENCE_UIDS],
+    selectedSequencesLasso: [] as string[],
     selectedGeneUids: [] as string[],
     sequenceToLociGenesLookup: new Map<
       string,
@@ -63,11 +58,20 @@ export const useGenomeStore = defineStore({
       string,
       { id: number; uid: string }[]
     >,
-    selectedSequencesTracker: new Set(DEFAULT_SEQUENCE_UIDS),
+    sequenceToMrnaLookup: new Map<string, string[]>(),
+    mrnaScoreMatrix: [] as number[][],
+    selectedSequencesTracker: new Set(),
     genomeUids: [] as string[], // Array to store genome numbers in the loading order
     genomeUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
     sequenceUids: [] as string[], // Array to store genome numbers in the loading order
     sequenceUidLookup: {} as Record<string, number>, // Dictionary to map genome name to index
+    distanceMatrix: [],
+    distanceMatrixLabels: {},
+    distanceMatrixLabelsFiltered: {},
+    embedding: [],
+    embeddingFiltered: [],
+    filterEmpty: false,
+    filteredSequences: [],
     isInitialized: false,
   }),
   getters: {
@@ -85,8 +89,21 @@ export const useGenomeStore = defineStore({
       state.genomeData?.genomes?.map((genome) => genome.name) || [],
     sequenceNames: (state) =>
       state.genomeData?.sequences?.map((sequence) => sequence.name) || [],
+    sequenceUidsWithLoci(state) {
+      return state.genomeData.sequences
+        .filter((sequence) => sequence.loci && sequence.loci.length > 0)
+        .map((sequence) => sequence.uid)
+    },
   },
   actions: {
+    toggleFilterEmpty() {
+      this.filterEmpty = !this.filterEmpty
+    },
+    updateFilteredSequences() {
+      this.filteredSequences = this.genomeData.sequences.filter(
+        (sequence) => sequence.loci && sequence.loci.length > 0
+      )
+    },
     async loadGenomeData() {
       const global = useGlobalStore()
 
@@ -99,6 +116,46 @@ export const useGenomeStore = defineStore({
         this.geneToLocusSequenceLookup = createGeneToLociAndSequenceLookup(
           this.genomeData
         )
+
+        this.updateFilteredSequences()
+
+        this.generateMrnaScoreMatrix()
+
+        // Fetch and set the distance matrix
+        const matrix = await fetchDistanceMatrix()
+        this.setDistanceMatrix(matrix)
+
+        const labels = await fetchDistanceMatrixLabels()
+        if (labels && labels.length > 0) {
+          // Transform the labels array into a lookup with the index
+          this.distanceMatrixLabels = labels.reduce((lookup, label, index) => {
+            lookup[label] = index
+            return lookup
+          }, {})
+        } else {
+          this.distanceMatrixLabels = {} // Set as an empty object if no labels are found
+        }
+
+        const labelsFiltered = await fetchFilteredLabels()
+        if (labelsFiltered && labelsFiltered.length > 0) {
+          // Transform the labels array into a lookup with the index
+          this.distanceMatrixLabelsFiltered = labelsFiltered.reduce(
+            (lookup, label, index) => {
+              lookup[label] = index
+              return lookup
+            },
+            {}
+          )
+        } else {
+          this.distanceMatrixLabelsFiltered = {} // Set as an empty object if no labels are found
+        }
+
+        // Fetch and set the embedding matrix
+        const embedding = await fetchEmbedding()
+        this.setEmbeddingMatrix(embedding)
+
+        const embeddingFiltered = await fetchFilteredEmbedding()
+        this.setFilteredEmbeddingMatrix(embeddingFiltered)
       } catch (error) {
         global.setError({
           message: 'Could not load or parse genome data.',
@@ -106,8 +163,102 @@ export const useGenomeStore = defineStore({
         })
         throw error
       }
+
+      this.initializeSelectedSequencesLasso()
+
       // Set initialized flag only after all API calls complete successfully
       this.isInitialized = true
+    },
+    initializeSelectedSequencesLasso() {
+      console.log('initializing lasso selection')
+
+      // Initialize lasso with non-emtpy sequences
+      this.selectedSequencesLasso = this.sequenceUidsWithLoci.slice(0,3)
+
+      // Add to selectedSequencesTracker
+      this.sequenceUidsWithLoci.forEach((uid) =>
+        this.selectedSequencesTracker.add(uid)
+      )
+    },
+    generateMrnaScoreMatrix() {
+      // Step 1: Gather all unique mrna_uids from groups that contain more than one mRNA
+      const uniqueMrnaUids = new Set<string>()
+      this.genomeData.groups.forEach((group) => {
+        if (group.mrnas.length > 1) {
+          group.mrnas.forEach((mrna) => uniqueMrnaUids.add(mrna))
+        }
+      })
+
+      const mrnaUids = Array.from(uniqueMrnaUids)
+      this.mrnaUidIndexLookup = mrnaUids.reduce((lookup, uid, index) => {
+        lookup[uid] = index
+        return lookup
+      }, {} as Record<string, number>)
+
+      const size = mrnaUids.length
+
+      // Step 2: Initialize the matrix with NaN values
+      this.mrnaScoreMatrix = Array.from({ length: size }, () =>
+        Array(size).fill(NaN)
+      )
+
+      // // Step 3: Populate the matrix with normalized identity scores from links
+      // this.genomeData.links.forEach((link) => {
+      //   const queryUid = link.query.uid
+      //   const targetUid = link.target.uid
+      //   const identityScore = link.identity
+
+      //   if (
+      //     this.mrnaUidIndexLookup.hasOwnProperty(queryUid) &&
+      //     this.mrnaUidIndexLookup.hasOwnProperty(targetUid)
+      //   ) {
+      //     const queryIndex = this.mrnaUidIndexLookup[queryUid]
+      //     const targetIndex = this.mrnaUidIndexLookup[targetUid]
+      //     const normalizedScore = identityScore ? identityScore / 100 : 0
+
+      //     this.mrnaScoreMatrix[queryIndex][targetIndex] = normalizedScore
+      //     this.mrnaScoreMatrix[targetIndex][queryIndex] = normalizedScore
+      //   }
+      // })
+
+      // Step 4: Replace any remaining NaN values with 0
+      this.mrnaScoreMatrix = this.mrnaScoreMatrix.map((row) =>
+        row.map((value) => (isNaN(value) ? 0 : value))
+      )
+      // // Step 3: Create a map of links to batch updates
+      // const linkMap = new Map<string, Map<string, number>>()
+
+      // this.genomeData.links.forEach((link) => {
+      //   const queryUid = link.query.uid
+      //   const targetUid = link.target.uid
+      //   const identityScore = link.identity ?? 0 // Default to 0 if undefined
+
+      //   if (!linkMap.has(queryUid)) {
+      //     linkMap.set(queryUid, new Map<string, number>())
+      //   }
+      //   if (!linkMap.has(targetUid)) {
+      //     linkMap.set(targetUid, new Map<string, number>())
+      //   }
+
+      //   // Update both [query -> target] and [target -> query]
+      //   linkMap.get(queryUid)!.set(targetUid, identityScore)
+      //   linkMap.get(targetUid)!.set(queryUid, identityScore)
+      // })
+
+      // // Step 4: Populate the matrix using the precomputed linkMap
+      // linkMap.forEach((targets, queryUid) => {
+      //   if (!this.mrnaUidIndexLookup.hasOwnProperty(queryUid)) return
+      //   const queryIndex = this.mrnaUidIndexLookup[queryUid]
+
+      //   targets.forEach((identityScore, targetUid) => {
+      //     if (!this.mrnaUidIndexLookup.hasOwnProperty(targetUid)) return
+      //     const targetIndex = this.mrnaUidIndexLookup[targetUid]
+
+      //     const normalizedScore = identityScore / 100
+      //     this.mrnaScoreMatrix[queryIndex][targetIndex] = normalizedScore
+      //     this.mrnaScoreMatrix[targetIndex][queryIndex] = normalizedScore
+      //   })
+      // })
     },
     generateIndicesAndLookup() {
       this.genomeUids = this.genomeData.genomes.map((genome) => genome.uid) // Populate genomeNrs array
@@ -158,6 +309,24 @@ export const useGenomeStore = defineStore({
         },
         {} as Record<string, { id: number; uid: string }[]>
       )
+
+      // Populate sequenceToMrnaLookup
+      this.sequenceToMrnaLookup = this.genomeData.genes.reduce(
+        (lookup, gene) => {
+          const sequenceUid = this.geneToLocusSequenceLookup.get(
+            gene.uid
+          )?.sequence
+          if (sequenceUid) {
+            if (!lookup[sequenceUid]) {
+              lookup[sequenceUid] = []
+            }
+            lookup[sequenceUid].push(...gene.mrnas) // Add mRNA UIDs for this gene
+          }
+          return lookup
+        },
+        new Map<string, string[]>()
+      )
+
       // Extend each gene object in genomeData.genes with its homology groups
       this.genomeData.genes = this.genomeData.genes.map((gene) => ({
         ...gene,
@@ -167,7 +336,7 @@ export const useGenomeStore = defineStore({
       // Extend each gene object in genomeData.genes with its sequence uid
       this.genomeData.genes = this.genomeData.genes.map((gene) => ({
         ...gene,
-        sequence_uid: this.geneToLocusSequenceLookup[gene.uid]?.sequence,
+        sequence_uid: this.geneToLocusSequenceLookup.get(gene.uid)?.sequence,
       }))
     },
     getGenesForSelectedLasso(): string[] {
@@ -188,7 +357,15 @@ export const useGenomeStore = defineStore({
 
       return genes
     },
-
+    setDistanceMatrix(matrix) {
+      this.distanceMatrix = matrix // Set the matrix using an action
+    },
+    setEmbeddingMatrix(embedding_matrix) {
+      this.embedding = embedding_matrix // Set the matrix using an action
+    },
+    setFilteredEmbeddingMatrix(embedding_matrix) {
+      this.embeddingFiltered = embedding_matrix // Set the matrix using an action
+    },
     setSelectedGenomes(genomeNames: string[]) {
       this.selectedGenomes = genomeNames
     },
@@ -198,18 +375,14 @@ export const useGenomeStore = defineStore({
     setSelectedSequencesLasso(sequenceUids: string[]) {
       this.selectedSequencesLasso = sequenceUids
     },
-    setSelectedSequencesTracker(sequenceUids: string[]) {
-      // Add each `sequenceUid` to `selectedSequencesLassoTracker`
-      sequenceUids.forEach((uid) => {
-        this.selectedSequencesTracker.add(uid)
-      })
+    setSelectedSequencesTracker(sequenceUid) {
+      this.selectedSequencesTracker.add(sequenceUid)
     },
     setSelectedGeneUids(uids: string[]) {
       this.selectedGeneUids = uids
     },
   },
 })
-
 export const useGeneSetStore = defineStore('geneSet', {
   state: () => ({
     // Data from API
@@ -244,6 +417,14 @@ export const useGeneSetStore = defineStore('geneSet', {
     percentageGC: true,
     allSequences: true,
     colorGenomes: false,
+
+    // Spring simulation forces
+    scaleXForce: 1,
+    scaleYForce: 1,
+    scaleContraction: 1,
+    scaleRepulsion: 1,
+    minimumDistance: 1000,
+    rerunSimulation: false,
 
     //Graphics
     overviewArrows: false,
@@ -500,6 +681,14 @@ export const useGeneSetStore = defineStore('geneSet', {
     },
     getGroupInfo(key: string) {
       return this.groupInfoLookup[key]
+    },
+    updateSimulation() {
+      this.rerunSimulation = true
+      // [newGenePositions, nodeGroups, heat] = runSpringSimulation(newGenePositions, this.data ?? [], 1000, 100, 232273529)
+      // currentHeat.value = heat
+      // crossingHomologyGroups.value = crossDetection(newGenePositions)
+
+      // currentGraphNodeGroups.value = nodeGroups
     },
   },
   getters: {

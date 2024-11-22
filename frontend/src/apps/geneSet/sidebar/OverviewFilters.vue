@@ -222,6 +222,7 @@ g.brush .selection {
 
 <template>
   <SidebarItem title="Filters Overview">
+  
     <div id="sequence-chart-container">
       <svg id="sequence-length-chart"></svg>
     </div>
@@ -240,6 +241,7 @@ g.brush .selection {
       :wrapperCol="{ span: 14 }"
       class="view-options"
     >
+     
       <AFormItem label="Filter genomes">
         <ASelect
           v-model:value="selectedGenomes"
@@ -263,13 +265,17 @@ g.brush .selection {
           showSearch
           showArrow
         />
+        
+      </AFormItem>
+      <AFormItem label="Filter empty">
+            <ASwitch size="small" v-model:checked="filterEmpty"/>
       </AFormItem>
     </AForm>
   </SidebarItem>
 </template>
 
 <script lang="ts">
-import { Form, FormItem, Select } from 'ant-design-vue'
+import { Form, FormItem, Select, Switch } from 'ant-design-vue'
 import * as d3 from 'd3'
 import { mapState, mapWritableState } from 'pinia'
 import { defineComponent } from 'vue'
@@ -289,6 +295,7 @@ export default defineComponent({
     AFormItem: FormItem,
     ASelect: Select,
     SidebarItem,
+    ASwitch: Switch,
   },
   computed: {
     ...mapWritableState(useGenomeStore, [
@@ -296,6 +303,8 @@ export default defineComponent({
       'selectedSequences',
     ]),
     ...mapState(useGenomeStore, ['genomeData']),
+    ...mapWritableState(useGenomeStore, ['filterEmpty']),
+
 
     genomeOptions() {
       const genomeStore = useGenomeStore()
@@ -335,6 +344,14 @@ export default defineComponent({
       yLabel: 'Sequence Loci count',
       tickFormat: (d) => d.toLocaleString(),
     })
+  },
+  watch: {
+    filterEmpty(newValue) {
+      const genomeStore = useGenomeStore();
+      console.log('Filter empty changed:', newValue);
+      genomeStore.initializeSelectedSequencesLasso(); // Reinitialize lasso selection
+      // genomeStore.selectedSequencesLasso = [];
+    },
   },
   methods: {
     getSequenceLengths() {

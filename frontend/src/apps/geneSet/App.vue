@@ -1,5 +1,13 @@
 <script lang="ts">
-import { Col, Form, FormItem, Row, Select } from 'ant-design-vue'
+import {
+  Button,
+  Col,
+  Form,
+  FormItem,
+  RadioGroup,
+  Row,
+  Select,
+} from 'ant-design-vue'
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 
 import Layout from '@/components/Layout.vue'
@@ -18,7 +26,9 @@ import ChromosomeDetails from './visualizations/ChromosomeDetails.vue'
 import ChromosomeOverview from './visualizations/ChromosomeOverview.vue'
 import Density from './visualizations/Density.vue'
 import GroupInfoTable from './visualizations/GroupInfoTable.vue'
+import SpringTuning from './sidebar/SpringTuning.vue';
 import PixiCanvas from './visualizations/PixiScatter.vue'
+import PixiUMAP from './visualizations/PixiUMAP.vue'
 
 export default defineComponent({
   name: 'App',
@@ -34,8 +44,10 @@ export default defineComponent({
     ChromosomeDetails,
     // GroupInfoTable,
     PixiCanvas,
+    PixiUMAP,
     ARow: Row,
     ACol: Col,
+    SpringTuning,
   },
   setup() {
     const geneSetStore = useGeneSetStore()
@@ -50,6 +62,7 @@ export default defineComponent({
         console.error('Error handling PixiScatter loaded event:', error)
       }
     }
+
     // Trigger loading of genome data
     genomeStore.loadGenomeData()
     const isInitializedGenome = computed(() => genomeStore.isInitialized)
@@ -58,6 +71,16 @@ export default defineComponent({
     const isInitialized = computed(() => geneSetStore.isInitialized)
     const showTable = computed(() => geneSetStore.showTable)
     const showDetails = computed(() => geneSetStore.showDetails)
+
+    const distanceMatrix = computed(() => genomeStore.distanceMatrix)
+    const embedding = computed(() => genomeStore.embedding)
+    const embeddingFiltered = computed(() => genomeStore.embeddingFiltered)
+
+     // Dynamically select the embedding based on filterEmpty
+     const filterEmpty = computed(() => genomeStore.filterEmpty)
+    const selectedEmbedding = computed(() =>
+      filterEmpty.value ? embeddingFiltered.value : embedding.value
+    )
 
     // Sample chromosome number for demonstration
     const chromosomeNr = 5
@@ -93,6 +116,10 @@ export default defineComponent({
       chromosomeNr,
       pixiLoaded,
       handlePixiLoaded,
+      distanceMatrix,
+      embedding,
+      embeddingFiltered,
+      selectedEmbedding,
     }
   },
 })
@@ -104,6 +131,7 @@ export default defineComponent({
       <OverviewFilters />
       <Filters />
       <Sorting />
+      <SpringTuning />
       <GraphicsOptions />
       <ContextOptions />
       <Unphased />
@@ -111,8 +139,16 @@ export default defineComponent({
 
     <!-- Row 1: PixiCanvas Visualization -->
     <ARow type="flex" :gutter="8" class="row full-height">
-      <ACol :span="12" class="col full-height">
-        <div class="content-overview" ref="parentElement">
+      <ACol :span="12" :gutter="8" class="col full-height">
+        <div class="content-overview" ref="parentElementUMAP">
+          <PixiUMAP
+            :distanceMatrix="distanceMatrix"
+            :embedding="selectedEmbedding"
+            @loaded="handlePixiLoaded"
+          />
+        </div>
+        <div class="gutter"></div>
+        <div class="content-overview" ref="parentElementGrid">
           <PixiCanvas @loaded="handlePixiLoaded" />
         </div>
       </ACol>
@@ -133,6 +169,13 @@ export default defineComponent({
 </template>
 
 <style>
+.radio-group-container {
+  display: flex;
+  justify-content: center; /* Center horizontally */
+  align-items: center; /* Center vertically if needed */
+  padding: 16px; /* Adjust padding as needed */
+}
+
 .ant-layout-sider {
   background: #fafafa !important;
 }
@@ -187,5 +230,10 @@ export default defineComponent({
   overflow: hidden;
   width: 100%;
   height: 100%;
+}
+
+.gutter {
+  height: 8px; /* Adjust this for the vertical spacing */
+  width: 100%; /* Ensures it spans the column width */
 }
 </style>

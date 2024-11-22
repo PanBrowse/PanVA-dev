@@ -3,20 +3,20 @@
  */
 
 export type App = {
-  id: string
-  name: string
-  description: string
-}
+  id: string;
+  name: string;
+  description: string;
+};
 
 export type AppError = {
-  message: string
-  isFatal?: boolean
-}
+  message: string;
+  isFatal?: boolean;
+};
 
 /**
  * Common.
  */
-export type mRNAid = string
+export type mRNAid = string;
 export type Nucleotide =
   | 'A'
   | 'C'
@@ -48,83 +48,83 @@ export type Nucleotide =
   | 'h'
   | 'v'
   | 'n'
-  | '-'
-export type NucleotideSimplified = 'A' | 'C' | 'G' | 'T' | 'N' | '-'
-export type Range = [number, number]
-export type DataIndexCollapsed = number | Group
-export type TreeOption = 'dendroDefault' | 'dendroCustom' | string
-export type FilterPosition = 'all' | 'variable' | string
+  | '-';
+export type NucleotideSimplified = 'A' | 'C' | 'G' | 'T' | 'N' | '-';
+export type Range = [number, number];
+export type DataIndexCollapsed = number | Group;
+export type TreeOption = 'dendroDefault' | 'dendroCustom' | string;
+export type FilterPosition = 'all' | 'variable' | string;
 
 export type GroupReference = {
-  type: 'group'
-  id: number
-}
+  type: 'group';
+  id: number;
+};
 export type DataReference = {
-  type: 'data'
-  dataIndex: number
-}
+  type: 'data';
+  dataIndex: number;
+};
 
-export type Reference = GroupReference | DataReference
+export type Reference = GroupReference | DataReference;
 
 /**
  * Sorting.
  */
 type SortingCommon = {
-  name: 'mrnaId'
-}
+  name: 'mrnaId';
+};
 
 type SortingMetadata = {
-  name: 'metadata'
-  column: string
-}
+  name: 'metadata';
+  column: string;
+};
 
 type SortingPosition = {
-  name: 'position'
-  position: number
-}
+  name: 'position';
+  position: number;
+};
 
 type SortingTree = {
-  name: 'tree'
-  tree: string
-}
+  name: 'tree';
+  tree: string;
+};
 
 export type Sorting =
   | SortingCommon
   | SortingMetadata
   | SortingPosition
-  | SortingTree
+  | SortingTree;
 
 /**
  * Filtering
  */
 export type MetadataFilter = {
-  type: ConfigMetadata['type']
-  column: string
+  type: ConfigMetadata['type'];
+  column: string;
   operator:
-    | 'in'
-    | 'not-in'
-    | 'equals'
-    | 'between'
-    | 'greater-than'
-    | 'greater-than-equal'
-    | 'less-than'
-    | 'less-than-equal'
-  values: (string | number)[]
-}
+  | 'in'
+  | 'not-in'
+  | 'equals'
+  | 'between'
+  | 'greater-than'
+  | 'greater-than-equal'
+  | 'less-than'
+  | 'less-than-equal';
+  values: (string | number)[];
+};
 
 /**
  * Grouping.
  */
 export type Group = {
-  id: number
-  name: string
-  color: string
-  isCollapsed: boolean
-  isColorized: boolean
-  dataIndices: number[]
+  id: number;
+  name: string;
+  color: string;
+  isCollapsed: boolean;
+  isColorized: boolean;
+  dataIndices: number[];
   // Will match `dataIndices.length`, unless `dataIndices` is filter by sequence filters.
-  size: number
-}
+  size: number;
+};
 
 /**
  * Data structures.
@@ -136,158 +136,158 @@ export type Group = {
 // Type for sequence info
 // Type genome
 export interface Genome {
-  uid: string
-  name: string
-  sequences: SequenceInfo[]
-  genomeIndex?: number // Optional until we assign it
+  uid: string;
+  name: string;
+  sequences: SequenceInfo[];
+  genomeIndex?: number; // Optional until we assign it
 }
 
 // Type for sequence info
 export interface SequenceInfo {
-  find(arg0: (seq: any) => boolean): unknown
-  uid: string
-  sequence_length_nuc: number
-  gene_count: number
-  phasing: string | null
-  name: string
-  id: string
-  loci: string[]
-  sequenceIndex?: number // Optional until we assign it
+  find(arg0: (seq: any) => boolean): unknown;
+  uid: string;
+  sequence_length_nuc: number;
+  gene_count: number;
+  phasing: string | null;
+  name: string;
+  id: string;
+  loci: string[];
+  sequenceIndex?: number; // Optional until we assign it
 }
 
 export interface Locus {
-  uid: string
-  loci_length_nuc: number
-  genes: string[]
-  name: string
-  start: number
-  end: number
+  uid: string;
+  loci_length_nuc: number;
+  genes: string[];
+  name: string;
+  start: number;
+  end: number;
 }
 
 // Type for gene
 export interface Gene {
-  uid: string
-  names: string[]
-  strand: number
-  noncoding_rnas: { trnas: any[]; rrnas: any[] }
-  start: number
-  sequence_id: string
-  end: number
-  label: string
-  gene_length_nuc: number
-  mrnas: string[]
-  homology_groups?: { id: number; uid: string }[]
-  sequence_uid?: string
+  uid: string;
+  names: string[];
+  strand: number;
+  noncoding_rnas: { trnas: any[]; rrnas: any[]; };
+  start: number;
+  sequence_id: string;
+  end: number;
+  label: string;
+  gene_length_nuc: number;
+  mrnas: string[];
+  homology_groups: { id: number; uid: string; }[];
+  sequence_uid?: string;
 }
 
 export interface Mrna {
-  uid: string
-  exons: Exon[]
-  cds_length_nuc: number
-  start: number[]
-  mrna_length_nuc: number[]
-  functional_domains: Domain[]
-  end: number[]
-  label: string
-  protein_length_aa: number[]
-  cdss: Cds[]
+  uid: string;
+  exons: Exon[];
+  cds_length_nuc: number;
+  start: number[];
+  mrna_length_nuc: number[];
+  functional_domains: Domain[];
+  end: number[];
+  label: string;
+  protein_length_aa: number[];
+  cdss: Cds[];
 }
 
 export interface Domain {
-  uid: string
-  domain_id: string
-  domain_type: string
-  name: string
+  uid: string;
+  domain_id: string;
+  domain_type: string;
+  name: string;
 }
 
 export interface Exon {
-  uid: string
-  start: number
-  end: number
+  uid: string;
+  start: number;
+  end: number;
 }
 
 export interface Cds {
-  uid: string
-  start: number
-  end: number
+  uid: string;
+  start: number;
+  end: number;
 }
 
 export interface HomologyGroup {
-  uid: string
-  hidden: boolean
-  label: string
-  mrnas: Mrna[]
+  uid: string;
+  hidden: boolean;
+  label: string;
+  mrnas: Mrna[];
 }
 
 export interface HomologyLink {
-  uid: string
-  identity: number
-  query: { uid: string } // mrna uid
-  target: { uid: string } // mrna uid
+  uid: string;
+  identity: number;
+  query: { uid: string; }; // mrna uid
+  target: { uid: string; }; // mrna uid
 }
 
 // Type for the overall hierarchical structure
 export interface GenomeData {
-  genomes: Genome[]
-  sequences: SequenceInfo[]
-  loci: Locus[]
+  genomes: Genome[];
+  sequences: SequenceInfo[];
+  loci: Locus[];
   // repeats: any[]
-  genes: Gene[]
-  mrnas: Mrna[]
-  cds: Cds[]
-  exons: Exon[]
-  functional_domains: Domain[]
-  groups: HomologyGroup[]
-  links: HomologyLink[]
+  genes: Gene[];
+  mrnas: Mrna[];
+  cds: Cds[];
+  exons: Exon[];
+  functional_domains: Domain[];
+  groups: HomologyGroup[];
+  links: HomologyLink[];
 }
 
 // old types
 export type SequenceMetrics = {
-  id: number
-  sequence_id: string
-  phasing_chromosome: number
-  phasing_id: string
-  genome_number: number
-  annotation_id: string
-  sequence_length: number
-  total_A: number
-  total_T: number
-  total_C: number
-  total_G: number
-  total_N: number
-  total_other: number
-  GC_content_percent: number
-  sequence_unknown_percent: number
-  gene_count: number
-  gene_length_total: number
-  gene_length_min: number
-  gene_length_max: number
-  gene_length_average: number
-  gene_length_median: number
-  gene_sequence_percent: number
-  gene_density_per_Mbp: number
-}
+  id: number;
+  sequence_id: string;
+  phasing_chromosome: number;
+  phasing_id: string;
+  genome_number: number;
+  annotation_id: string;
+  sequence_length: number;
+  total_A: number;
+  total_T: number;
+  total_C: number;
+  total_G: number;
+  total_N: number;
+  total_other: number;
+  GC_content_percent: number;
+  sequence_unknown_percent: number;
+  gene_count: number;
+  gene_length_total: number;
+  gene_length_min: number;
+  gene_length_max: number;
+  gene_length_average: number;
+  gene_length_median: number;
+  gene_sequence_percent: number;
+  gene_density_per_Mbp: number;
+};
 
 export type GroupInfo = {
-  homology_id: number
-  gene_id: string
-  gene_name: string
-  mRNA_id: string
-  mRNA_name: string
-  genome_number: number
-  sequence_number: number
-  mRNA_start_position: number
-  mRNA_end_position: number
-  gene_start_position: number
-  gene_end_position: number
-  chromosome: string
-  strand: string
-  gene_length_nuc: number
-  mRNA_length_nuc: number
-  cds_length_nuc: number
-  protein_length_AA: number
-  phasing_chromosome: string
-}
+  homology_id: number;
+  gene_id: string;
+  gene_name: string;
+  mRNA_id: string;
+  mRNA_name: string;
+  genome_number: number;
+  sequence_number: number;
+  mRNA_start_position: number;
+  mRNA_end_position: number;
+  gene_start_position: number;
+  gene_end_position: number;
+  chromosome: string;
+  strand: string;
+  gene_length_nuc: number;
+  mRNA_length_nuc: number;
+  cds_length_nuc: number;
+  protein_length_AA: number;
+  phasing_chromosome: string;
+};
 
 /**
  *  PANVA
@@ -298,63 +298,63 @@ export type HomologyMetadataValue =
   | MetadataBoolean
   | MetadataCategorical
   | MetadataCategorical[]
-  | MetadataQuantitative
-export type HomologyMetadata = Record<string, HomologyMetadataValue>
+  | MetadataQuantitative;
+export type HomologyMetadata = Record<string, HomologyMetadataValue>;
 
 export type Homology = {
-  id: string
-  members: number
-  alignment_length: number
-  metadata: HomologyMetadata
-}
+  id: string;
+  members: number;
+  alignment_length: number;
+  metadata: HomologyMetadata;
+};
 
 export type Alignment = {
-  nucleotide: Nucleotide
-  metadata: Metadata
-}
+  nucleotide: Nucleotide;
+  metadata: Metadata;
+};
 
 export type Sequence = {
-  metadata: Metadata
-}
+  metadata: Metadata;
+};
 
 export type VariablePosition = {
-  A: number
-  C: number
-  G: number
-  T: number
-  gap: number
-  conservation: number
-  metadata: Metadata
-}
+  A: number;
+  C: number;
+  G: number;
+  T: number;
+  gap: number;
+  conservation: number;
+  metadata: Metadata;
+};
 
 export type Annotation = {
-  mRNA_id: mRNAid
+  mRNA_id: mRNAid;
   // Per position an object with a boolean for each configured annotation column.
-  features: Record<string, boolean>[]
-}
+  features: Record<string, boolean>[];
+};
 
 export type Tree = {
-  name: string
-  label: string
-  root: TreeNode
-}
+  name: string;
+  label: string;
+  root: TreeNode;
+};
 
 export type TreeNode = {
-  name: string
-  children?: TreeNode[]
+  name: string;
+  children?: TreeNode[];
   // Not used in Dendrogram, but used in coreSNP.
-  branch_length?: number
-}
+  branch_length?: number;
+};
 
-export type MetadataBoolean = boolean | null
-export type MetadataCategorical = string
-export type MetadataQuantitative = number | null
+export type MetadataBoolean = boolean | null;
+export type MetadataCategorical = string;
+export type MetadataQuantitative = number | null;
 
 export type MetadataValue =
   | MetadataBoolean
   | MetadataCategorical
-  | MetadataQuantitative
-export type Metadata = Record<string, MetadataValue>
+  | MetadataQuantitative;
+export type Metadata = Record<string, MetadataValue>;
 
 /**
  * Raw API data.
@@ -363,11 +363,11 @@ export type AlignmentCSVColumns =
   | 'mRNA_id'
   | 'genome_nr'
   | 'position'
-  | 'nucleotide'
+  | 'nucleotide';
 
-export type AnnotationCSVColumns = 'mRNA_id' | 'position'
+export type AnnotationCSVColumns = 'mRNA_id' | 'position';
 
-export type SequenceMetadataCSVColumns = 'mRNA_id'
+export type SequenceMetadataCSVColumns = 'mRNA_id';
 
 export type VariablePositionCSVColumns =
   | 'position'
@@ -375,24 +375,24 @@ export type VariablePositionCSVColumns =
   | 'C'
   | 'G'
   | 'T'
-  | 'gap'
+  | 'gap';
 
 export type ThemeCellColors = {
-  A: string
-  C: string
-  G: string
-  T: string
-  N: string
-  '-': string
-  empty: string
-  aggregate: string
-}
+  A: string;
+  C: string;
+  G: string;
+  T: string;
+  N: string;
+  '-': string;
+  empty: string;
+  aggregate: string;
+};
 
 export type Theme = {
-  name: string
-  cellColors: ThemeCellColors
-  annotationColors: string[]
-}
+  name: string;
+  cellColors: ThemeCellColors;
+  annotationColors: string[];
+};
 
 /**
  * Configuration.
@@ -402,65 +402,65 @@ export type Theme = {
  */
 
 export type ConfigAnnotation = {
-  column: string
-  label: string
-}
+  column: string;
+  label: string;
+};
 
 type ConfigMetadataBase = {
-  column: string
-  label: string
-}
+  column: string;
+  label: string;
+};
 
 export type ConfigMetadataBoolean = ConfigMetadataBase & {
-  type: 'boolean'
+  type: 'boolean';
   labels?: {
-    true: string
-    false: string
-    null: string
-  }
+    true: string;
+    false: string;
+    null: string;
+  };
   values?: {
-    true: string
-    false: string
-  }
-}
+    true: string;
+    false: string;
+  };
+};
 
 export type ConfigMetadataCategorical = ConfigMetadataBase & {
-  type: 'categorical'
-  width?: number
-}
+  type: 'categorical';
+  width?: number;
+};
 
 export type ConfigMetadataQuantitative = ConfigMetadataBase & {
-  type: 'quantitative'
-  decimals?: number
-  maxValue?: number
-  suffix?: string
-  width?: number
-}
+  type: 'quantitative';
+  decimals?: number;
+  maxValue?: number;
+  suffix?: string;
+  width?: number;
+};
 
 export type ConfigMetadata =
   | ConfigMetadataBoolean
   | ConfigMetadataCategorical
-  | ConfigMetadataQuantitative
+  | ConfigMetadataQuantitative;
 
 export type ConfigTree = {
-  filename: string
-  label: string
-}
+  filename: string;
+  label: string;
+};
 
 export type Config = {
-  apiUrl?: string // Default: '/'
-  apps?: string[] // Default: ['homology']
+  apiUrl?: string; // Default: '/'
+  apps?: string[]; // Default: ['homology']
   homology?: {
-    alignmentMetadata?: ConfigMetadata[] // Default: []
-    annotations?: ConfigAnnotation[] // Default: []
-    defaultId?: string // Default: First homology in homologies.
-    defaultSequenceMetadataColumns?: string[] // Default: []
-    homologyMetadata?: ConfigMetadata[] // Default: []
-    sequenceMetadata?: ConfigMetadata[] // Default: []
-    trees?: ConfigTree[] // Default: []
-    variableMetadata?: ConfigMetadata[] // Default: []
-  }
-  title?: string // Default `constants.DEFAULT_TITLE`
-}
+    alignmentMetadata?: ConfigMetadata[]; // Default: []
+    annotations?: ConfigAnnotation[]; // Default: []
+    defaultId?: string; // Default: First homology in homologies.
+    defaultSequenceMetadataColumns?: string[]; // Default: []
+    homologyMetadata?: ConfigMetadata[]; // Default: []
+    sequenceMetadata?: ConfigMetadata[]; // Default: []
+    trees?: ConfigTree[]; // Default: []
+    variableMetadata?: ConfigMetadata[]; // Default: []
+  };
+  title?: string; // Default `constants.DEFAULT_TITLE`
+};
 
-export type ConfigHomologies = Homology[]
+export type ConfigHomologies = Homology[];
