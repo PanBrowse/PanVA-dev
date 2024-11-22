@@ -43,6 +43,7 @@ import type { Gene, Genome, GenomeData } from '@/types'
 import { parseSVG } from 'svg-path-parser';
 
 const globalSelectedSprites = ref<string[]>([])
+// to-do: need to use these again:
 const circleTexture = ref<PIXI.Texture>()
 const lassoInstance = ref<lasso>()
 
@@ -228,7 +229,7 @@ export default {
               pressDrag: true, // Enables dragging
             })
           }
-          if (this.lassoInstance) {
+          if (lassoInstance.value) {
             console.log('Removing lasso.')
 
             // Clear lasso paths
@@ -293,14 +294,14 @@ export default {
           const circleRadius = 5 * devicePixelRatio
 
           // Regenerate the circle texture
-          this.circleTexture = this.createCircleTexture(
+          circleTexture.value = this.createCircleTexture(
             circleRadius,
             resolution
           )
 
           // Update all sprites
           this.viewport.children.forEach((sprite) => {
-            sprite.texture = this.circleTexture
+            sprite.texture = circleTexture.value
           })
           // this.drawGrid();
 
@@ -437,7 +438,7 @@ export default {
       const resolution = window.devicePixelRatio * zoomLevel
 
       // Create the circle texture
-      this.circleTexture = this.createCircleTexture(circleRadius, resolution)
+      circleTexture.value = this.createCircleTexture(circleRadius, resolution)
 
       // Check and log canvas size
       const canvas = this.app.canvas
@@ -474,7 +475,8 @@ export default {
             !filterEmpty || (sequence.loci && sequence.loci.length > 0)
 
           if (shouldDraw) {
-            const circleSprite = new PIXI.Sprite(circleTexture.value)
+            const circleSprite = new PIXI.Sprite(circleTexture.value
+            )
 
             // Check if this sequence is part of the selectedSequencesLasso
             const isSelected = this.genomeStore.selectedSequencesLasso.includes(
@@ -545,8 +547,8 @@ export default {
         .on('end', this.lassoEnd)
 
       // Link lasso to the sprites in the container
-      this.lassoInstance.items(this.viewport.children as PIXI.Sprite[])
-      svg.select('g.lasso').call(this.lassoInstance)
+      lassoInstance.value.items(this.viewport.children as PIXI.Sprite[])
+      svg.select('g.lasso').call(lassoInstance.value)
 
       console.log('Lasso initialized and added.')
     },
@@ -617,7 +619,7 @@ export default {
 
 
         // checking matrices 
-        this.lassoInstance.items().forEach((sprite) => {
+        lassoInstance.value.items().forEach((sprite) => {
         // Get the sprite's position in the original data space using groupTransform
         const { x: itemX, y: itemY } = sprite;
         const { tx: spriteXl, ty: spriteYl } = sprite.localTransform
@@ -790,7 +792,7 @@ export default {
       // Create a sprite using the circle texture
       const circleSprite = new PIXI.Sprite()
       // Assign the texture
-      circleSprite.texture = this.circleTexture
+      circleSprite.texture = circleTexture.value
 
       circleSprite.tint = 0xd3d3d3
       circleSprite.alpha = 0.5 // Set opacity to 50%
