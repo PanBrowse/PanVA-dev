@@ -70,7 +70,7 @@ export const useGenomeStore = defineStore({
     distanceMatrixLabelsFiltered: {},
     embedding: [],
     embeddingFiltered: [],
-    filterEmpty: false,
+    filterEmpty: true,
     filteredSequences: [],
     isInitialized: false,
   }),
