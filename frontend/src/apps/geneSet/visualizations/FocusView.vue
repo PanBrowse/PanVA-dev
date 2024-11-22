@@ -450,7 +450,7 @@ export default {
       > = {}
       //determine global ranges'
       const sortedCompressionRangeGlobal = newGenePositions
-        .map((d) => d.position)
+        .map((d) => d.startPosition)
         .sort((a, b) => a - b)
 
       const edgesOfNewRangeGlobal: [number, number] = [
@@ -1309,7 +1309,7 @@ export default {
     > = {}
     //determine global ranges'
     const sortedCompressionRangeGlobal = newGenePositions
-      .map((d) => d.position)
+      .map((d) => d.startPosition)
       .sort((a, b) => a - b)
 
     const edgesOfNewRangeGlobal: [number, number] = [

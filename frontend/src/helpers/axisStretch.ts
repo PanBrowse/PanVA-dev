@@ -56,7 +56,7 @@ export const calculateIndividualScales = (
   const uniqueGenePositions = filterUniquePosition(genePositionsOnSequence);
 
   //create scale from gene coordinates to compressed coordinates
-  const compressionRange = uniqueGenePositions.flatMap(d => [d.position, d.endPosition]);
+  const compressionRange = uniqueGenePositions.flatMap(d => [d.startPosition, d.endPosition]);
   const geneRangeInner = uniqueGenePositions.flatMap(d => [d.originalPosition, d.originalPosition + d.width]);
   const geneToCompressionScale = d3.scaleLinear().domain(geneRangeInner).range(compressionRange);
 

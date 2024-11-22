@@ -9,7 +9,7 @@ export const createCompressionScale = (graphNodes: GraphNode[], sequences: Seque
   let xScaleGeneToCompressionInit: Dictionary<d3.ScaleLinear<number, number, never>> = {};
 
   //determine global ranges'
-  const sortedCompressionRangeGlobal = (graphNodes.map(d => d.position)).sort((a, b) => a - b);
+  const sortedCompressionRangeGlobal = (graphNodes.map(d => d.startPosition)).sort((a, b) => a - b);
   const edgesOfNewRangeGlobal: [number, number] = [sortedCompressionRangeGlobal[0], sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length - 1]];
   const oldRanges = graphNodes.map(d => d.originalPosition).sort((a, b) => a - b);
   const edgesOfOldRange = [oldRanges[0], oldRanges[oldRanges.length - 1]];

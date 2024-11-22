@@ -65,7 +65,7 @@ export default {
         <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=1000> </ASlider>
       </AFormItem>
       <AFormItem label="Minimum distance">
-        <ASlider id="distance" v-model:value="minimumDistance"  :min=1 :max=10000> </ASlider>
+        <ASlider id="distance" v-model:value="minimumDistance"  :min=2 :max=10000> </ASlider>
       </AFormItem>
 
     </AForm>

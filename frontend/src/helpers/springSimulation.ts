@@ -40,10 +40,10 @@ export const runSpringSimulation = (
       if (anchorElement === undefined) {
         anchor = 0;
       } else {
-        anchor = anchorElement.position;
+        anchor = anchorElement.startPosition;
       }
       sequenceMembers.forEach((gene) => {
-        gene.position = gene.position - anchor;
+        gene.startPosition = gene.startPosition - anchor;
       });
     });
   }
