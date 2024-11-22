@@ -1464,8 +1464,6 @@ export default {
       handler(newVal) {
         console.log('mappedIndices updated:', newVal)
         this.addLabels()
-        this.drawSquishBars()
-        this.drawGenes()
       },
       deep: true,
       immediate: true,
@@ -1484,8 +1482,6 @@ export default {
       handler(newVal) {
         console.log('sequenceIndicesInLookup updated:', newVal)
         this.addLabels()
-        this.drawSquishBars()
-        this.drawGenes()
       },
       deep: true,
       immediate: true,
@@ -1494,7 +1490,6 @@ export default {
       this.drawGenes()
     },
     showLinks() {
-      this.drawSquishBars()
       this.drawGenes()
     },
     anchor() {
@@ -1509,7 +1504,6 @@ export default {
     colorGenomes() {
       console.log('color genomes')
       this.drawSquishBars()
-      this.drawGenes()
     },
     // percentageGC() {
     //   console.log('show GC')

@@ -581,7 +581,7 @@ export const updateHighStressNodeGroup = (
   const nodeGroupSpread = nodeGroupRange[1] - nodeGroupRange[0];
   // find node that moves the most
   // for (const group of nodeGroups) {
-  for (const index of Array(50).keys()) {
+  for (const index of Array(200).keys()) {
     const randomIndex = Math.floor(Math.random() * nodeGroups.length);
     const group = nodeGroups[randomIndex];
     // currentIndex = currentIndex + 1;
