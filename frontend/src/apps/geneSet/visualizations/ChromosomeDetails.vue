@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <div
     id="content-focus"
     style="
@@ -20,7 +20,7 @@
       :minGC="GCcontentMin"
     />
   </div>
-</template>
+</template> -->
 
 <script lang="ts">
 import * as d3 from 'd3'
@@ -33,11 +33,13 @@ import type { SequenceMetrics } from '@/types'
 
 import FocusView from './FocusView.vue'
 import SequencesDetails from './SequencesDetails.vue'
+import LoadingScreen from '@/components/LoadingScreen.vue'
 
 export default {
   components: {
     // SequencesDetails,
     FocusView,
+    LoadingScreen
   },
   data: () => ({
     svgWidth: 0,
@@ -58,6 +60,7 @@ export default {
       'groupInfoLookup',
       'sortedGroupInfoLookup',
       'sequenceIdLookup',
+      'rerunSimulation'
     ]),
 
     dataMax() {
@@ -94,9 +97,39 @@ export default {
     this.svgHeight =
       (contentElement?.offsetHeight || 0) * this.svgHeightScaleFactor
   },
-  watch: {},
+  watch: {
+    rerunSimulation: {
+      handler(rerun) {
+
+      }
+     }
+  },
 }
 </script>
+
+<template>
+  <div
+    id="content-focus"
+    style="
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: space-between;
+    "
+  >
+    <FocusView
+      v-bind:key="`chr${chrFocus}_focus`"
+      :chromosomeNr="String(chrFocus)"
+      :name="`chr${chrFocus}_focus`"
+      :data="getChromosome(String(chrFocus))"
+      :dataGenes="getGroupInfo(String(chrFocus))"
+      :dataMin="dataMin"
+      :dataMax="dataMax"
+      :maxGC="GCcontentMax"
+      :minGC="GCcontentMin"
+    />
+  </div>
+</template>
 
 <style lang="scss">
 @import '@/assets/colors.module.scss';

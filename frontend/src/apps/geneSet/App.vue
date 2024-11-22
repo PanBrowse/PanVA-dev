@@ -65,8 +65,8 @@ export default defineComponent({
 
     // Trigger loading of genome data
     genomeStore.loadGenomeData()
-    const isInitializedGenome = computed(() => genomeStore.isInitialized)
-
+    const isInitializedGenome = computed(() => genomeStore.isInitialized )
+    const rerun = computed(() => geneSetStore.rerunSimulation)
     // Computed properties for state
     const isInitialized = computed(() => geneSetStore.isInitialized)
     const showTable = computed(() => geneSetStore.showTable)
@@ -92,6 +92,9 @@ export default defineComponent({
     watch([isInitialized, isInitializedGenome], ([geneInit, genomeInit]) => {
       console.log('isInitialized:', geneInit)
       console.log('isInitializedGenome:', genomeInit)
+    })
+    watch(rerun, (value) => {
+      console.log('rerun', value)
     })
 
     // Trigger loading on component mount
@@ -120,6 +123,7 @@ export default defineComponent({
       embedding,
       embeddingFiltered,
       selectedEmbedding,
+      rerun
     }
   },
 })

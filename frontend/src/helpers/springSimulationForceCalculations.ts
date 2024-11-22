@@ -1,6 +1,6 @@
 import { useGeneSetStore } from "@/stores/geneSet";
 import { abs } from "./math";
-import { GraphNode, GraphNodeGroup } from "./springSimulationUtils";
+import { GraphNode, GraphNodeGroup, type SpringTuningParameters } from "./springSimulationUtils";
 import { mapWritableState } from "pinia";
 
 
@@ -24,8 +24,10 @@ export const evaluateForces = (
   connectedXNodes: (GraphNode | GraphNodeGroup | undefined)[],
   connectedYNodes: (GraphNode | GraphNodeGroup)[],
   heat: number,
+  springTuning: SpringTuningParameters,
   excludedHomologyGroup?: number,
-  print: boolean = false
+  print: boolean = false,
+
 ): [number, number] => {
   /* Returns [forcesWithNormal, forces] */
 
@@ -40,11 +42,17 @@ export const evaluateForces = (
 
 
   // tune force contributions
-  const scalePartialForceY = parameters.scaleYForce.get(); //connectedYNodes.length > 0 ? 1/connectedYNodes.length : 100
-  const scalePartialForceX = parameters.scaleXForce.get();
-  const scalePartialForceGravity = parameters.scaleContraction.get();
-  const scaleRepelling = parameters.scaleRepulsion.get();
-  const touchingDistance = parameters.minimumDistance.get();
+  // const scalePartialForceY = parameters.scaleYForce.get(); //connectedYNodes.length > 0 ? 1/connectedYNodes.length : 100
+  // const scalePartialForceX = parameters.scaleXForce.get();
+  // const scalePartialForceGravity = parameters.scaleContraction.get();
+  // const scaleRepelling = parameters.scaleRepulsion.get();
+  // const touchingDistance = parameters.minimumDistance.get();
+
+  const scalePartialForceY = springTuning.scaleYForce; //connectedYNodes.length > 0 ? 1/connectedYNodes.length : 100
+  const scalePartialForceX = springTuning.scaleXForce;
+  const scalePartialForceGravity = springTuning.scaleContraction;
+  const scaleRepelling = springTuning.scaleRepulsion;
+  const touchingDistance = springTuning.minimumDistance;
 
   let forceOnNode: number = 0;
   // Calculate contribution for all nodes in the same homology group
@@ -152,7 +160,7 @@ const calculateNaturalRepellingForce = (distanceToNeighbour: number) => {
   return -1 / Math.pow(abs(distanceToNeighbour), 1 / 2) * Math.sign(distanceToNeighbour) * scale;
 };
 
-export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGroup[], touchingDistance: number = 1000) => {
+export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGroup[], springTuning: SpringTuningParameters, touchingDistance: number = 1000) => {
 
   const touchingLeft = findTouchingNeighboursLeft(group, allGroups, touchingDistance);
   const touchingRight = findTouchingNeighboursRight(group, allGroups, touchingDistance);
@@ -160,18 +168,23 @@ export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGrou
   // For right nodes
   let totalRightForce = 0;
   touchingRight.sort((a, b) => b.position - a.position).forEach(neighbourGroup => {
-    const connectedXNodes = findNeighgourNodes(neighbourGroup, allGroups);
-    const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id));
-    const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1, undefined, false);
+    const connectedXNodes = findNeighbourNodes(neighbourGroup, allGroups);
+    // const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id));
+
+    const connectionsYSet = new Set(neighbourGroup.connectionsY);
+    const connectedYNodes = allGroups.filter(d => connectionsYSet.has(d.id));
+    const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1, springTuning, undefined, false);
     const updatedTotalRight = totalRightForce + forceContribution;
     totalRightForce = Math.min(updatedTotalRight, 0);
   });
   // For left nodes
   let totalLeftForce = 0;
   touchingLeft.sort((a, b) => a.position - b.position).forEach(neighbourGroup => {
-    const connectedXNodes = findNeighgourNodes(neighbourGroup, allGroups);
-    const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id));
-    const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1, undefined, false);
+    const connectedXNodes = findNeighbourNodes(neighbourGroup, allGroups);
+    const connectionsYSet = new Set(neighbourGroup.connectionsY);
+    const connectedYNodes = allGroups.filter(d => connectionsYSet.has(d.id));
+    // const connectedYNodes = allGroups.filter(d => neighbourGroup.connectionsY.includes(d.id));
+    const [forceWithNormal, forceContribution] = evaluateForces(neighbourGroup, connectedXNodes, connectedYNodes, 1, springTuning, undefined, false);
     const updatedTotalLeft = totalLeftForce + forceContribution;
     totalLeftForce = Math.max(updatedTotalLeft, 0);
   });
@@ -180,7 +193,7 @@ export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGrou
 };
 
 const findTouchingNeighboursLeft = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[], touchingDistance: number = 1000): GraphNodeGroup[] => {
-  const [leftNeighbour, rightNeighbour] = findNeighgourNodes(group, nodeGroups);
+  const [leftNeighbour, rightNeighbour] = findNeighbourNodes(group, nodeGroups);
   if (leftNeighbour === undefined) { return []; }
   if (group.position - leftNeighbour.endPosition > touchingDistance) { return []; }
   else {
@@ -189,7 +202,7 @@ const findTouchingNeighboursLeft = (group: GraphNodeGroup, nodeGroups: GraphNode
 };
 
 const findTouchingNeighboursRight = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[], touchingDistance: number = 1000): GraphNodeGroup[] => {
-  const [leftNeighbour, rightNeighbour] = findNeighgourNodes(group, nodeGroups);
+  const [leftNeighbour, rightNeighbour] = findNeighbourNodes(group, nodeGroups);
   if (rightNeighbour === undefined) { return []; }
   if (rightNeighbour.position - group.endPosition > touchingDistance) { return []; }
   else {
@@ -197,13 +210,16 @@ const findTouchingNeighboursRight = (group: GraphNodeGroup, nodeGroups: GraphNod
   }
 };
 
-export const findNeighgourNodes = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[]) => {
+export const findNeighbourNodes = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[]) => {
   if (group.connectionsX === undefined) { return [undefined, undefined]; }
-  const leftNeighbourId = group.connectionsX.left ? group.connectionsX.left[0] : undefined;
-  const rightNeighbourId = group.connectionsX.right ? group.connectionsX.right[0] : undefined;
+  // const leftNeighbourId = group.connectionsX.left ? group.connectionsX.left[0] : undefined;
+  // const rightNeighbourId = group.connectionsX.right ? group.connectionsX.right[0] : undefined;
+  const { left, right } = group.connectionsX;
+  const leftNeighbourId = left?.[0];
+  const rightNeighbourId = right?.[0];
 
-  const leftNeighbour = leftNeighbourId ? nodeGroups.find(d => d.id === leftNeighbourId) : undefined;
-  const rightNeighbour = rightNeighbourId ? nodeGroups.find(d => d.id === rightNeighbourId) : undefined;
+  const leftNeighbour = nodeGroups.find(d => d.id === leftNeighbourId);
+  const rightNeighbour = nodeGroups.find(d => d.id === rightNeighbourId);
   const connectedXNodes = [leftNeighbour, rightNeighbour];
   return connectedXNodes;
 };

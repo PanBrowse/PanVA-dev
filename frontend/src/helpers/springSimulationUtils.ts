@@ -6,13 +6,23 @@ import { filterUniquePosition } from './axisStretch';
 import { abs } from './math';
 import {
   evaluateForces,
-  findNeighgourNodes,
+  findNeighbourNodes,
   findNormalForces,
+
 } from './springSimulationForceCalculations';
+import { arrayRange } from './arrayRange';
 
 export interface xConnections {
   left: [id: string, distance: number] | undefined;
   right: [id: string, distance: number] | undefined;
+}
+
+export interface SpringTuningParameters {
+  scaleXForce: number,
+  scaleYForce: number,
+  scaleContraction: number,
+  scaleRepulsion: number,
+  minimumDistance: number,
 }
 export class GraphNode {
   private _id: string;
@@ -135,6 +145,7 @@ export class GraphNodeGroup {
       newNode.localTempScaling = node.localTempScaling;
       newNodes.push(newNode);
     });
+    newNodes.sort((a, b) => a.position - b.position);
     this._nodes = newNodes;
     this._originalRange = originalRange ?? calculateRange(nodes);
     this._id = id ?? nodes[0].id + 'group';
@@ -160,10 +171,10 @@ export class GraphNodeGroup {
     return this._originalRange[0];
   }
   public get position() {
-    return this.range[0];
+    return this._nodes[0].position;
   }
   public get endPosition() {
-    return this.range[1];
+    return this._nodes[this._nodes.length - 1].endPosition;
   }
   public get connectionsX() {
     return this._xConnections;
@@ -303,14 +314,25 @@ export const applyMinimumdistanceOnSequence = (
   return sorted;
 };
 
-const calculateRange = (nodes: GraphNode[]) => {
+const calculateRange = (nodes: GraphNode[]): [number, number] => {
   if (nodes.length === 0) {
     return [0, 0] as [number, number];
   }
-  const positions = nodes
-    .flatMap((node) => [node.position, node.endPosition])
-    .sort((a, b) => a - b);
+  // const positions = nodes
+  //   .flatMap((node) => [node.position, node.endPosition])
+  //   .sort((a, b) => a - b);
+  // return [positions[0], positions[positions.length - 1]] as [number, number];
+  return [nodes[0].position, nodes[nodes.length - 1].endPosition];
+
+
+  const positions = nodes.reduce((acc: number[], node) => {
+    acc.push(node.position, node.endPosition);
+    return acc;
+  }, []).sort((a, b) => a - b);
+
   return [positions[0], positions[positions.length - 1]] as [number, number];
+
+
 };
 
 export const rangesOverlap = (
@@ -412,7 +434,10 @@ export const addYConnections = (nodeGroups: GraphNodeGroup[]) => {
     const yConnections = group.nodes.flatMap((node) => node.connectionsY);
     const yConnectionsGroup: string[] = [];
     yConnections.forEach((d) => {
-      const neighbour = nodeGroups.find((group) => group.nodeIds.includes(d));
+      const dSet = new Set([d]);
+      const neighbour = nodeGroups.find((group) => group.nodeIds.some(id => dSet.has(id)));
+
+      // const neighbour = nodeGroups.find((group) => group.nodeIds.includes(d));
       if (neighbour !== undefined) {
         yConnectionsGroup.push(neighbour.id);
       }
@@ -506,11 +531,11 @@ const enforceMinimumDistance = (
 export const updateHighStressNodeGroup = (
   nodeGroups: GraphNodeGroup[],
   heat: number,
+  springTuning: SpringTuningParameters,
   excludedHomologyGroup: number = 0,
   touchingDistance: number = 1000
 ): [GraphNodeGroup[], boolean] => {
   let terminate = false;
-  const largestStep = 0; // used for the termination condition
   let highestForceNode = undefined;
   let highestDeltaPosNodeIndex = -1;
   let highestDeltaPosConstrained = 0;
@@ -521,18 +546,23 @@ export const updateHighStressNodeGroup = (
   ];
   const nodeGroupSpread = nodeGroupRange[1] - nodeGroupRange[0];
   // find node that moves the most
-  for (const group of nodeGroups) {
+  // for (const group of nodeGroups) {
+  for (const index of Array(50).keys()) {
+    const randomIndex = Math.floor(Math.random() * nodeGroups.length);
+    const group = nodeGroups[randomIndex];
     currentIndex = currentIndex + 1;
+    currentIndex = randomIndex;
     // calculate direct forces
-    const connectedXNodes = findNeighgourNodes(group, nodeGroups);
-    const connectedYNodes = nodeGroups.filter((d) =>
-      group.connectionsY.includes(d.id)
-    );
+    const connectedXNodes = findNeighbourNodes(group, nodeGroups);
+    const connectionsYSet = new Set(group.connectionsY);
+    const connectedYNodes = nodeGroups.filter(d => connectionsYSet.has(d.id));
+
     let [force, forceWithoutNormal] = evaluateForces(
       group,
       connectedXNodes,
       connectedYNodes,
       heat,
+      springTuning,
       excludedHomologyGroup,
       false
     );
@@ -540,6 +570,7 @@ export const updateHighStressNodeGroup = (
     const [forceFromLeft, forceFromRight] = findNormalForces(
       group,
       nodeGroups,
+      springTuning,
       touchingDistance
     );
     force = force + forceFromLeft + forceFromRight;

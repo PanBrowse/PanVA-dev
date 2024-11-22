@@ -6,6 +6,7 @@ import {
   genesToNodes,
   GraphNode,
   GraphNodeGroup,
+  type SpringTuningParameters,
   updateHighStressNodeGroup,
 } from './springSimulationUtils';
 
@@ -14,7 +15,8 @@ export const runSpringSimulation = (
   sequences: SequenceInfo[],
   fromHeat: number = 1000,
   toHeat: number = 0.1,
-  initializeOnHomologygroup?: number
+  springTuning: SpringTuningParameters,
+  initializeOnHomologygroup?: number,
 ) => {
   // simulates forces applied to all nodes in the graph
   // if tuning of the evaluateForces function is bad it can result in strange behaviour (ugly layout)
@@ -30,11 +32,11 @@ export const runSpringSimulation = (
     let anchor = 0;
     sequences.forEach((sequence) => {
       const sequenceMembers = nodes.filter((d) => d.sequenceId === sequence.uid);
-      console.log('sequenceMembers', sequenceMembers);
+
       const anchorElement = sequenceMembers.find(
         (d) => d.homologyGroup === initializeOnHomologygroup
       );
-      console.log('anchorElement', anchorElement);
+
       if (anchorElement === undefined) {
         anchor = 0;
       } else {
@@ -57,6 +59,7 @@ export const runSpringSimulation = (
     ;[nodeGroups, terminate] = updateHighStressNodeGroup(
       nodeGroups,
       heat,
+      springTuning,
       touchingDistance
     );
 

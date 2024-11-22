@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <ACard
     title="Focus View"
     :style="{
@@ -7,6 +7,7 @@
     }"
     :bordered="false"
     size="small"
+    v-if="!rerunSimulation"
   >
     <template #extra
       ><AButton type="text" size="small"
@@ -18,7 +19,8 @@
       :height="svgHeight"
     ></svg>
   </ACard>
-</template>
+  <LoadingScreen v-else>Loading data, please wait...</LoadingScreen>
+</template> -->
 
 <script lang="ts">
 import { CloseCircleOutlined, ConsoleSqlOutlined } from '@ant-design/icons-vue'
@@ -27,6 +29,8 @@ import * as d3 from 'd3'
 import { type Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 import { computed, defineComponent, ref, watch } from 'vue'
+
+import LoadingScreen from '@/components/LoadingScreen.vue'
 
 import colors from '@/assets/colors.module.scss'
 import {
@@ -46,6 +50,7 @@ import type { Gene, GroupInfo, Locus, Sequence, SequenceInfo, SequenceMetrics } 
 import { drawSquish } from './compressibleScale';
 import { arrayRange } from '@/helpers/arrayRange';
 
+
 // states
 const compressionViewWindowRange = ref<[number, number]>([0, 1])
 const geneToCompressionScales = ref<
@@ -59,6 +64,7 @@ const brush = ref<d3.BrushBehavior<unknown>>(d3.brushX())
 const anchorMax = ref<number>(0)
 const anchorMin = ref<number>(0)
 const anchorLookup = ref<Dictionary<number>>({})
+// const isLoading = ref<boolean>(true)
 
 export default {
   name: 'FocusView',
@@ -77,6 +83,7 @@ export default {
     ACard: Card,
     AButton: Button,
     CloseCircleOutlined: CloseCircleOutlined,
+    LoadingScreen
   },
   setup() {
     const genomeStore = useGenomeStore()
@@ -89,7 +96,6 @@ export default {
     // const selectedGeneUids = ref<string[]>([])
     const selectedGeneUids = computed(() => genomeStore.selectedGeneUids)
     const geneToLocusSequenceLookup = genomeStore.geneToLocusSequenceLookup
-    const rerunSimulation = computed(() => useGeneSetStore().rerunSimulation)
 
     // watch(
     //   () => genomeStore.selectedGeneUids,
@@ -220,83 +226,6 @@ export default {
       { immediate: true }
     )
 
-    watch(
-      rerunSimulation, 
-      (rerun) => {
-        if(!rerun ) {return}
-        useGeneSetStore().rerunSimulation = false
-        let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] =
-        runSpringSimulation(
-          genomeStore.genomeData.genes ?? [],
-          genomeStore.genomeData.sequences ?? [],
-          currentHeat.value,
-          1,
-          736740
-        )
-        console.log('rerunning')
-
-
-        crossingHomologyGroups.value = crossDetection(newGenePositions)
-
-        let xScaleGeneToWindowInit: Dictionary<
-          d3.ScaleLinear<number, number, never>
-        > = {}
-        let xScaleGeneToCompressionInit: Dictionary<
-          d3.ScaleLinear<number, number, never>
-        > = {}
-        //determine global ranges'
-        const sortedCompressionRangeGlobal = newGenePositions
-          .map((d) => d.position)
-          .sort((a, b) => a - b)
-
-        const edgesOfNewRangeGlobal: [number, number] = [
-          sortedCompressionRangeGlobal[0],
-          sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length - 1],
-        ]
-
-        const oldRanges = newGenePositions
-        .map((d) => d.originalPosition)
-        .sort((a, b) => a - b)
-        const edgesOfOldRange = [oldRanges[0], oldRanges[oldRanges.length - 1]]
-        // const overallCompressionFactor =
-        //   (edgesOfOldRange[1] - edgesOfOldRange[0]) /
-        //   (edgesOfNewRangeGlobal[1] - edgesOfNewRangeGlobal[0])
-        //   globalCompressionFactor.value = overallCompressionFactor
-        compressionViewWindowRange.value = edgesOfNewRangeGlobal
-        const compressions: number[] = []
-
-        genomeStore.genomeData.sequences.forEach((sequence) => {
-          //find gene positions
-          const key = sequence.uid
-          let genePositionsOnSequence = newGenePositions
-            .filter((d) => String(d.sequenceId) === key)
-            .sort((d) => d.originalPosition)
-
-            // create scales
-          const [geneToCompression, scaleGeneToWindow] = calculateIndividualScales(
-            genePositionsOnSequence,
-            edgesOfNewRangeGlobal,
-          )
-          xScaleGeneToCompressionInit[key] = geneToCompression
-          xScaleGeneToWindowInit[key] = scaleGeneToWindow
-
-          //  calculate compression
-          if(genePositionsOnSequence.length === 0) { return }
-          const compressedWidth = geneToCompression(sequence.sequence_length_nuc) - geneToCompression(0)
-          const compression = sequence.sequence_length_nuc / compressedWidth
-          compressions.push(compression)
-        })
-        //assign scale dictionaries
-        geneToCompressionScales.value = xScaleGeneToCompressionInit
-        // find median compression
-        compressions.sort((a,b)  => a - b)
-
-        const medianCompression = compressions[Math.floor(compressions.length / 2)]
-        globalCompressionFactor.value = medianCompression
-      },
-      {immediate: true}
-    ) 
-
     return {
       filteredSequences,
       sequenceIndicesInLookup,
@@ -336,6 +265,7 @@ export default {
     transcriptSpacing: 2,
     transcriptHeight: 2,
     transcriptWidth: 2,
+    isLoading: true
   }),
   computed: {
     ...mapState(useGeneSetStore, [
@@ -356,6 +286,12 @@ export default {
       'anchor',
       // 'colorGenes',
       'showLinks',
+      'rerunSimulation',
+      'scaleXForce',
+      'scaleYForce',
+      'scaleContraction',
+      'scaleRepulsion',
+      'minimumDistance'
     ]),
     containerWidth() {
       return this.showTable ? this.svgWidth / 2 : this.svgWidth
@@ -495,6 +431,88 @@ export default {
         )
         .attr('x', 0)
         .attr('y', 0)
+    },
+
+    async runSimulation() {
+      console.log('simulation start')
+      const response = await this.simulationAsync()
+      console.log('simulation done')
+      let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] = response
+      useGeneSetStore().rerunSimulation = false
+
+      crossingHomologyGroups.value = crossDetection(newGenePositions)
+
+      let xScaleGeneToWindowInit: Dictionary<
+        d3.ScaleLinear<number, number, never>
+      > = {}
+      let xScaleGeneToCompressionInit: Dictionary<
+        d3.ScaleLinear<number, number, never>
+      > = {}
+      //determine global ranges'
+      const sortedCompressionRangeGlobal = newGenePositions
+        .map((d) => d.position)
+        .sort((a, b) => a - b)
+
+      const edgesOfNewRangeGlobal: [number, number] = [
+        sortedCompressionRangeGlobal[0],
+        sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length - 1],
+      ]
+
+      const oldRanges = newGenePositions
+      .map((d) => d.originalPosition)
+      .sort((a, b) => a - b)
+      const edgesOfOldRange = [oldRanges[0], oldRanges[oldRanges.length - 1]]
+
+      compressionViewWindowRange.value = edgesOfNewRangeGlobal
+      const compressions: number[] = []
+
+      useGenomeStore().genomeData.sequences.forEach((sequence) => {
+        //find gene positions
+        const key = sequence.uid
+        let genePositionsOnSequence = newGenePositions
+          .filter((d) => String(d.sequenceId) === key)
+          .sort((d) => d.originalPosition)
+
+          // create scales
+        const [geneToCompression, scaleGeneToWindow] = calculateIndividualScales(
+          genePositionsOnSequence,
+          edgesOfNewRangeGlobal,
+        )
+        xScaleGeneToCompressionInit[key] = geneToCompression
+        xScaleGeneToWindowInit[key] = scaleGeneToWindow
+
+        //  calculate compression
+        if(genePositionsOnSequence.length === 0) { return }
+        const compressedWidth = geneToCompression(sequence.sequence_length_nuc) - geneToCompression(0)
+        const compression = sequence.sequence_length_nuc / compressedWidth
+        compressions.push(compression)
+      })
+      //assign scale dictionaries
+      geneToCompressionScales.value = xScaleGeneToCompressionInit
+      // find median compression
+      compressions.sort((a,b)  => a - b)
+
+      const medianCompression = compressions[Math.floor(compressions.length / 2)]
+      globalCompressionFactor.value = medianCompression
+      this.isLoading = false
+    },
+
+    async simulationAsync() {
+      this.isLoading = true
+      console.log('asyncing')
+      const response = new Promise<[GraphNode[], GraphNodeGroup[]]>((resolve) => resolve(runSpringSimulation(
+        useGenomeStore().genomeData.genes ?? [],
+        useGenomeStore().genomeData.sequences ?? [],
+        currentHeat.value,
+        1,
+        {scaleXForce: useGeneSetStore().scaleXForce,
+        scaleYForce: useGeneSetStore().scaleYForce,
+        scaleContraction: useGeneSetStore().scaleContraction,
+        scaleRepulsion: useGeneSetStore().scaleRepulsion,
+        minimumDistance: useGeneSetStore().minimumDistance,
+        },
+        736740)))
+      return response
     },
 
     ///////////////////////////////////////////////////////////////////////////////Update chart////////////////////////////////////
@@ -1267,8 +1285,15 @@ export default {
         this.genomeStore.genomeData.sequences ?? [],
         currentHeat.value,
         1,
+        {scaleXForce: useGeneSetStore().scaleXForce,
+        scaleYForce: useGeneSetStore().scaleYForce,
+        scaleContraction: useGeneSetStore().scaleContraction,
+        scaleRepulsion: useGeneSetStore().scaleRepulsion,
+        minimumDistance: useGeneSetStore().minimumDistance,
+        },
         736740
       )
+    this.isLoading = false
 
     // let newGenePositions = genesToNodes(this.filteredGenes)
     //used for alignment
@@ -1424,6 +1449,9 @@ export default {
   // unmounted() {
   //   this.resizeObserver?.disconnect()
   // },
+  actions: {
+
+  },
   watch: {
     //Watch for updates to `mappedIndices` before redrawing
     filteredGenes: {
@@ -1510,10 +1538,50 @@ export default {
       immediate: true,
       deep: true
     },
-
-  },
+    isLoading: {
+      handler(newValue) {
+        console.log('is loading:', newValue)
+      }
+    },
+    rerunSimulation: {
+      async handler(rerun) {
+        if(!rerun ) {
+          return
+        }
+        console.log('rerun: ', rerun)
+        this.isLoading = true
+        await this.runSimulation()
+        console.log('done')
+      }
+    }
+  }
 }
 </script>
+
+<template>
+  <ACard
+    title="Focus View"
+    :style="{
+      width: `${100}%`,
+      height: `${100}%`,
+    }"
+    :bordered="false"
+    size="small"
+  >
+    <template #extra
+      ><AButton type="text" size="small"
+        ><CloseCircleOutlined key="edit" /></AButton
+    ></template>
+    <!-- <LoadingScreen>Loading data, please wait...</LoadingScreen> -->
+    <LoadingScreen v-show="rerunSimulation">Loading data, please wait...</LoadingScreen>
+    <svg
+      :id="`container_${name}`"
+      :width="containerWidth"
+      :height="svgHeight"
+    ></svg>
+  </ACard>
+
+</template>
 
 <style lang="scss">
 @import '@/assets/colors.module.scss';
