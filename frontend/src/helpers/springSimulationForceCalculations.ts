@@ -81,7 +81,7 @@ export const evaluateForces = (
     if (Math.sign(expectedNeighbourDistance) !== Math.sign(neighbourDistance)) {
       // if different signs: order flipped,  this should never happen
       dnaStringPartialForce = calculateAttractingForce(neighbourDistance, expectedNeighbourDistance, touchingDistance);
-      console.log('order flipped', expectedNeighbourDistance, neighbourDistance);
+      console.log('order flipped', expectedNeighbourDistance, neighbourDistance, currentNode.id);
     }
     else if (abs(neighbourDistance) < abs(expectedNeighbourDistance)) {
       dnaStringPartialForce = calculateRepellingForce(neighbourDistance, expectedNeighbourDistance);

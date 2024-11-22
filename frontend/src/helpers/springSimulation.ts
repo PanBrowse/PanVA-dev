@@ -3,6 +3,7 @@ import type { Gene, GroupInfo, SequenceInfo, SequenceMetrics } from '@/types';
 import {
   applyMinimumdistanceOnSequence,
   createNodeGroups,
+  enforceMinimumDistance,
   genesToNodes,
   GraphNode,
   GraphNodeGroup,
@@ -23,9 +24,8 @@ export const runSpringSimulation = (
   let heat = fromHeat;
   let nodeGroups: GraphNodeGroup[] = [];
   const nodes: GraphNode[] = genesToNodes(genes);
-  console.log('nodes simulation', nodes);
   const excludedHomologyGroup = 0; // 232290464
-  const touchingDistance = 100;
+  const touchingDistance = springTuning.minimumDistance;
 
   // initalize with centering on a specific homologygroup
   if (initializeOnHomologygroup !== undefined) {
@@ -50,7 +50,7 @@ export const runSpringSimulation = (
 
   // Form grous of overlappiung nodes
   nodeGroups = createNodeGroups(nodes);
-
+  nodeGroups = enforceMinimumDistance(nodeGroups, springTuning.minimumDistance);
   let terminate = false;
   let nIterations = 0;
   const largestStep = 0;

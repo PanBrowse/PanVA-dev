@@ -434,9 +434,7 @@ export default {
     },
 
     async runSimulation() {
-      console.log('simulation start')
       const response = await this.simulationAsync()
-      console.log('simulation done')
       let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] = response
       useGeneSetStore().rerunSimulation = false
 
@@ -499,7 +497,6 @@ export default {
 
     async simulationAsync() {
       this.isLoading = true
-      console.log('asyncing')
       const response = new Promise<[GraphNode[], GraphNodeGroup[]]>((resolve) => resolve(runSpringSimulation(
         useGenomeStore().genomeData.genes ?? [],
         useGenomeStore().genomeData.sequences ?? [],
@@ -1538,20 +1535,13 @@ export default {
       immediate: true,
       deep: true
     },
-    isLoading: {
-      handler(newValue) {
-        console.log('is loading:', newValue)
-      }
-    },
     rerunSimulation: {
       async handler(rerun) {
         if(!rerun ) {
           return
         }
-        console.log('rerun: ', rerun)
         this.isLoading = true
         await this.runSimulation()
-        console.log('done')
       }
     }
   }

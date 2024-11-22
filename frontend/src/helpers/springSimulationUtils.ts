@@ -244,18 +244,21 @@ export const applyOrderConstraint = (
   touchingDistance: number = 1000
 ) => {
   // maximum allowed move depends on the heat (Davidson and Harel)
+
+
   const maxMove = 1000 * heat;
   const bounds = [-maxMove, maxMove];
   let deltaPos: number = deltaPosIn;
   //calculate bounds
   const connectedRight = connectedXNodes[1];
   const connectedLeft = connectedXNodes[0];
-  const previousDistanceRight = connectedRight
-    ? connectedRight.startPosition - currentNode.endPosition
-    : maxMove;
   const previousDistanceLeft = connectedLeft
     ? connectedLeft.endPosition - currentNode.startPosition
     : -maxMove;
+  const previousDistanceRight = connectedRight
+    ? connectedRight.startPosition - currentNode.endPosition
+    : maxMove;
+
   bounds[0] = Math.max(previousDistanceLeft + touchingDistance, -maxMove);
   bounds[1] = Math.min(previousDistanceRight - touchingDistance, maxMove);
 
@@ -266,7 +269,6 @@ export const applyOrderConstraint = (
   } else {
     deltaPos = Math.min(deltaPos, bounds[1]);
   }
-  console.log(deltaPos, bounds[0], bounds[1]);
   return deltaPos;
 };
 
@@ -504,7 +506,7 @@ export const checkNodeOrder = (newNodes: GraphNodeGroup[]) => {
   });
 };
 
-const enforceMinimumDistance = (
+export const enforceMinimumDistance = (
   inputNodes: GraphNodeGroup[],
   minimumDistance: number
 ) => {
@@ -531,6 +533,34 @@ const enforceMinimumDistance = (
   });
   return newNodes;
 };
+
+// export const enforceMinimumDistance = (
+//   inputNodes: GraphNodeGroup[],
+//   minimumDistance: number
+// ) => {
+//   const newNodes: GraphNodeGroup[] = [];
+//   const uniqueSequences: string[] = [];
+//   inputNodes
+//     .map((d) => d.sequenceId)
+//     .forEach((d) => {
+//       if (uniqueSequences.includes(d)) {
+//         return;
+//       }
+//       uniqueSequences.push(d);
+//     });
+//   uniqueSequences.forEach((sequence) => {
+//     const currentSequence = sequence;
+//     const nodesOnSequence = inputNodes.filter(
+//       (d) => d.sequenceId === currentSequence
+//     );
+//     const spreadNodes = applyMinimumdistanceOnSequence(
+//       nodesOnSequence,
+//       minimumDistance
+//     ) as GraphNodeGroup[];
+//     newNodes.push(...spreadNodes);
+//   });
+//   return newNodes;
+// };
 
 export const updateHighStressNodeGroup = (
   nodeGroups: GraphNodeGroup[],
@@ -627,7 +657,7 @@ export const updateHighStressNodeGroup = (
   if (highestForceNode !== undefined) {
     nodeGroups.splice(highestDeltaPosNodeIndex, 1, highestForceNode);
   }
-  const newNodes = nodeGroups; // enforceMinimumDistance(nodeGroups, touchingDistance)
+  let newNodes = nodeGroups; // enforceMinimumDistance(nodeGroups, touchingDistance)
 
   // check for order changes
   checkNodeOrder(newNodes);
@@ -656,5 +686,6 @@ export const updateHighStressNodeGroup = (
       (terminate = true);
   }
 
+  newNodes = enforceMinimumDistance(newNodes, touchingDistance);
   return [newNodes, terminate];
 };
