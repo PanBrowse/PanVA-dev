@@ -6,7 +6,7 @@ import { mapWritableState } from "pinia";
 
 export const evaluateForcesY = (currentNode: GraphNode, connectedYNodes: GraphNode[], heat: number, excludedHomologyGroup?: number) => {
   let force = 0;
-  const scalePartialForceY = 1000;
+  const scalePartialForceY = 0.1;
 
   // Calculate contribution for all in the same homology group
   connectedYNodes.forEach(connectedNode => {
@@ -121,7 +121,7 @@ export const calculateAttractingForce = (distanceToNeighbour: number, expectedDi
   const force = (abs(differenceToExpectedDistance) / abs(expectedDistance));
   const direction = Math.sign(expectedDistance);
   if (force <= 1) { return force * direction; }
-  return Math.log2(force) * direction / 1000;
+  return Math.log2(force) * direction * 10;
 };
 
 const calculateAttractingForceY = (distanceToNeighbour: number) => {
@@ -148,7 +148,8 @@ const calculateGravityForce = (distanceToNeighbour: number, minimumDistance: num
 
 const calculateNaturalRepellingForce = (distanceToNeighbour: number) => {
   if (distanceToNeighbour === 0) { return 0; }
-  return -1 / Math.pow(abs(distanceToNeighbour), 1 / 10) * Math.sign(distanceToNeighbour);
+  const scale = 100;
+  return -1 / Math.pow(abs(distanceToNeighbour), 1 / 2) * Math.sign(distanceToNeighbour) * scale;
 };
 
 export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGroup[], touchingDistance: number = 1000) => {

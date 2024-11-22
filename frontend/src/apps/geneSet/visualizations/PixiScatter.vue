@@ -42,6 +42,10 @@ import { useGenomeStore } from '@/stores/geneSet'
 import type { Gene, Genome, GenomeData } from '@/types'
 import { parseSVG } from 'svg-path-parser';
 
+const globalSelectedSprites = ref<string[]>([])
+const circleTexture = ref<PIXI.Texture>()
+const lassoInstance = ref<lasso>()
+
 PIXI.Sprite.prototype.getBoundingClientRect = function () {
   const devicePixelRatio = window.devicePixelRatio || 1
 
@@ -470,7 +474,7 @@ export default {
             !filterEmpty || (sequence.loci && sequence.loci.length > 0)
 
           if (shouldDraw) {
-            const circleSprite = new PIXI.Sprite(this.circleTexture)
+            const circleSprite = new PIXI.Sprite(circleTexture.value)
 
             // Check if this sequence is part of the selectedSequencesLasso
             const isSelected = this.genomeStore.selectedSequencesLasso.includes(
@@ -528,7 +532,7 @@ export default {
         
 
       // Set up the lasso instance
-      this.lassoInstance = lasso()
+      lassoInstance.value = lasso()
         .targetArea(d3.select(canvas)) // Bind to the canvas
         .closePathDistance(150)
         // .scale(this.viewport.scale.x)
@@ -557,7 +561,7 @@ export default {
       const trackerUids = genomeStore.selectedSequencesTracker
 
       // Filter the sprites in lassoInstance based on sequence_uids in tracker
-      const trackedSprites = this.lassoInstance.items().filter((sprite) => {
+      const trackedSprites = lassoInstance.value.items().filter((sprite) => {
         return trackerUids.has(sprite.sequence_uid) // Check if sprite's UID is in the tracker
       })
 
@@ -566,8 +570,8 @@ export default {
       //   sprite.tint = 0xa9a9a9 // darker tint for previously selected sprites
       //   sprite.alpha = 0.5 // Set opacity to 50%
       // })
-      if (this.selectedSprites) {
-        this.selectedSprites.forEach((sprite) => {
+      if (trackedSprites) {
+       trackedSprites.forEach((sprite) => {
           if (!trackerUids.has(sprite.sequence_uid)) {
             sprite.tint = 0xd3d3d3 // default tint for unmatched sprites
             sprite.alpha = 0.5 // Set opacity to 50%
@@ -691,13 +695,13 @@ export default {
       this.app?.render()
       // debugger;
 
-      // const boolSprites = this.lassoInstance.items().map(x => x.__lasso.selected);
+      // const boolSprites = lassoInstance.value.items().map(x => x.__lasso.selected);
       // console.log('boolSprites', boolSprites)
-      // const selectedSprites = this.lassoInstance.items().filter((sprite, index) => boolSprites[index] === true).map(
+      // const selectedSprites = lassoInstance.value.items().filter((sprite, index) => boolSprites[index] === true).map(
       // (sprite) => sprite.sequence_uid
       // );
       console.log('Selected sprites:', selectedSprites)
-      this.selectedSprites = selectedSprites
+      globalSelectedSprites.value = selectedSprites
       const genomeStore = useGenomeStore()
       genomeStore.setSelectedSequencesLasso(selectedSprites)
 
@@ -777,7 +781,7 @@ export default {
       circleContainer,
       sequence_uid
     ) {
-      if (!this.circleTexture) {
+      if (!circleTexture.value) {
         console.error('Circle texture is not created.')
         return
       }

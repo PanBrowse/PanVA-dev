@@ -44,13 +44,15 @@ export const filterUniquePosition = (genes: (GraphNode | GraphNodeGroup)[]) => {
 export const calculateIndividualScales = (
   genePositionsOnSequence: (GraphNode[] | GraphNodeGroup[]),
   newCompressionRangeEdges: [number, number],
-  windowRangeEdges: [number, number]
+  windowRangeEdges: [number, number] = [0, 1]
 ): [d3.ScaleLinear<number, number, never>, d3.ScaleLinear<number, number, never>] => {
-  //filter unique positions (to avoid undefined behaviour from d3 scale)
   if (genePositionsOnSequence.length === 0) {
-    return [d3.scaleLinear().domain(newCompressionRangeEdges).range(windowRangeEdges),
-    d3.scaleLinear().domain(newCompressionRangeEdges).range(windowRangeEdges)];
+    const newRangeWidth = newCompressionRangeEdges[1] - newCompressionRangeEdges[0];
+    const originalRange = [0, newRangeWidth];
+    return [d3.scaleLinear().domain(originalRange).range(newCompressionRangeEdges),
+    d3.scaleLinear().domain(originalRange).range(windowRangeEdges)];
   }
+  //filter unique positions (to avoid undefined behaviour from d3 scale)
   const uniqueGenePositions = filterUniquePosition(genePositionsOnSequence);
 
   //create scale from gene coordinates to compressed coordinates
@@ -88,9 +90,13 @@ export const calculateWidth = (geneToCompression: d3.ScaleLinear<number, number,
   if (geneToCompression === undefined) { return 0; }
   const genePositions: number[] = geneToCompression.domain();
   const indexOfCurrentGene: number = genePositions.findIndex(domainPoint => genePosition <= domainPoint);
-  if (indexOfCurrentGene >= genePositions.length - 1 || indexOfCurrentGene === -1) { return 0; }
-  const currentGenePosition = genePositions[indexOfCurrentGene];
-  const nextGenePosition: number = genePositions[indexOfCurrentGene + 1];
+  let currentGenePosition = genePositions[indexOfCurrentGene];
+  let nextGenePosition: number = genePositions[indexOfCurrentGene + 1];
+
+  if (indexOfCurrentGene === -1) {
+    currentGenePosition = 0;
+  }
+  if (indexOfCurrentGene >= genePositions.length - 1) { return 0; }
 
   let windowCoordinateNext = geneToWindow(nextGenePosition);// Math.min(geneToWindow(nextGenePosition), windowRange[1])
   if (nextGenePosition === undefined) { windowCoordinateNext = windowRange[1]; }
