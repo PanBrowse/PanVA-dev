@@ -60,9 +60,12 @@ export const fetchHomologies = async () => {
 
 export const fetchGenomeData = async (): Promise<GenomeData> => {
   const config = useConfigStore()
+  const dataset = config.geneSet.dataset 
   const data = await d3.json<GenomeData>(
-    `${config.apiUrl}geneSet/yeast_test.json`
-  )
+    // `${config.apiUrl}geneSet/yeast_test.json`
+      //  `${config.apiUrl}geneSet/Rosa.ROI.NUDX.genesetexplorer.json`
+      `${config.apiUrl}geneSet/${dataset}/genesetexplorer.json`
+  )   
 
   // Combine all sequences into a flat array for the standalone `sequences` property
   const sequences =
@@ -240,11 +243,16 @@ export const fetchGenomeData = async (): Promise<GenomeData> => {
 // Function to fetch and process the JSON distance matrix
 export const fetchDistanceMatrix = async () => {
   const config = useConfigStore()
+  const dataset = config.geneSet.dataset
   try {
     // Fetch the JSON-encoded distance matrix from the API
-    const response = await fetch(
-      `${config.apiUrl}geneSet/yeast_matrices_test/protein_distance_matrix`
-    )
+    // const response = await fetch(
+    //   `${config.apiUrl}geneSet/yeast_matrices_test/protein_distance_matrix`
+    // )
+      // Fetch the JSON-encoded distance matrix from the API
+      const response = await fetch(
+        `${config.apiUrl}geneSet/${dataset}/protein_distance_matrix`
+      )
     if (!response.ok) {
       throw new Error(`Failed to fetch distance matrix: ${response.statusText}`)
     }
@@ -276,10 +284,11 @@ export const fetchDistanceMatrix = async () => {
 
 export const fetchDistanceMatrixLabels = async () => {
   const config = useConfigStore()
+  const dataset = config.geneSet.dataset
   try {
     // Fetch the JSON labels data from the API
     const response = await fetch(
-      `${config.apiUrl}geneSet/yeast_matrices_test/protein_labels`
+      `${config.apiUrl}geneSet/${dataset}/protein_labels`
     )
     if (!response.ok) {
       throw new Error(`Failed to fetch labels: ${response.statusText}`)
@@ -300,10 +309,11 @@ export const fetchDistanceMatrixLabels = async () => {
 
 export const fetchFilteredLabels = async () => {
   const config = useConfigStore()
+  const dataset = config.geneSet.dataset
   try {
     // Fetch the JSON labels data from the API
     const response = await fetch(
-      `${config.apiUrl}geneSet/yeast_matrices_test/filtered_protein_labels`
+      `${config.apiUrl}geneSet/${dataset}/filtered_protein_labels`
     )
     if (!response.ok) {
       throw new Error(`Failed to fetch labels: ${response.statusText}`)
@@ -325,10 +335,12 @@ export const fetchFilteredLabels = async () => {
 // Function to fetch and process the UMAP embedding JSON
 export const fetchEmbedding = async () => {
   const config = useConfigStore()
+  const dataset = config.geneSet.dataset
+
   try {
     // Fetch the UMAP embedding JSON from the API
     const response = await fetch(
-      `${config.apiUrl}geneSet/yeast_embeddings_test/protein_umap_embedding`
+      `${config.apiUrl}geneSet/${dataset}/protein_umap_embedding`
     )
     if (!response.ok) {
       throw new Error(`Failed to fetch UMAP embedding: ${response.statusText}`)
@@ -348,10 +360,12 @@ export const fetchEmbedding = async () => {
 // Function to fetch and process the UMAP embedding JSON
 export const fetchFilteredEmbedding = async () => {
   const config = useConfigStore()
+  const dataset = config.geneSet.dataset
+
   try {
     // Fetch the UMAP embedding JSON from the API
     const response = await fetch(
-      `${config.apiUrl}geneSet/yeast_embeddings_test/filtered_protein_umap_embedding`
+      `${config.apiUrl}geneSet/${dataset}/filtered_protein_umap_embedding`
     )
     if (!response.ok) {
       throw new Error(`Failed to fetch UMAP embedding: ${response.statusText}`)

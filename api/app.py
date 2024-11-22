@@ -29,6 +29,27 @@ load_dotenv(".env")
 db_path = os.environ.get("API_DB_PATH")
 print("db_path", db_path)
 
+# Configuration for datasets
+DATASET_CONFIG = {
+    "rose": {
+        "embedding_filtered": os.path.join(db_path, "geneSet", "rose", "filtered_embedding_rose_neighbors4_minDist0.1_seed42.json"),
+        "embedding": os.path.join(db_path, "geneSet", "rose", "embedding_rose_neighbors10_minDist0.5_seed42.json"),
+        "labels_filtered": os.path.join(db_path, "geneSet", "rose", "filtered_protein_distance_labels.json"),
+        "labels": os.path.join(db_path, "geneSet", "rose", "protein_distance_labels.json"),
+        "distance_matrix": os.path.join(db_path, "geneSet", "rose", "protein_distance_matrix.npy"),
+    },
+    "yeast": {
+        "embedding_filtered": os.path.join(db_path, "geneSet", "yeast", "filtered_embedding_yeast_neighbors2_minDist0.1_seed42.json"),
+        "embedding": os.path.join(db_path, "geneSet", "yeast", "embedding_neighbors10_minDist0.1_seed42.json"),
+        "labels_filtered": os.path.join(db_path, "geneSet", "yeast", "filtered_protein_distance_labels.json"),
+        "labels": os.path.join(db_path, "geneSet", "yeast", "protein_distance_labels.json"),
+        "distance_matrix": os.path.join(db_path, "geneSet", "yeast", "protein_distance_matrix.npy"),
+    }
+}
+
+# Default dataset
+DEFAULT_DATASET = "yeast"  # Change to yeast or rose
+
 
 # Instantiate the app.
 app = Flask(
@@ -89,10 +110,11 @@ def get_dendrogram(id):
     return create_dendrogram(linkage_matrix, labels)
 
 #### new route geneSets ####
-@app.route('/geneSet/yeast_embeddings_test/filtered_protein_umap_embedding', methods=['GET'])
-def get_umap_embedding_filtered():
-    # Define the path to the UMAP embedding JSON file
-    embedding_path = os.path.join(db_path, "geneSet", "yeast_embeddings_test", "filtered_embedding_yeast_neighbors2_minDist0.1_seed42.json")
+@app.route('/geneSet/<dataset>/filtered_protein_umap_embedding', methods=['GET'])
+def get_umap_embedding_filtered(dataset):
+    dataset = dataset or DEFAULT_DATASET
+    embedding_path = DATASET_CONFIG[dataset]["embedding_filtered"]
+   
     print("Loading embedding from:", embedding_path)
     
     # Load the JSON embedding
@@ -107,10 +129,10 @@ def get_umap_embedding_filtered():
         print("Error loading embedding:", e)
         return jsonify({"error": "Failed to load embedding"}), 500
     
-@app.route('/geneSet/yeast_embeddings_test/protein_umap_embedding', methods=['GET'])
-def get_umap_embedding():
-    # Define the path to the UMAP embedding JSON file
-    embedding_path = os.path.join(db_path, "geneSet", "yeast_embeddings_test", "embedding_neighbors10_minDist0.1_seed42.json")
+@app.route('/geneSet/<dataset>/protein_umap_embedding', methods=['GET'])
+def get_umap_embedding(dataset):
+    dataset = dataset or DEFAULT_DATASET
+    embedding_path = DATASET_CONFIG[dataset]["embedding"]
     print("Loading embedding from:", embedding_path)
     
     # Load the JSON embedding
@@ -125,14 +147,13 @@ def get_umap_embedding():
         print("Error loading embedding:", e)
         return jsonify({"error": "Failed to load embedding"}), 500
 
-@app.route('/geneSet/yeast_matrices_test/filtered_protein_labels', methods=['GET'])
-def get_labels_filtered():
-    try:
-        labels_path = os.path.join(
-            db_path, "geneSet", "yeast_matrices_test", "filtered_protein_distance_labels.json"
-        )
-        print("Loading labels from:", labels_path)
+@app.route('/geneSet/<dataset>/filtered_protein_labels', methods=['GET'])
+def get_labels_filtered(dataset):
+    dataset = dataset or DEFAULT_DATASET
+    labels_path = DATASET_CONFIG[dataset]["labels_filtered"]
+    print("Loading filtered labels from:", labels_path)
 
+    try:
         # Load the labels from the JSON file
         with open(labels_path, "r") as f:
             labels = json.load(f)
@@ -146,14 +167,13 @@ def get_labels_filtered():
         return jsonify({"error": str(e)}), 500
 
     
-@app.route('/geneSet/yeast_matrices_test/protein_labels', methods=['GET'])
-def get_labels():
-    try:
-        labels_path = os.path.join(
-            db_path, "geneSet", "yeast_matrices_test", "protein_distance_labels.json"
-        )
-        print("Loading labels from:", labels_path)
+@app.route('/geneSet/<dataset>/protein_labels', methods=['GET'])
+def get_labels(dataset):
+    dataset = dataset or DEFAULT_DATASET
+    labels_path = DATASET_CONFIG[dataset]["labels"]
+    print("Loading labels from:", labels_path)
 
+    try:
         # Load the labels from the JSON file
         with open(labels_path, "r") as f:
             labels = json.load(f)
@@ -167,11 +187,11 @@ def get_labels():
         return jsonify({"error": str(e)}), 500
 
     
-@app.route('/geneSet/yeast_matrices_test/protein_distance_matrix', methods=['GET'])
-def get_distance_matrix():
-    # Load the .npy file
-    matrix_path = os.path.join(db_path, "geneSet", "yeast_matrices_test", "protein_distance_matrix.npy")
-    print("Loading matrix from:", matrix_path)
+@app.route('/geneSet/<dataset>/protein_distance_matrix', methods=['GET'])
+def get_distance_matrix(dataset):
+    dataset = dataset or DEFAULT_DATASET
+    matrix_path = DATASET_CONFIG[dataset]["distance_matrix"]
+    print("Loading distance matrix from:", matrix_path)
 
     try:
         # Load the matrix from the .npy file
