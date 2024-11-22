@@ -28,7 +28,7 @@ export const useConfigStore = defineStore('config', {
       variableMetadata: [] as ConfigMetadata[],
     },
     geneSet: {
-      dataset: 'rose' as string, // Default dataset for geneSet
+      dataset: 'yeast' as string, // Default dataset for geneSet
       datasets: ['yeast', 'rose'] as string[], // Available datasets
     },
     title: 'PanVA' as string,

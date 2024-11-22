@@ -702,6 +702,7 @@ export default {
       // );
       console.log('Selected sprites:', selectedSprites)
       globalSelectedSprites.value = selectedSprites
+      this.selectedSprites = selectedSprites
       const genomeStore = useGenomeStore()
       genomeStore.setSelectedSequencesLasso(selectedSprites)
 
