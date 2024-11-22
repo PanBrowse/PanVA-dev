@@ -231,6 +231,8 @@ export class GraphNodeGroup {
 
   public addNode(newNode: GraphNode) {
     this._nodes.push(newNode);
+    this._nodes.sort((a, b) => a.position - b.position);
+    this.originalRange = calculateRange(this._nodes);
   }
 }
 
@@ -322,15 +324,15 @@ const calculateRange = (nodes: GraphNode[]): [number, number] => {
   //   .flatMap((node) => [node.position, node.endPosition])
   //   .sort((a, b) => a - b);
   // return [positions[0], positions[positions.length - 1]] as [number, number];
-  return [nodes[0].position, nodes[nodes.length - 1].endPosition];
+  // return [nodes[0].position, nodes[nodes.length - 1].endPosition];
 
 
-  const positions = nodes.reduce((acc: number[], node) => {
-    acc.push(node.position, node.endPosition);
+  const endPositions = nodes.reduce((acc: number[], node) => {
+    acc.push(node.endPosition);
     return acc;
   }, []).sort((a, b) => a - b);
 
-  return [positions[0], positions[positions.length - 1]] as [number, number];
+  return [nodes[0].position, endPositions[endPositions.length - 1]] as [number, number];
 
 
 };
