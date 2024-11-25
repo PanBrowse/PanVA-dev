@@ -156,14 +156,33 @@ const calculateGravityForce = (distanceToNeighbour: number, minimumDistance: num
 
 const calculateNaturalRepellingForce = (distanceToNeighbour: number) => {
   if (distanceToNeighbour === 0) { return 0; }
-  const scale = 100;
-  return -1 / Math.pow(abs(distanceToNeighbour), 1 / 2) * Math.sign(distanceToNeighbour) * scale;
+  const scale = 1000;
+  return -1 / Math.pow(abs(distanceToNeighbour), 1 / 10) * Math.sign(distanceToNeighbour) * scale;
 };
 
-export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGroup[], springTuning: SpringTuningParameters, touchingDistance: number = 1000) => {
 
-  const touchingLeft = findTouchingNeighboursLeft(group, allGroups, touchingDistance);
-  const touchingRight = findTouchingNeighboursRight(group, allGroups, touchingDistance);
+export const findNormalForces = (
+  group: GraphNodeGroup,
+  allGroups: GraphNodeGroup[],
+  springTuning: SpringTuningParameters,
+  touchingDistance: number = 1000,
+  maxDepth: number = 1
+) => {
+
+  const touchingLeft = findTouchingNeighboursLeft(
+    group,
+    allGroups,
+    touchingDistance,
+    0,
+    maxDepth
+  );
+  const touchingRight = findTouchingNeighboursRight(
+    group,
+    allGroups,
+    touchingDistance,
+    0,
+    maxDepth
+  );
 
   // For right nodes
   let totalRightForce = 0;
@@ -188,25 +207,50 @@ export const findNormalForces = (group: GraphNodeGroup, allGroups: GraphNodeGrou
     const updatedTotalLeft = totalLeftForce + forceContribution;
     totalLeftForce = Math.max(updatedTotalLeft, 0);
   });
-
   return [totalLeftForce, totalRightForce];
 };
 
-const findTouchingNeighboursLeft = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[], touchingDistance: number = 1000): GraphNodeGroup[] => {
-  const [leftNeighbour, rightNeighbour] = findNeighbourNodes(group, nodeGroups);
+const findTouchingNeighboursLeft = (
+  group: GraphNodeGroup,
+  nodeGroups: GraphNodeGroup[],
+  touchingDistance: number = 1000,
+  depth: number = 0,
+  maxDepth: number | undefined = undefined
+): GraphNodeGroup[] => {
+  if (maxDepth && depth >= maxDepth) { return []; }
+  const [leftNeighbour, _] = findNeighbourNodes(group, nodeGroups);
   if (leftNeighbour === undefined) { return []; }
   if (group.startPosition - leftNeighbour.endPosition > touchingDistance) { return []; }
   else {
-    return [group, ...findTouchingNeighboursLeft(leftNeighbour, nodeGroups)];
+    return [group, ...findTouchingNeighboursLeft(
+      leftNeighbour,
+      nodeGroups,
+      touchingDistance,
+      depth + 1,
+      maxDepth
+    )];
   }
 };
 
-const findTouchingNeighboursRight = (group: GraphNodeGroup, nodeGroups: GraphNodeGroup[], touchingDistance: number = 1000): GraphNodeGroup[] => {
-  const [leftNeighbour, rightNeighbour] = findNeighbourNodes(group, nodeGroups);
+const findTouchingNeighboursRight = (
+  group: GraphNodeGroup,
+  nodeGroups: GraphNodeGroup[],
+  touchingDistance: number = 1000,
+  depth: number = 0,
+  maxDepth: number | undefined = undefined
+): GraphNodeGroup[] => {
+  if (maxDepth && depth >= maxDepth) { return []; }
+  const [_, rightNeighbour] = findNeighbourNodes(group, nodeGroups);
   if (rightNeighbour === undefined) { return []; }
   if (rightNeighbour.startPosition - group.endPosition > touchingDistance) { return []; }
   else {
-    return [group, ...findTouchingNeighboursRight(rightNeighbour, nodeGroups)];
+    return [group, ...findTouchingNeighboursRight(
+      rightNeighbour,
+      nodeGroups,
+      touchingDistance,
+      depth + 1,
+      maxDepth
+    )];
   }
 };
 

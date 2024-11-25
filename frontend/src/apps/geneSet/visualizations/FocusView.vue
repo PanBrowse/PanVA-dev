@@ -497,18 +497,21 @@ export default {
 
     async simulationAsync() {
       this.isLoading = true
-      const response = new Promise<[GraphNode[], GraphNodeGroup[]]>((resolve) => resolve(runSpringSimulation(
-        useGenomeStore().genomeData.genes ?? [],
-        useGenomeStore().genomeData.sequences ?? [],
-        currentHeat.value,
-        1,
-        {scaleXForce: useGeneSetStore().scaleXForce,
-        scaleYForce: useGeneSetStore().scaleYForce,
-        scaleContraction: useGeneSetStore().scaleContraction,
-        scaleRepulsion: useGeneSetStore().scaleRepulsion,
-        minimumDistance: useGeneSetStore().minimumDistance,
-        },
-        736740)))
+      const endHeat = 10
+      const response = new Promise<[GraphNode[], GraphNodeGroup[]]>((resolve) => 
+        resolve(runSpringSimulation(
+          this.filteredGenes ?? [],
+          useGenomeStore().genomeData.sequences ?? [],
+          currentHeat.value,
+          endHeat,
+          {scaleXForce: useGeneSetStore().scaleXForce,
+          scaleYForce: useGeneSetStore().scaleYForce,
+          scaleContraction: useGeneSetStore().scaleContraction,
+          scaleRepulsion: useGeneSetStore().scaleRepulsion,
+          minimumDistance: useGeneSetStore().minimumDistance,
+          },
+        )
+      ))
       return response
     },
 
@@ -1275,20 +1278,19 @@ export default {
 
     let newAnchorMax = d3.max(divergentScale)
     anchorMax.value = newAnchorMax ?? 0
-
-    let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] =
+    const endHeat = 10
+    let [newGenePositions, _]: [GraphNode[], GraphNodeGroup[]] =
       runSpringSimulation(
         this.genomeStore.genomeData.genes ?? [],
         this.genomeStore.genomeData.sequences ?? [],
         currentHeat.value,
-        1,
+        endHeat,
         {scaleXForce: useGeneSetStore().scaleXForce,
         scaleYForce: useGeneSetStore().scaleYForce,
         scaleContraction: useGeneSetStore().scaleContraction,
         scaleRepulsion: useGeneSetStore().scaleRepulsion,
         minimumDistance: useGeneSetStore().minimumDistance,
         },
-        736740
       )
     this.isLoading = false
 

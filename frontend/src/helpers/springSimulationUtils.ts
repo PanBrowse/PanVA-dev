@@ -1,6 +1,6 @@
 import { type Dictionary } from 'lodash';
 
-import type { Gene, GroupInfo } from '@/types';
+import type { Gene } from '@/types';
 
 import { filterUniquePosition } from './axisStretch';
 import { abs } from './math';
@@ -244,8 +244,6 @@ export const applyOrderConstraint = (
   touchingDistance: number = 1000
 ) => {
   // maximum allowed move depends on the heat (Davidson and Harel)
-
-
   const maxMove = 1000 * heat;
   const bounds = [-maxMove, maxMove];
   let deltaPos: number = deltaPosIn;
@@ -567,7 +565,8 @@ export const updateHighStressNodeGroup = (
   heat: number,
   springTuning: SpringTuningParameters,
   excludedHomologyGroup: number = 0,
-  touchingDistance: number = 1000
+  touchingDistance: number = 1000,
+  maxNodeSpread: number | undefined = undefined
 ): [GraphNodeGroup[], boolean] => {
   let terminate = false;
   let highestForceNode = undefined;
@@ -578,10 +577,25 @@ export const updateHighStressNodeGroup = (
     Math.min(...nodeGroups.map((d) => d.startPosition)),
     Math.max(...nodeGroups.map((d) => d.endPosition)),
   ];
-  const nodeGroupSpread = nodeGroupRange[1] - nodeGroupRange[0];
-  // find node that moves the most
-  // for (const group of nodeGroups) {
-  for (const index of Array(200).keys()) {
+  let maxNodeGroupSpread = 0;
+
+  if (maxNodeSpread === undefined) {
+    const sequenceIds = new Set(nodeGroups.map(d => d.sequenceId));
+    sequenceIds.forEach(sequenceId => {
+      const elements = nodeGroups.filter(d => d.sequenceId === sequenceId);
+      const start = Math.min(...elements.map((d) => d.startPosition));
+      const end = Math.max(...elements.map((d) => d.endPosition));
+      const spread = end - start;
+      if (spread > maxNodeGroupSpread) {
+        maxNodeGroupSpread = spread;
+      }
+    });
+  }
+  else { maxNodeGroupSpread = maxNodeSpread; }
+
+
+  // find node that moves the most out of a random sample of 20 nodes
+  for (const _ of Array(20).keys()) {
     const randomIndex = Math.floor(Math.random() * nodeGroups.length);
     const group = nodeGroups[randomIndex];
     // currentIndex = currentIndex + 1;
@@ -591,7 +605,7 @@ export const updateHighStressNodeGroup = (
     const connectionsYSet = new Set(group.connectionsY);
     const connectedYNodes = nodeGroups.filter(d => connectionsYSet.has(d.id));
 
-    let [force, forceWithoutNormal] = evaluateForces(
+    let [force, _] = evaluateForces(
       group,
       connectedXNodes,
       connectedYNodes,
@@ -600,17 +614,20 @@ export const updateHighStressNodeGroup = (
       excludedHomologyGroup,
       false
     );
-    // calculate forces through other blocks "touching"
+
+    const maxDepth = 10;
+    // calculate forces through other blocks "touching" (only maxDepth n of blocks though)
     const [forceFromLeft, forceFromRight] = findNormalForces(
       group,
       nodeGroups,
       springTuning,
-      touchingDistance
+      touchingDistance,
+      maxDepth
     );
     force = force + forceFromLeft + forceFromRight;
 
     // calculate new position
-    const deltaPos = force * group.localTempScaling;
+    const deltaPos = force * group.localTempScaling * heat / 1000;
     const deltaPosConstrained: number = applyOrderConstraint(
       group,
       connectedXNodes,
@@ -663,17 +680,20 @@ export const updateHighStressNodeGroup = (
   checkNodeOrder(newNodes);
   // check termination criteria
   if (
-    Math.abs(highestDeltaPosConstrained) < 10 ||
-    Math.abs(highestDeltaPosConstrained) / nodeGroupSpread < 0.005
+    (Math.abs(highestDeltaPosConstrained) < 10
+      // || Math.abs(highestDeltaPosConstrained) / maxNodeGroupSpread < 0.0001
+    ) && highestDeltaPosConstrained !== 0
   ) {
     console.log(
       'terminating highest delta pos too low.',
       'heat: ',
       heat,
       'highest delta pos: ',
-      highestDeltaPosConstrained
+      highestDeltaPosConstrained,
+      'max gene spread: ',
+      maxNodeGroupSpread
     ),
-      (terminate = true);
+      terminate = true;
   }
   if (heat < 1) {
     console.log(
@@ -683,7 +703,7 @@ export const updateHighStressNodeGroup = (
       'highest delta pos: ',
       highestDeltaPosConstrained
     ),
-      (terminate = true);
+      terminate = true;
   }
 
   newNodes = enforceMinimumDistance(newNodes, touchingDistance);
