@@ -155,10 +155,10 @@ export default defineComponent({
     CloseCircleOutlined,
   },
   props: {
-    distanceMatrix: {
-      type: Array,
-      required: true,
-    },
+    // distanceMatrix: {
+    //   type: Array,
+    //   required: true,
+    // },
     embedding: {
       type: Array,
       required: true,

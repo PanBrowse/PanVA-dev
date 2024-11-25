@@ -72,6 +72,9 @@ export const useGenomeStore = defineStore({
     embeddingFiltered: [],
     filterEmpty: true,
     filteredSequences: [],
+    filteredGenomes: {},
+    filteredSequencePositions: {}, // Precomputed positions for filtered sequences
+    sequencePositions: {},
     isInitialized: false,
   }),
   getters: {
@@ -104,6 +107,58 @@ export const useGenomeStore = defineStore({
         (sequence) => sequence.loci && sequence.loci.length > 0
       )
     },
+    createFilteredGenomes() {
+      const filteredGenomesMap = {};
+      this.genomeData.genomes.forEach((genome) => {
+        const filteredSequences = genome.sequences.filter(
+          (sequence) => sequence.loci && sequence.loci.length > 0
+        );
+        filteredGenomesMap[genome.uid] = filteredSequences;
+      });
+      return filteredGenomesMap;
+    },
+    computeSequencePositions(genomes, canvasWidth, circleRadius, circleSpacing, genomeGap, padding) {
+      const positions = {};
+      let currentX = padding;
+      let currentY = padding;
+      const maxCols = Math.floor(
+        (canvasWidth - 2 * padding) / (2 * circleRadius + circleSpacing)
+      );
+
+      if (Array.isArray(genomes)) {
+        // Unfiltered genomes: Array of genome objects
+        genomes.forEach((genome) => {
+          genome.sequences.forEach((sequence, index) => {
+            positions[sequence.uid] = { x: currentX, y: currentY };
+
+            currentX += 2 * circleRadius + circleSpacing;
+            if ((index + 1) % maxCols === 0) {
+              currentX = padding;
+              currentY += 2 * circleRadius + circleSpacing;
+            }
+          });
+          currentX = padding;
+          currentY += genomeGap;
+        });
+      } else {
+        // Filtered genomes: Object with genome UIDs as keys
+        Object.entries(genomes).forEach(([genomeUid, sequences]) => {
+          sequences.forEach((sequence, index) => {
+            positions[sequence.uid] = { x: currentX, y: currentY };
+
+            currentX += 2 * circleRadius + circleSpacing;
+            if ((index + 1) % maxCols === 0) {
+              currentX = padding;
+              currentY += 2 * circleRadius + circleSpacing;
+            }
+          });
+          currentX = padding;
+          currentY += genomeGap;
+        });
+      }
+
+      return positions;
+    },
     async loadGenomeData() {
       const global = useGlobalStore()
 
@@ -118,6 +173,8 @@ export const useGenomeStore = defineStore({
         )
 
         this.updateFilteredSequences()
+        this.filteredGenomes = this.createFilteredGenomes()
+
 
         this.generateMrnaScoreMatrix()
 
