@@ -58,7 +58,7 @@ const geneToCompressionScales = ref<
 >({})
 const globalCompressionFactor = ref<number>(1)
 const currentHeat = ref<number>(1000)
-const crossingHomologyGroups = ref<number[]>([])
+const crossingHomologyGroups = ref<string[]>([])
 const showGeneBars = ref<boolean>(true)
 const brush = ref<d3.BrushBehavior<unknown>>(d3.brushX())
 const anchorMax = ref<number>(0)
@@ -284,7 +284,7 @@ export default {
       'showNotificationsDetail',
       'homologyFocus',
       'anchor',
-      // 'colorGenes',
+      'colorGenes',
       'showLinks',
       'rerunSimulation',
       'scaleXForce',
@@ -345,17 +345,34 @@ export default {
         .domain(['1', '2', '3', '4', '5'])
         .range(d3.schemeCategory10)
     },
-    colorGenes() {
-      let nGenesTotal = 0
-      let nOfGenomes = 0
-      for (const [key, value] of Object.entries(this.geneToWindowScales)) {
-        nGenesTotal = nGenesTotal + value.domain().length - 2
-        nOfGenomes = nOfGenomes + 1
-      }
-      if (nGenesTotal / nOfGenomes < 15) {
+    colorGenesLocal() {
+      if(this.colorGenes) {return true}
+      // let nGenesTotal = 0
+      // let nOfGenomes = 0
+      // for (const [key, value] of Object.entries(this.geneToWindowScales)) {
+      //   nGenesTotal = nGenesTotal + value.domain().length - 2
+      //   nOfGenomes = nOfGenomes + 1
+      // }
+      // if (nGenesTotal / nOfGenomes < 15) {
+      //   return true
+      // }
+      // return false
+
+      const genesInView = this.filteredGenes.filter(d => {
+        const sequence = d.sequence_uid
+        let xScale = this.geneToWindowScales[sequence ?? '']
+        if (
+          xScale === undefined ||
+          xScale(d.end) < this.windowRange[0]||
+          xScale(d.start) > this.windowRange[1]
+          ) {return false}
         return true
-      }
-      return false
+      })
+      const homologyGroupsInView = 
+        new Set(genesInView.flatMap(
+          gene => gene.homology_groups.map(d => d.uid)
+        ))
+      return [...homologyGroupsInView].length < 15
     },
     shapeGenerator() {
       const shapes = [
@@ -435,7 +452,7 @@ export default {
 
     async runSimulation() {
       const response = await this.simulationAsync()
-      let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] = response
+      let [newGenePositions, _]: [GraphNode[], GraphNodeGroup[]] = response
       useGeneSetStore().rerunSimulation = false
 
       crossingHomologyGroups.value = crossDetection(newGenePositions)
@@ -734,10 +751,25 @@ export default {
         return
       }
 
+      const segmentsInView = vis.filteredSegments.filter(segment => {
+        const key: string = segment.uid ?? ''
+        const currentGeneToWindowScale = this.geneToWindowScales[key]
+        if(currentGeneToWindowScale === undefined) {return false}
+
+        const start = currentGeneToWindowScale(segment.start)
+        const end = currentGeneToWindowScale(segment.end)
+        if ( start > vis.windowRange[1] + 20) { return false; }
+        if (end < vis.windowRange[0] - 20) { return false; }
+
+        //visibility
+        const width = end-start
+        if(width < 0.1) {return false; }
+        return true
+      })
       this.svg()
         .select('g.bar-context')
         .selectAll('path.bar-chr-context')
-        .data(vis.filteredSegments, d => d.uid + d.start)
+        .data(segmentsInView, d => d.uid + d.start)
         .join(
           (enter) =>
             enter
@@ -763,7 +795,8 @@ export default {
                   this.barHeight,
                   ypos,
                   this.defaultConnectionThickness,
-                  globalCompressionFactor.value
+                  globalCompressionFactor.value,
+                  vis.windowRange
                 )
               })
               .attr('fill', (d) => {
@@ -807,7 +840,8 @@ export default {
                   this.barHeight,
                   yPos,
                   this.defaultConnectionThickness,
-                  globalCompressionFactor.value
+                  globalCompressionFactor.value,
+                  vis.windowRange
                 )
               })
               .attr('fill', (d) => {
@@ -962,24 +996,25 @@ export default {
     ///////////////////////////////////////////////////////////////////////////// Draw genes ////////////////////////////////////////////////
     drawGenes() {
       let vis = this
-      if (this.genomeStore.genomeData.genes === undefined) {
+      if (this.filteredGenes === undefined) {
         return
       }
-      const genes: Gene[] = this.genomeStore.genomeData.genes
+      const genes: Gene[] = this.filteredGenes
 
       /// connection lines
       this.svg().selectAll('path.connection').remove()
-      let currentHomologyGroups = this.homologyGroups
+      let currentHomologyGroups: string[] = [...new Set(genes.flatMap(d => d.homology_groups.map(p =>p.uid)))]
+      console.log('current hgs', currentHomologyGroups, crossingHomologyGroups)
 
       if (this.showLinks === false) {
-        currentHomologyGroups = this.homologyGroups.filter((d) =>
+        currentHomologyGroups = currentHomologyGroups.filter((d) =>
           crossingHomologyGroups.value.includes(d)
         )
       }
       // draw the lines
       currentHomologyGroups.forEach((homology) => {
         const path_focus = genes.filter(
-          (d) => d.homology_groups[0].id == homology //this.homologyFocus
+          (d) => d.homology_groups[0].uid == homology //this.homologyFocus
         )
 
         const newPathFocus = path_focus.map((v) => ({
@@ -987,11 +1022,13 @@ export default {
           sequence_id: v.sequence_uid ?? '',
         }))
 
-        let sortOrder = Object.keys(this.sequenceIdLookup[this.chromosomeNr])
 
         let sortedPath = [...newPathFocus].sort(function (a, b) {
+          let sequence_a = vis.genomeStore.sequenceUidLookup[a.sequence_uid ?? '']
+          let sequence_b = vis.genomeStore.sequenceUidLookup[b.sequence_uid ?? '']
+
           return (
-            sortOrder.indexOf(a.sequence_id) - sortOrder.indexOf(b.sequence_id)
+            vis.indexMap.get(sequence_a) ?? 0 - (vis.indexMap.get(sequence_b) ?? 0)
           )
         })
 
@@ -1001,14 +1038,17 @@ export default {
           sortedPath.forEach((node, i) => {
             const key = node.sequence_uid ?? ''
             const currentGeneToWindow = this.geneToWindowScales[key]
+            if(currentGeneToWindow === undefined) {return ''}
             const nodePosition =
               (currentGeneToWindow(node.start) +
                 currentGeneToWindow(node.end)) /
               2
+            const yIndex = vis.indexMap.get(
+                    vis.genomeStore.sequenceUidLookup[key]
+                  ) ?? 0
             const y =
-              vis.margin.top * 2 +
               vis.barHeight / 2 +
-              vis.sequenceIdLookup[vis.chromosomeNr][key] * (vis.barHeight + 10)
+              yIndex * (vis.barHeight + 10)
             if (
               nodePosition < this.windowRange[0] ||
               nodePosition > this.windowRange[1]
@@ -1027,19 +1067,23 @@ export default {
         }
 
         // Add the line
-        if (vis.colorGenes !== true) {
+        if (vis.colorGenesLocal !== true) {
           this.svg()
+            .select('g.bar-context')
             .append('path')
             .datum(sortedPath)
             .attr('class', 'connection')
             .attr('fill', 'none')
             .attr('stroke', (d) =>
-              vis.colorGenes
+              vis.colorGenesLocal
                 ? (vis.colorScale(String(homology)) as string)
-                : colors['gray-7']
+                : colors['gray-5']
             )
-            .attr('stroke-width', 1.5)
-            .attr('d', (d) => connectionsLine(d).toString())
+            .attr('stroke-width', 1)
+            .attr('d', (d) => {
+              console.log('drawing lines')
+              return connectionsLine(d).toString()
+            })
         }
       })
 
@@ -1077,15 +1121,27 @@ export default {
           )
         })
 
+      const genesInView = vis.filteredGenes.filter(d => {
+        const sequence = d.sequence_uid
+        let xScale = vis.geneToWindowScales[sequence ?? '']
+        if (
+          xScale === undefined ||
+          xScale(d.end) < this.windowRange[0] - 50 ||
+          xScale(d.start) > this.windowRange[1] + 50
+          ) {return false}
+        return true
+      })
       this.svg()
         .select('g.gene-context')
         .selectAll('path.gene')
-        .data(vis.filteredGenes, d => d.uid)
+        .data(genesInView, d => d.uid)
         .join(
           (enter) =>
             enter
               .append('path')
-              .attr('d', geneSymbol)
+              .attr('d', d => {
+                return geneSymbol
+              })
               .attr('transform', function (d, i) {
                 const sequence = d.sequence_uid
                 let xTransform = vis.geneToWindowScales[sequence ?? ''](
@@ -1106,7 +1162,11 @@ export default {
                 (d: Gene) => d.homology_groups?.map((entry) => entry.id) ?? []
               )
               .attr('stroke-width', '3px')
-              .attr('fill', colors['gray-7'])
+              .attr('fill', d =>               
+              vis.colorGenesLocal
+                ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                : colors['gray-7']
+              )
               .attr('z-index', 1000)
               .attr('opacity', 0.8),
           (update) =>
@@ -1129,11 +1189,10 @@ export default {
               .attr('d', geneSymbol)
               .attr('z-index', 1000)
               .attr('fill', (d) => {
-                return vis.colorGenes
+                return vis.colorGenesLocal
                   ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
-                  : 'gray'
+                  : colors['gray-7']
               }),
-          // .attr('fill', colors['gray-7']),
           (exit) => exit.remove()
         )
 
@@ -1141,7 +1200,7 @@ export default {
         this.svg()
         .select('g.gene-context')
         .selectAll('path.mrna')
-        .data(vis.filteredGenes, (d:Gene) => d.uid + d.sequence)
+        .data(genesInView, (d:Gene) => d.uid + d.sequence)
         .join(
           (enter) =>
             enter.append('path')
@@ -1181,7 +1240,7 @@ export default {
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('stroke', (d) => {
-                return vis.colorGenes
+                return vis.colorGenesLocal
                   ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
                   : 'gray'
               })
@@ -1232,7 +1291,7 @@ export default {
                 return `translate(${xTransform},${yTransform})`
               })
               .attr('stroke', (d) => {
-                return vis.colorGenes
+                return vis.colorGenesLocal
                   ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
                   : 'gray'
               })

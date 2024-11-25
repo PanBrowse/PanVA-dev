@@ -1438,7 +1438,7 @@ export default {
         useGeneSetStore().genomeData?.genes ?? [],
         useGeneSetStore().genomeData?.sequences ?? [],
         currentHeat.value,
-        0.5,
+        100,
         232273529
       )
 

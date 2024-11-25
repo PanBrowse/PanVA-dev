@@ -4,7 +4,7 @@ import { GraphNode, GraphNodeGroup, type SpringTuningParameters } from "./spring
 import { mapWritableState } from "pinia";
 
 
-export const evaluateForcesY = (currentNode: GraphNode, connectedYNodes: GraphNode[], heat: number, excludedHomologyGroup?: number) => {
+export const evaluateForcesY = (currentNode: GraphNode, connectedYNodes: GraphNode[], heat: number, excludedHomologyGroup?: string) => {
   let force = 0;
   const scalePartialForceY = 0.1;
 

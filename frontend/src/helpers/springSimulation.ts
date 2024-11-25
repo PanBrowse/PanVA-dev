@@ -17,13 +17,13 @@ export const runSpringSimulation = (
   fromHeat: number = 1000,
   toHeat: number = 10,
   springTuning: SpringTuningParameters,
-  initializeOnHomologygroup?: number | boolean,
+  initializeOnHomologygroup?: string | boolean,
 ) => {
   // simulates forces applied to all nodes in the graph
   let heat = fromHeat;
   let nodeGroups: GraphNodeGroup[] = [];
   const nodes: GraphNode[] = genesToNodes(genes);
-  const excludedHomologyGroup = 0; // 232290464
+
   const touchingDistance = springTuning.minimumDistance;
 
   // initalize with centering on a specific homologygroup
@@ -61,7 +61,7 @@ export const runSpringSimulation = (
   let terminateCount = 0;
 
   const maxTerminateCount = 3;
-  const maxTime = 10000;
+  const maxTime = 3000;
 
   let maxGeneDistance = 0;
   const sequenceIds = new Set(nodeGroups.map(d => d.sequenceId));
@@ -94,7 +94,6 @@ export const runSpringSimulation = (
 
       //recalculate gene distances
       maxGeneDistance = 0;
-      // const sequenceIds = new Set(nodeGroups.map(d => d.sequenceId));
       sequenceIds.forEach(sequenceId => {
         const elements = nodeGroups.filter(d => d.sequenceId === sequenceId);
         const start = Math.min(...elements.map((d) => d.startPosition));

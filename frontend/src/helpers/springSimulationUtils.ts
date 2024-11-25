@@ -27,7 +27,7 @@ export interface SpringTuningParameters {
 export class GraphNode {
   private _id: string;
   private _position: number;
-  private _homologyGroup: number;
+  private _homologyGroup: string;
   private _connectionsX: xConnections = { left: undefined, right: undefined };
   private _connectionsY: string[] = [];
   private _sequenceId: string;
@@ -40,7 +40,7 @@ export class GraphNode {
     id: string,
     position: number,
     endPosition: number,
-    homologyGroup: number,
+    homologyGroup: string,
     sequenceId: string,
     originalPosition?: number
   ) {
@@ -462,7 +462,7 @@ export const genesToNodes = (genes: Gene[]) => {
         gene.uid,
         gene.start,
         gene.end,
-        gene.homology_groups?.[0]?.id,
+        gene.homology_groups?.[0]?.uid,
         gene.sequence_uid ?? '',
       )
     );
