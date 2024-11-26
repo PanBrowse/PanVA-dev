@@ -542,12 +542,8 @@ export default {
         // Re-render to update the visuals
         this.app.render();
 
-      
-
+        }
       }
-
-
-     
     },
     drawSequenceSprite(sequence, x, y, radius) {
       const circleSprite = new PIXI.Sprite(circleTexture.value);
