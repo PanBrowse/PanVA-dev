@@ -298,6 +298,14 @@ export default {
           const resolution = window.devicePixelRatio * zoomLevel
 
           console.log('zoomlevel:', zoomLevel)
+
+           // Ensure linesContainer exists
+          if (!this.linesContainer) {
+            this.linesContainer = new PIXI.Container();
+            this.viewport.addChildAt(this.linesContainer,0);
+          }
+
+
           this.spritesContainer.children.forEach((sprite) => {
           // this.viewport.children.forEach((sprite) => {
             if (sprite.sequence_uid) {
@@ -368,13 +376,21 @@ export default {
           // })
           // // this.drawGrid();
         
+          // Dynamically toggle links based on zoom level
           if (zoomLevel > 2.5) {
+            // Draw connections if zoom level is high enough
             this.drawConnections();
+          } else {
+            // Hide connections by clearing the linesContainer
+            this.linesContainer.visible = false; // Hide instead of removing children
           }
-          if (zoomLevel < 2.5) {
-            // Clear existing lines
-           this.linesContainer.removeChildren(); // Clear previous connections
+
+          // Ensure visibility of linesContainer at higher zoom levels
+          if (zoomLevel > 2.5 && !this.linesContainer.visible) {
+            this.linesContainer.visible = true;
           }
+
+          this.app.render();
 
         })
 
@@ -482,6 +498,41 @@ export default {
     })
   },
   methods: {
+    highlightLinks(sequence_uid, isHovered) {
+
+      console.log('highlight links')
+
+      if (this.viewport.scale.x > 2.6) {
+
+        if (isHovered === true){
+        console.log('highlight links true', this.linesContainer.children)
+        this.linesContainer.children.forEach((line) => {
+          // console.log(line.sourceSequenceUid, sequence_uid)
+          if (line.sourceSequenceUid === sequence_uid) {
+            console.log('source sequence uid', line.sourceSequenceUid, line.geometry)
+
+            line.clear();
+            line.setStrokeStyle({width:1, color:0x00ff00});
+
+       
+            }
+            else{
+              line.setStrokeStyle({ width: 1, color:  0xd3d3d3});
+            }
+        });
+
+      }
+
+      
+
+      // Re-render to update the visuals
+      this.app.render();
+
+      }
+
+
+     
+    },
     drawSequenceSprite(sequence, x, y, radius) {
       const circleSprite = new PIXI.Sprite(circleTexture.value);
 
@@ -494,6 +545,14 @@ export default {
       circleSprite.x = x;
       circleSprite.originalX = x;
       circleSprite.y = y;
+
+      circleSprite.interactive = true;
+
+   
+      circleSprite.on('mouseover', () => this.highlightLinks(circleSprite.sequence_uid, true)); // Highlight links
+      circleSprite.on('mouseout', () => this.highlightLinks(circleSprite.sequence_uid, false)); // Reset links
+      
+
 
       // this.viewport.addChild(circleSprite);
       // Add the sprite to spritesContainer
@@ -521,7 +580,7 @@ export default {
       // Clear existing lines
       this.linesContainer.removeChildren(); // Clear previous connections
 
-      this.connectionGraphics = new PIXI.Graphics();
+      // this.connectionGraphics = new PIXI.Graphics();
 
 
       const spriteLinks = this.genomeStore.sequenceHomologyLinks;
@@ -558,10 +617,23 @@ export default {
           const normalizedOpacity = Math.pow(link.identity / 100, 3);
 
           // Draw the line
+          this.connectionGraphics = new PIXI.Graphics();
           this.connectionGraphics.moveTo(sourceX, sourceY);
           // this.connectionGraphics.lineTo(targetX, targetY);
           this.connectionGraphics.quadraticCurveTo(controlX, controlY, targetX, targetY);
-          this.connectionGraphics.stroke({ width: 1, color: 0x00FF00, alpha: normalizedOpacity });
+          this.connectionGraphics.stroke({ width: 1, color:  0xd3d3d3, alpha: normalizedOpacity });
+
+          // Add source and target sequence_uid properties
+          this.connectionGraphics.sourceSequenceUid = sprite.sequence_uid;
+          this.connectionGraphics.targetSequenceUid = link.targetUid;
+
+          // Add geometry 
+          this.connectionGraphics.startX = sourceX;
+          this.connectionGraphics.startY = sourceY;
+          this.connectionGraphics.controlX = controlX;
+          this.connectionGraphics.controlY = controlY;
+          this.connectionGraphics.endX = targetX;
+          this.connectionGraphics.endY = targetY;
 
           // Add to the lines container
           this.linesContainer.addChild(this.connectionGraphics);
@@ -980,14 +1052,14 @@ export default {
     createCircleTexture(circleRadius, resolution, borderThickness) {
       const res =
         Math.max(1, window.devicePixelRatio) * (this.viewport?.scale.x || 1)
-      console.log('Generating texture with resolution:', res)
+      // console.log('Generating texture with resolution:', res)
 
       // Adjust circle radius based on the zoom level to keep it constant
       const adjustedRadius = circleRadius / (this.viewport?.scale.x || 1);
       const adjustedBorderThickness = borderThickness * devicePixelRatio / (this.viewport?.scale.x || 1);
 
-      console.log('Adjusted circle radius:', adjustedRadius);
-      console.log('Adjusted border thickness:', adjustedBorderThickness);
+      // console.log('Adjusted circle radius:', adjustedRadius);
+      // console.log('Adjusted border thickness:', adjustedBorderThickness);
 
 
       // Use PIXI.Graphics to draw a circle
