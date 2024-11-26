@@ -377,7 +377,7 @@ export default {
           // // this.drawGrid();
         
           // Dynamically toggle links based on zoom level
-          if (zoomLevel > 2.5) {
+          if (zoomLevel > 2) {
             // Draw connections if zoom level is high enough
             this.drawConnections();
           } else {
@@ -386,7 +386,7 @@ export default {
           }
 
           // Ensure visibility of linesContainer at higher zoom levels
-          if (zoomLevel > 2.5 && !this.linesContainer.visible) {
+          if (zoomLevel > 2 && !this.linesContainer.visible) {
             this.linesContainer.visible = true;
           }
 
@@ -502,31 +502,47 @@ export default {
 
       console.log('highlight links')
 
-      if (this.viewport.scale.x > 2.6) {
+      if (this.viewport.scale.x > 2) {
+
+        const hoveredLines = [];
+        const nonHoveredLines = [];
 
         if (isHovered === true){
         console.log('highlight links true', this.linesContainer.children)
         this.linesContainer.children.forEach((line) => {
           // console.log(line.sourceSequenceUid, sequence_uid)
           if (line.sourceSequenceUid === sequence_uid) {
-            console.log('source sequence uid', line.sourceSequenceUid, line.geometry)
+            console.log('source sequence uid', line.startX, line.startY, line.controlX, line.controlY, line.endX, line.endY)
 
             line.clear();
-            line.setStrokeStyle({width:1, color:0x00ff00});
-
+            // Redraw the line
+        
+            line.moveTo(line.startX, line.startY);
+            line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+            line.stroke({width: 2, color: 0xb674e8, alpha: line.identityNorm});
+            hoveredLines.push(line);
        
             }
-            else{
-              line.setStrokeStyle({ width: 1, color:  0xd3d3d3});
+            else {
+              line.clear();
+              line.moveTo(line.startX, line.startY);
+              line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+              line.stroke({width:1, color: 0xd3d3d3, alpha: line.identityNorm});
+              nonHoveredLines.push(line);
             }
         });
 
-      }
+        // Clear the container
+        this.linesContainer.removeChildren();
+
+        // Re-add non-hovered lines first, then hovered lines (to render them on top)
+        nonHoveredLines.forEach((line) => this.linesContainer.addChild(line));
+        hoveredLines.forEach((line) => this.linesContainer.addChild(line));
+
+        // Re-render to update the visuals
+        this.app.render();
 
       
-
-      // Re-render to update the visuals
-      this.app.render();
 
       }
 
@@ -634,6 +650,7 @@ export default {
           this.connectionGraphics.controlY = controlY;
           this.connectionGraphics.endX = targetX;
           this.connectionGraphics.endY = targetY;
+          this.connectionGraphics.identityNorm = normalizedOpacity;
 
           // Add to the lines container
           this.linesContainer.addChild(this.connectionGraphics);
