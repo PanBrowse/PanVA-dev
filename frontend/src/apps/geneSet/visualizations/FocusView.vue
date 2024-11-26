@@ -925,47 +925,7 @@ export default {
         )
     },
     /////////////////////////////////////////////////////////////////////////////// Add values ////////////////////////////////////
-    addValues() {
-      if (this.genomeStore.genomeData.sequences === undefined) {
-        return
-      }
-      this.svg()
-        .selectAll('text.value-chr')
-        .data(this.genomeStore.genomeData.sequences)
-        .join(
-          (enter) =>
-            enter
-              .append('text')
-              .attr(
-                'transform',
-                `translate(${this.margin.left},${this.margin.top * 2})`
-              )
-              .attr('class', 'value-chr')
-              .attr('dominant-baseline', 'hanging')
-              .attr('x', 0)
-              .attr('dx', 2)
-              .attr(
-                'y',
-                (d, i) =>
-                  this.genomeStore.sequenceUidLookup[d.uid] *
-                  (this.barHeight + 10)
-              )
-              .attr('dy', this.barHeight / 4)
-              .text((d) => Math.floor(d.sequence_length_nuc).toLocaleString()),
 
-          (update) =>
-            update
-              .transition()
-              .duration(this.transitionTime)
-              .attr(
-                'y',
-                (d, i) =>
-                  this.genomeStore.sequenceUidLookup[d.uid] *
-                  (this.barHeight + 10)
-              ),
-          (exit) => exit.remove()
-        )
-    },
     ///////////////////////////////////////////////////////////////////////////////Draw x-axis ////////////////////////////////////
     drawXAxis() {
       this.svg().select('g.x-axis').remove() //needed because otherwise draws twice in some cases. To-do: fix side effect
@@ -1017,18 +977,18 @@ export default {
           (d) => d.homology_groups[0].uid == homology //this.homologyFocus
         )
 
-        const newPathFocus = path_focus.map((v) => ({
+        const newPathFocus: Gene[] = path_focus.map((v) => ({
           ...v,
           sequence_id: v.sequence_uid ?? '',
         }))
 
 
-        let sortedPath = [...newPathFocus].sort(function (a, b) {
+        let sortedPath = newPathFocus.sort(function (a, b) {
           let sequence_a = vis.genomeStore.sequenceUidLookup[a.sequence_uid ?? '']
           let sequence_b = vis.genomeStore.sequenceUidLookup[b.sequence_uid ?? '']
 
           return (
-            vis.indexMap.get(sequence_a) ?? 0 - (vis.indexMap.get(sequence_b) ?? 0)
+            (vis.indexMap.get(sequence_a) ?? 0) - (vis.indexMap.get(sequence_b) ?? 0)
           )
         })
 
@@ -1036,6 +996,7 @@ export default {
           const currentPath = d3.path()
           let previousWasRendered = false
           sortedPath.forEach((node, i) => {
+            
             const key = node.sequence_uid ?? ''
             const currentGeneToWindow = this.geneToWindowScales[key]
             if(currentGeneToWindow === undefined) {return ''}
