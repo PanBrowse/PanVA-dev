@@ -372,7 +372,7 @@ export default {
         new Set(genesInView.flatMap(
           gene => gene.homology_groups.map(d => d.uid)
         ))
-      return [...homologyGroupsInView].length < 15
+      return [...homologyGroupsInView].length < 20
     },
     shapeGenerator() {
       const shapes = [
@@ -1102,12 +1102,7 @@ export default {
             vis.barHeight,
             showGeneBars.value
           )
-          if (
-            currentGeneToWindow(d.start) > this.windowRange[1] ||
-            currentGeneToWindow(d.end) < this.windowRange[0]
-          ) {
-            return 0
-          }
+
           return size
         })
         .type((d) => {
@@ -1121,6 +1116,12 @@ export default {
           )
         })
 
+      const tooltip = this.svg().select('g.tooltip-context').append('rect').style('position', 'absolute').attr('fill', 'white') 
+      .attr('width', 80).attr('height', 15).style('visibility', 'hidden')// d3.select("body").select('div.tooltip').style('position', 'absolute').select('rect')
+      const tooltipText = this.svg().select('g.tooltip-context').append('text').style('position', 'absolute').attr('fill', 'black') 
+      .style('visibility', 'hidden').attr('text-anchor', 'start').attr('height', 12)
+
+        // filter out genes out of view
       const genesInView = vis.filteredGenes.filter(d => {
         const sequence = d.sequence_uid
         let xScale = vis.geneToWindowScales[sequence ?? '']
@@ -1131,10 +1132,12 @@ export default {
           ) {return false}
         return true
       })
+
+      //draw genes
       this.svg()
         .select('g.gene-context')
         .selectAll('path.gene')
-        .data(genesInView, d => d.uid)
+        .data(genesInView, d => d.uid + d.sequence_uid)
         .join(
           (enter) =>
             enter
@@ -1161,14 +1164,37 @@ export default {
                 'hg',
                 (d: Gene) => d.homology_groups?.map((entry) => entry.id) ?? []
               )
-              .attr('stroke-width', '3px')
+              .attr('stroke-width', '5px')
               .attr('fill', d =>               
               vis.colorGenesLocal
                 ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
                 : colors['gray-7']
               )
               .attr('z-index', 1000)
-              .attr('opacity', 0.8),
+              .attr('opacity', 0.8)
+              .attr('pointer-events', 'visible')
+              .on('mouseenter', (event, d) => {  
+                const target = event.currentTarget
+                const container = this.svg().select('g.tooltip-context').nodes()[0].getBoundingClientRect()
+                d3.select(target).attr('fill', 'pink')
+                tooltip.transition().duration(100).style("visibility", 'visible')
+                tooltip.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 10);  
+                tooltipText.attr("x",  event.x -container.x + 22).attr("y", event.y - container.y + 22);  
+                tooltipText.text(d.homology_groups ? `${d.homology_groups[0].id}`: '')
+                tooltipText.transition().duration(100).style("visibility", 'visible')
+
+              })
+              .on('mouseleave',  (event, d) => {
+                const target = event.currentTarget
+                d3.select(target).attr('fill', d =>               
+              vis.colorGenesLocal
+                ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                : colors['gray-7']
+              )
+              tooltip.transition().duration(200).style("visibility", 'hidden');
+              tooltipText.transition().duration(200).style("visibility", 'hidden');
+              })
+              ,
           (update) =>
             update
               .transition()
@@ -1434,12 +1460,16 @@ export default {
     selection.call(zoom)
     // this.call(zoom)
     // Add brushing
-    this.svg().append('g').attr('class', 'brush').call(brush.value)
+    this.svg().append('g').append('g').attr('class', 'brush').call(brush.value)
 
     // create groups for focus view drawing
     this.svg().append('g').attr('class', 'bar-context')
       .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
+ 
     this.svg().append('g').attr('class', 'gene-context')
+    .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
+    
+    this.svg().append('g').attr('class', 'tooltip-context')
     .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
 
     this.addClipPath()
