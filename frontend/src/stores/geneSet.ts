@@ -59,6 +59,7 @@ export const useGenomeStore = defineStore({
       { id: number; uid: string }[]
     >,
     sequenceToMrnaLookup: new Map<string, string[]>(),
+    mrnaToSequenceLookup: new Map<string, string[]>(),
     mrnaScoreMatrix: [] as number[][],
     selectedSequencesTracker: new Set(),
     genomeUids: [] as string[], // Array to store genome numbers in the loading order
@@ -75,6 +76,7 @@ export const useGenomeStore = defineStore({
     filteredGenomes: {},
     filteredSequencePositions: {}, // Precomputed positions for filtered sequences
     sequencePositions: {},
+    sequenceHomologyLinks: {},
     isInitialized: false,
   }),
   getters: {
@@ -172,6 +174,50 @@ export const useGenomeStore = defineStore({
           this.genomeData
         )
 
+        // Populate sequenceToMrnaLookup
+        this.sequenceToMrnaLookup = this.genomeData.genes.reduce(
+          (lookup, gene) => {
+            const sequenceUid = this.geneToLocusSequenceLookup.get(
+              gene.uid
+            )?.sequence
+            if (sequenceUid) {
+              if (!lookup[sequenceUid]) {
+                lookup[sequenceUid] = []
+              }
+              lookup[sequenceUid].push(...gene.mrnas) // Add mRNA UIDs for this gene
+            }
+            return lookup
+          },
+          new Map<string, string[]>()
+        )
+
+        console.log('sequenceToMrnaLookup', this.sequenceToMrnaLookup)
+
+        // Generate reverse mapping from sequenceToMrnaLookup
+        this.mrnaToSequenceLookup = Object.entries(this.sequenceToMrnaLookup).reduce(
+          (lookup, [sequenceUid, mrnas]) => {
+            mrnas.forEach((mrnaUid) => {
+              lookup[mrnaUid] = sequenceUid; // Map each mRNA to its sequence UID
+            });
+            return lookup;
+          },
+          {} // Initialize as an empty object
+        );
+
+        console.log('mrnaToSequenceLookup', this.mrnaToSequenceLookup);
+
+        // Extend each gene object in genomeData.genes with its homology groups
+        this.genomeData.genes = this.genomeData.genes.map((gene) => ({
+          ...gene,
+          homology_groups: this.geneToHomologyGroupLookup[gene.uid] || [],
+        }))
+
+        // Extend each gene object in genomeData.genes with its sequence uid
+        this.genomeData.genes = this.genomeData.genes.map((gene) => ({
+          ...gene,
+          sequence_uid: this.geneToLocusSequenceLookup.get(gene.uid)?.sequence,
+        }))
+
         this.updateFilteredSequences()
         this.filteredGenomes = this.createFilteredGenomes()
 
@@ -220,6 +266,7 @@ export const useGenomeStore = defineStore({
         })
         throw error
       }
+      this.generateSequenceHomologyLinks()
 
       this.initializeSelectedSequencesLasso()
 
@@ -367,35 +414,41 @@ export const useGenomeStore = defineStore({
         {} as Record<string, { id: number; uid: string }[]>
       )
 
-      // Populate sequenceToMrnaLookup
-      this.sequenceToMrnaLookup = this.genomeData.genes.reduce(
-        (lookup, gene) => {
-          const sequenceUid = this.geneToLocusSequenceLookup.get(
-            gene.uid
-          )?.sequence
-          if (sequenceUid) {
-            if (!lookup[sequenceUid]) {
-              lookup[sequenceUid] = []
-            }
-            lookup[sequenceUid].push(...gene.mrnas) // Add mRNA UIDs for this gene
-          }
-          return lookup
-        },
-        new Map<string, string[]>()
-      )
-
-      // Extend each gene object in genomeData.genes with its homology groups
-      this.genomeData.genes = this.genomeData.genes.map((gene) => ({
-        ...gene,
-        homology_groups: this.geneToHomologyGroupLookup[gene.uid] || [],
-      }))
-
-      // Extend each gene object in genomeData.genes with its sequence uid
-      this.genomeData.genes = this.genomeData.genes.map((gene) => ({
-        ...gene,
-        sequence_uid: this.geneToLocusSequenceLookup.get(gene.uid)?.sequence,
-      }))
+     
     },
+    generateSequenceHomologyLinks() {
+      const lookup = {};
+
+      // Iterate over all links
+      this.genomeData.links.forEach((link) => {
+        // Map query and target mRNAs to their sequence UIDs
+        const querySequenceUid = this.mrnaToSequenceLookup[link.query.uid];
+        const targetSequenceUid = this.mrnaToSequenceLookup[link.target.uid];
+        // console.log('querySequenceUid', querySequenceUid, 'targetSequenceUid', targetSequenceUid)
+
+        // debugger;
+
+        // Ensure both sequences exist and are not the same
+        if (querySequenceUid && targetSequenceUid && querySequenceUid !== targetSequenceUid) {
+          // Initialize the array for the query sequence UID if it doesn't exist
+          if (!lookup[querySequenceUid]) {
+            lookup[querySequenceUid] = [];
+          }
+
+          // Add the link as a separate object
+          lookup[querySequenceUid].push({
+            targetUid: targetSequenceUid,
+            identity: link.identity || 0, // Default identity to 0 if undefined
+          });
+        }
+      });
+
+      // Store the lookup in the state
+      this.sequenceHomologyLinks = lookup;
+
+      console.log("Generated sequence homology links:", this.sequenceHomologyLinks);
+
+     },
     getGenesForSelectedLasso(): string[] {
       const genes: string[] = []
       const selectedSequenceUids = this.selectedSequencesLasso

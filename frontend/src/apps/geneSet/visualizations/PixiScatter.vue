@@ -213,6 +213,15 @@ export default {
         // Enable viewport plugins
         this.viewport.wheel().decelerate() // Enable mouse wheel zoom and panning
 
+        // Create a container for connection lines
+        const linesContainer = new PIXI.Container();
+        this.viewport.addChild(linesContainer); // Add the lines container to the viewport
+
+        // Create a container for sprites
+        const spritesContainer = new PIXI.Container();
+        this.viewport.addChild(spritesContainer); // Add the sprites container to the viewport
+        this.spritesContainer = spritesContainer
+
         const onFocusCanvas = () => {
           console.log('Canvas focused, keyboard events will be captured')
 
@@ -289,7 +298,8 @@ export default {
           const resolution = window.devicePixelRatio * zoomLevel
 
           console.log('zoomlevel:', zoomLevel)
-          this.viewport.children.forEach((sprite) => {
+          this.spritesContainer.children.forEach((sprite) => {
+          // this.viewport.children.forEach((sprite) => {
             if (sprite.sequence_uid) {
               const geneCount =
                 genomeStore.sequenceToLociGenesLookup.get(sprite.sequence_uid)
@@ -310,13 +320,26 @@ export default {
 
               // Update the sprite's texture with the calculated border thickness
               const circleRadius = 5 * window.devicePixelRatio;
-              sprite.texture = this.createCircleTexture(
+              const { texture, totalRadius } = this.createCircleTexture(
                 circleRadius,
                 resolution,
                 borderThickness
               );
+              sprite.texture = texture
+              sprite.totalRadius = totalRadius
+              // sprite.texture = this.createCircleTexture(
+              //   circleRadius,
+              //   resolution,
+              //   borderThickness
+              // );
+
+              // Spread out sprites in the x-direction based on zoom level
+              // The higher the zoom level, the greater the spacing factor
+              const spacingFactor = 1 + Math.max(0, (zoomLevel -1)); // Adjust factor to control spacing sensitivity
+              sprite.x = sprite.originalX * spacingFactor; // `originalX` holds the base position
             }
           });
+          this.app.render()
         
           // if (zoomLevel>2){
           //    // Access all sprites in the viewport
@@ -344,8 +367,15 @@ export default {
           //   sprite.texture = circleTexture.value
           // })
           // // this.drawGrid();
+        
+          if (zoomLevel > 2.5) {
+            this.drawConnections();
+          }
+          if (zoomLevel < 2.5) {
+            // Clear existing lines
+           this.linesContainer.removeChildren(); // Clear previous connections
+          }
 
-          this.app.render()
         })
 
         app.canvas.addEventListener('wheel', (e) => {
@@ -379,6 +409,7 @@ export default {
         // this.viewport.addChild(circleContainer)
 
         this.drawGrid()
+        // this.drawConnections();
 
 
 
@@ -389,7 +420,7 @@ export default {
             console.log('Lasso selection updated:', newSelectedSequences)
 
             if (this.viewport) {
-              this.viewport.children.forEach((sprite: any) => {
+              this.spritesContainer.children.forEach((sprite: any) => {
                 const isSelected = newSelectedSequences.includes(
                   sprite.sequence_uid
                 )
@@ -399,6 +430,7 @@ export default {
                 // Update sprite styles based on its state
                 if (isSelected) {
                   sprite.tint = 0x007bff // Blue for selected
+                  sprite.alpha = 0.5 // Dimmed
                   // sprite.alpha = 1 // Full opacity
                   // } else if (isTracked) {
                   //   sprite.tint = 0xa9a9a9 // Dark grey for tracked
@@ -425,6 +457,7 @@ export default {
             // genomeStore.selectedSequencesLasso = [];
 
             this.drawGrid()
+            // this.drawConnections();
           },
           { immediate: true, deep: true }
         )
@@ -459,9 +492,138 @@ export default {
       circleSprite.sequence_uid = sequence.uid;
 
       circleSprite.x = x;
+      circleSprite.originalX = x;
       circleSprite.y = y;
 
-      this.viewport.addChild(circleSprite);
+      // this.viewport.addChild(circleSprite);
+      // Add the sprite to spritesContainer
+      this.spritesContainer.addChild(circleSprite);
+    },
+    drawConnections() {
+
+      console.log('drawing connections')
+      // // Clear existing lines
+      // if (!this.connectionGraphics) {
+      //   this.connectionGraphics = new PIXI.Graphics();
+      //   this.viewport.addChildAt(this.connectionGraphics, 0); // Add to the back
+      // }
+      // this.connectionGraphics.clear();
+
+ 
+      // this.viewport.addChild(this.connectionGraphics)
+
+      // Ensure the connectionGraphics container is created and ordered correctly
+      if (!this.linesContainer) {
+        this.linesContainer = new PIXI.Container();
+        this.viewport.addChildAt(this.linesContainer, 0); // Add to the back
+      }
+
+      // Clear existing lines
+      this.linesContainer.removeChildren(); // Clear previous connections
+
+      this.connectionGraphics = new PIXI.Graphics();
+
+
+      const spriteLinks = this.genomeStore.sequenceHomologyLinks;
+
+      // Map sequence_uid to sprite for easy lookup
+      const spriteMap = new Map();
+      this.spritesContainer.children.forEach((sprite) => {
+      // this.viewport.children.forEach((sprite) => {
+        if (sprite.sequence_uid) {
+          spriteMap.set(sprite.sequence_uid, sprite);
+        }
+      });
+
+      // Draw connections based on homology links
+      this.spritesContainer.children.forEach((sprite) => {
+      // this.viewport.children.forEach((sprite) => {
+        if (!sprite.sequence_uid || !spriteLinks[sprite.sequence_uid]) return;
+
+        const sourceX = sprite.x + sprite.totalRadius;
+        const sourceY = sprite.y + sprite.totalRadius;
+
+        const links = spriteLinks[sprite.sequence_uid];
+        links.forEach((link) => {
+          const targetSprite = spriteMap.get(link.targetUid);
+          if (!targetSprite) return;
+
+          const targetX = targetSprite.x + targetSprite.totalRadius;
+          const targetY = targetSprite.y + targetSprite.totalRadius;
+
+          // Calculate control point for curvature
+          const controlX = (sourceX + targetX) / 2 + (targetY - sourceY) * 0.2; // Offset based on vertical distance
+          const controlY = (sourceY + targetY) / 2 + (sourceX - targetX) * 0.2; // Offset based on horizontal distance
+
+          const normalizedOpacity = Math.pow(link.identity / 100, 3);
+
+          // Draw the line
+          this.connectionGraphics.moveTo(sourceX, sourceY);
+          // this.connectionGraphics.lineTo(targetX, targetY);
+          this.connectionGraphics.quadraticCurveTo(controlX, controlY, targetX, targetY);
+          this.connectionGraphics.stroke({ width: 1, color: 0x00FF00, alpha: normalizedOpacity });
+
+          // Add to the lines container
+          this.linesContainer.addChild(this.connectionGraphics);
+        });
+      });
+
+
+      // // Collect all circle positions
+      // const circlePositions = [];
+      // this.viewport.children.forEach((sprite) => {
+      //   const spriteLinks = this.genomeStore.sequenceHomologyLinks
+
+      //   console.log('sprite', sprite.sequence_uid, sprite.totalRadius, spriteLinks[sprite.sequence_uid])
+      //   debugger;
+
+      //   if (sprite.sequence_uid) {
+      //     sprite.homologyLinks = spriteLinks[sprite.sequence_uid]
+      //     // const { tx: spriteXw, ty: spriteYw } = sprite._worldTransform
+      //     const spriteXw = sprite.x + sprite.totalRadius
+      //     const spriteYw = sprite.y + sprite.totalRadius
+      
+      //     // const { x: spriteXw, y: spriteYw } = sprite
+
+
+      //     circlePositions.push({ spriteXw, spriteYw });
+          
+      //   }
+    
+      // });
+
+      // // console.log('circlePositions', circlePositions)
+
+      // // Draw lines between all pairs of circles
+      // for (let i = 0; i < circlePositions.length; i++) {
+      //   for (let j = i + 1; j < circlePositions.length; j++) {
+      //     const start = circlePositions[i];
+      //     const end = circlePositions[j];
+
+      //     // Draw a line between each pair of circles
+      //     this.connectionGraphics.moveTo(start.spriteXw, start.spriteYw);
+      //     this.connectionGraphics.lineTo(end.spriteXw, end.spriteYw);
+      //     this.connectionGraphics.stroke({ width: 1, color: 0x00FF00, alpha: 0.2 });
+      //   }
+      // }
+
+      // // Draw lines between all sequences
+      // for (let i = 0; i < circlePositions.length - 1; i++) {
+      //   const start = circlePositions[i];
+      //   const end = circlePositions[i + 1];
+
+      //   // Draw a line between each pair of circles
+      //   this.connectionGraphics.moveTo(start.spriteXw, start.spriteYw);
+      //   this.connectionGraphics.lineTo(end.spriteXw, end.spriteYw);
+      //   this.connectionGraphics.stroke({ width: 1, color: 0x00FF00 });
+      // }
+      
+      // this.viewport.addChild(this.connectionGraphics);
+
+      const canvas = this.app.canvas
+      this.initializeLasso(canvas)
+
+      this.app.render();
     },
     drawGrid() {
       // Clear previous content
@@ -477,14 +639,29 @@ export default {
       // this.app.stage.addChild(this.circleContainer)
       // // this.app.stage.addChild(this.foregroundContainer)
 
-      if (!this.viewport) {
-        console.error('Viewport is not initialized.')
-        return
+      // /////// previous with only viewport //////////
+      // if (!this.viewport) {
+      //   console.error('Viewport is not initialized.')
+      //   return
+      // }
+
+      // // Clear the viewport
+      // this.viewport.removeChildren()
+      // ///////////////
+
+      // Ensure spritesContainer is created
+      if (!this.spritesContainer) {
+        this.spritesContainer = new PIXI.Container();
+        this.viewport.addChild(this.spritesContainer); // Add spritesContainer to the viewport
       }
 
-      // Clear the viewport
-      this.viewport.removeChildren()
+      // Clear the spritesContainer
+      this.spritesContainer.removeChildren();
 
+      if (!this.viewport) {
+        console.error("Viewport is not initialized.");
+        return;
+      }
 
       const app = this.app
       // const circleContainer = this.circleContainer
@@ -497,7 +674,9 @@ export default {
       const resolution = window.devicePixelRatio * zoomLevel
 
       // Create the circle texture
-      circleTexture.value = this.createCircleTexture(circleRadius, resolution, 0.5)
+      const { texture, totalRadius } = this.createCircleTexture(circleRadius, resolution, 0.5)
+      circleTexture.value = texture
+      // circleTexture.value = this.createCircleTexture(circleRadius, resolution, 0.5)
 
       // Check and log canvas size
       const canvas = this.app.canvas
@@ -574,7 +753,7 @@ export default {
           currentY += genomeGap;
         });
       }
-      this.app.stage.addChild(this.viewport)
+      // this.app.stage.addChild(this.viewport)
 
       this.app.render()
 
@@ -613,7 +792,8 @@ export default {
         .on('end', this.lassoEnd)
 
       // Link lasso to the sprites in the container
-      lassoInstance.value.items(this.viewport.children as PIXI.Sprite[])
+      // lassoInstance.value.items(this.viewport.children as PIXI.Sprite[])
+      lassoInstance.value.items(this.spritesContainer.children as PIXI.Sprite[])
       svg.select('g.lasso').call(lassoInstance.value)
 
       console.log('Lasso initialized and added.')
@@ -858,7 +1038,8 @@ export default {
       // Render the graphics to the texture
       this.app.renderer.render(graphics, {renderTexture})
 
-      return renderTexture
+      // Return both the texture and totalRadius
+      return { texture: renderTexture, totalRadius };
     },
     createSprites(
       x,
