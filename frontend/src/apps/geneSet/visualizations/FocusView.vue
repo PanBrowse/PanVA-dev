@@ -579,7 +579,7 @@ export default {
 
       this.svg().selectAll('circle.density').remove()
       this.svg().selectAll('text.density-value-focus').remove()
-      this.draw()
+      // this.draw()
     },
     /////////////////////////////////////////////////////////////////////////////// Reset zoom ////////////////////////////////////
     resetZoom() {
@@ -742,7 +742,7 @@ export default {
 
       this.svg().selectAll('circle.density').remove()
       this.svg().selectAll('text.density-value-focus').remove()
-      this.draw()
+      // this.draw()
     },
     ///////////////////////////////////////////////////////////////////////////////Draw bars ////////////////////////////////////
     drawSquishBars() {
@@ -964,7 +964,6 @@ export default {
       /// connection lines
       this.svg().selectAll('path.connection').remove()
       let currentHomologyGroups: string[] = [...new Set(genes.flatMap(d => d.homology_groups.map(p =>p.uid)))]
-      console.log('current hgs', currentHomologyGroups, crossingHomologyGroups)
 
       if (this.showLinks === false) {
         currentHomologyGroups = currentHomologyGroups.filter((d) =>
@@ -972,16 +971,21 @@ export default {
         )
       }
       // draw the lines
+      const genesByHomology: { [key: string]: Gene[] } = genes.reduce((acc:{ [key: string]: Gene[] }, gene) => {
+        const homologyId = gene.homology_groups[0].uid;
+        if (!acc[homologyId]) {
+            acc[homologyId] = [];
+        }
+        acc[homologyId].push(gene);
+        return acc;
+    }, {});
+
       currentHomologyGroups.forEach((homology) => {
-        const path_focus = genes.filter(
-          (d) => d.homology_groups[0].uid == homology //this.homologyFocus
-        )
+        const lineColor = vis.colorGenesLocal
+                ? (vis.colorScale(String(homology)) as string)
+                : colors['gray-5']
 
-        const newPathFocus: Gene[] = path_focus.map((v) => ({
-          ...v,
-          sequence_id: v.sequence_uid ?? '',
-        }))
-
+        const newPathFocus: Gene[] = genesByHomology[homology]
 
         let sortedPath = newPathFocus.sort(function (a, b) {
           let sequence_a = vis.genomeStore.sequenceUidLookup[a.sequence_uid ?? '']
@@ -1035,14 +1039,9 @@ export default {
             .datum(sortedPath)
             .attr('class', 'connection')
             .attr('fill', 'none')
-            .attr('stroke', (d) =>
-              vis.colorGenesLocal
-                ? (vis.colorScale(String(homology)) as string)
-                : colors['gray-5']
-            )
+            .attr('stroke', lineColor )
             .attr('stroke-width', 1)
             .attr('d', (d) => {
-              console.log('drawing lines')
               return connectionsLine(d).toString()
             })
         }
