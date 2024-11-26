@@ -793,7 +793,7 @@ export default {
                   xPos,
                   d.end,
                   this.barHeight,
-                  ypos,
+                  0,
                   this.defaultConnectionThickness,
                   globalCompressionFactor.value,
                   vis.windowRange
@@ -812,6 +812,12 @@ export default {
                 return 1
               })
               .attr('z-index', 100)
+              .attr('transform', d => {
+                const key: string = d.uid ?? ''
+                const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+                const ypos = index * (this.barHeight + 10)
+                return `translate(0,${ypos})`
+              })
               .attr('clip-path', 'url(#clipDetails)'),
           (update) =>
             update
@@ -1192,10 +1198,10 @@ export default {
             enter.append('path')
               .attr('d', d => {
                 const nTranscripts = d.mrnas.length
-                if(nTranscripts < 2) {return ''}
+                // if(nTranscripts < 2) {return ''}
                 const key = d.sequence_uid ?? ''
                 const size = getGeneSymbolSize(d, this.geneToWindowScales[key], this.barHeight, true)
-                if(size <= this.barHeight * 4) {return ''}
+                // if(size <= this.barHeight ) {return ''}
                 const renderedNTranscripts = Math.min(nTranscripts, this.maxNTranscripts)
                 const transcriptsWidth = 
                   (this.transcriptWidth + this.transcriptSpacing) * 
@@ -1221,7 +1227,7 @@ export default {
                 let drawingIndex =
                   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
-                  drawingIndex * (vis.barHeight + 10) + this.barHeight / 2 +5
+                  drawingIndex * (vis.barHeight + 10) + this.barHeight  /2
                 let rotation = d.strand === 0 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
@@ -1243,7 +1249,7 @@ export default {
 
                 const key = d.sequence_uid ?? ''
                 const size = getGeneSymbolSize(d, this.geneToWindowScales[key], this.barHeight, true)
-                if(size <= this.barHeight *4) {return ''}
+                // if(size <= this.barHeight ) {return ''}
 
                 const renderedNTranscripts = Math.min(nTranscripts, this.maxNTranscripts)
                 
@@ -1272,7 +1278,7 @@ export default {
                 let rowNumber =
                   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
-                  rowNumber * (vis.barHeight + 10) + this.barHeight / 2
+                  rowNumber * (vis.barHeight + 10) + this.barHeight / 2 
 
                 return `translate(${xTransform},${yTransform})`
               })
