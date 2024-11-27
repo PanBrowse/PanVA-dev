@@ -1164,21 +1164,20 @@ export default {
                   : colors['gray-7']
               })
               .attr('z-index', 1000)
-              .attr('opacity', d =>  {  
+              .attr('opacity', d =>  {
+                if(vis.highlightedHomologyGroups === undefined) {return 0.8}
                 const currentHG = d.homology_groups[0]?.id
                 if(currentHG === vis.highlightedHomologyGroups) {
                   return 1
                 }       
-                return 0.8}    
+                return 0.5}    
               )
               .attr('pointer-events', 'visible')
               .on('mouseenter', (event, d) => {  
                 clearTimeout(timer)
                 const homologyGroups = d.homology_groups[0]?.id
                 this.genomeStore.highlightedHomologyGroups = homologyGroups
-                const target = event.currentTarget
                 const container = this.svg().select('g.tooltip-context').nodes()[0].getBoundingClientRect()
-                // d3.select(target).attr('fill', 'pink')
                 tooltip.transition().duration(100).style("visibility", 'visible')
                 tooltip.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 10);  
                 tooltipText.attr("x",  event.x -container.x + 22).attr("y", event.y - container.y + 22);  
@@ -1189,13 +1188,6 @@ export default {
               })
               .on('mouseleave',  (event, d) => {
                 timer = setTimeout(() => {
-                  const target = event.currentTarget
-                  d3.select(target).attr('fill', d =>               
-                  vis.colorGenesLocal
-                    ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
-                    : colors['gray-7']
-                  )
-
                   this.genomeStore.highlightedHomologyGroups = undefined
                 }, 300);
                 tooltip.transition().duration(200).style("visibility", 'hidden');
