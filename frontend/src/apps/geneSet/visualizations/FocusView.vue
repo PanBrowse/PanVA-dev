@@ -778,8 +778,6 @@ export default {
               .attr('d', (d) => {
                 const key: string = d.uid ?? ''
                 const xPos = d.start
-                const geneIndex = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
-                const ypos = geneIndex  * (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 if(currentGeneToWindowScale === undefined || currentGeneToWindowScale === null) {
