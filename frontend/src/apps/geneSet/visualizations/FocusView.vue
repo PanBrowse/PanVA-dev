@@ -330,7 +330,7 @@ export default {
     colorScale(): d3.ScaleOrdinal<string, unknown, never> {
       return d3
         .scaleOrdinal()
-        .domain(this.homologyGroups.map(toString))
+        .domain(this.homologyGroups.sort((a,b) => a - b).map(toString))
         .range(d3.schemeCategory10)
     },
     colorScaleGC() {
@@ -1109,17 +1109,16 @@ export default {
               .attr('d', d => {
                 return geneSymbol
               })
-              .attr('transform', function (d, i) {
-                const sequence = d.sequence_uid
-                let xTransform = vis.geneToWindowScales[sequence ?? ''](
-                  d.start + (d.end - d.start) / 2
-                )
+              .attr('transform', (d) => {
+                const key = d.sequence_uid ?? '' //vis.geneToLocusSequenceLookup.get(d.uid)?.sequence
+                const scale = this.geneToWindowScales[key]
+                let xTransform = this.geneToWindowScales[key](
+                  d.start 
+                ) + (scale(d.end) - scale(d.start) ) /2
                 let drawingIndex =
-                  vis.indexMap.get(
-                    vis.genomeStore.sequenceUidLookup[sequence ?? '']
-                  ) ?? 0
+                  vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
-                  drawingIndex * (vis.barHeight + 10) + vis.barHeight / 2
+                  drawingIndex * (vis.barHeight + 10) + this.barHeight / 2
                 let rotation = d.strand === 0 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
@@ -1196,7 +1195,7 @@ export default {
             enter.append('path')
               .attr('d', d => {
                 const nTranscripts = d.mrnas.length
-                // if(nTranscripts < 2) {return ''}
+                if(nTranscripts < 2) {return ''}
                 const key = d.sequence_uid ?? ''
                 const size = getGeneSymbolSize(d, this.geneToWindowScales[key], this.barHeight, true)
                 // if(size <= this.barHeight ) {return ''}
@@ -1246,7 +1245,6 @@ export default {
                 if(nTranscripts < 2) {return ''}
 
                 const key = d.sequence_uid ?? ''
-                const size = getGeneSymbolSize(d, this.geneToWindowScales[key], this.barHeight, true)
                 // if(size <= this.barHeight ) {return ''}
 
                 const renderedNTranscripts = Math.min(nTranscripts, this.maxNTranscripts)

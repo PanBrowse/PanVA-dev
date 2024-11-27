@@ -244,7 +244,7 @@ export const applyOrderConstraint = (
   touchingDistance: number = 1000
 ) => {
   // maximum allowed move depends on the heat (Davidson and Harel)
-  const maxMove = 1000 * heat;
+  const maxMove = 10 * heat;
   const bounds = [-maxMove, maxMove];
   let deltaPos: number = deltaPosIn;
   //calculate bounds
