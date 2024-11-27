@@ -976,7 +976,7 @@ export default {
       }
       // draw the lines
       const genesByHomology: { [key: string]: Gene[] } = genes.reduce((acc:{ [key: string]: Gene[] }, gene) => {
-        const homologyId = gene.homology_groups[0].uid;
+        const homologyId = gene.homology_groups[0]?.uid;
         if (!acc[homologyId]) {
             acc[homologyId] = [];
         }
@@ -1131,7 +1131,7 @@ export default {
               .attr('stroke-width', '5px')
               .attr('fill', d =>               
               vis.colorGenesLocal
-                ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
                 : colors['gray-7']
               )
               .attr('z-index', 1000)
@@ -1144,7 +1144,7 @@ export default {
                 tooltip.transition().duration(100).style("visibility", 'visible')
                 tooltip.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 10);  
                 tooltipText.attr("x",  event.x -container.x + 22).attr("y", event.y - container.y + 22);  
-                tooltipText.text(d.homology_groups ? `${d.homology_groups[0].id}`: '')
+                tooltipText.text(d.homology_groups ? `${d.homology_groups[0]?.id}`: '')
                 tooltipText.transition().duration(100).style("visibility", 'visible')
 
               })
@@ -1152,7 +1152,7 @@ export default {
                 const target = event.currentTarget
                 d3.select(target).attr('fill', d =>               
               vis.colorGenesLocal
-                ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
                 : colors['gray-7']
               )
               tooltip.transition().duration(200).style("visibility", 'hidden');
@@ -1180,7 +1180,7 @@ export default {
               .attr('z-index', 1000)
               .attr('fill', (d) => {
                 return vis.colorGenesLocal
-                  ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
                   : colors['gray-7']
               }),
           (exit) => exit.remove()
@@ -1231,7 +1231,7 @@ export default {
               })
               .attr('stroke', (d) => {
                 return vis.colorGenesLocal
-                  ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
                   : 'gray'
               })
               .attr('class', 'mrna')
@@ -1282,7 +1282,7 @@ export default {
               })
               .attr('stroke', (d) => {
                 return vis.colorGenesLocal
-                  ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
                   : 'gray'
               })
               .attr('opacity', 1)
@@ -1303,7 +1303,7 @@ export default {
     ////
     //1.find all cdf 1
     const homologyAnchor = this.genomeStore.genomeData.genes.filter(
-      (gene) => gene.homology_groups[0].id === this.homologyFocus
+      (gene) => gene.homology_groups[0]?.id === this.homologyFocus
     )
 
     let newAnchorLookup: Dictionary<number> = {}
