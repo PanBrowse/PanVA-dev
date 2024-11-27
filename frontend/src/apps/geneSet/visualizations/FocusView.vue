@@ -1195,10 +1195,11 @@ export default {
                     ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
                     : colors['gray-7']
                   )
-                  tooltip.transition().duration(200).style("visibility", 'hidden');
-                  tooltipText.transition().duration(200).style("visibility", 'hidden');
+
                   this.genomeStore.highlightedHomologyGroups = undefined
                 }, 300);
+                tooltip.transition().duration(200).style("visibility", 'hidden');
+                tooltipText.transition().duration(200).style("visibility", 'hidden');
                 })
               .on('click', handleClick)
               ,
