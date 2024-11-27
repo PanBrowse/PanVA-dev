@@ -1121,7 +1121,7 @@ export default {
           ) {return false}
         return true
       })
-
+      let timer: string | number | NodeJS.Timeout | undefined = undefined
       // const highlightedHomologyGroups = this.genomeStore.highlightedHomologyGroups
       //draw genes
       this.svg()
@@ -1173,6 +1173,7 @@ export default {
               )
               .attr('pointer-events', 'visible')
               .on('mouseenter', (event, d) => {  
+                clearTimeout(timer)
                 const homologyGroups = d.homology_groups[0]?.id
                 this.genomeStore.highlightedHomologyGroups = homologyGroups
                 const target = event.currentTarget
@@ -1187,16 +1188,18 @@ export default {
 
               })
               .on('mouseleave',  (event, d) => {
-                const target = event.currentTarget
-                d3.select(target).attr('fill', d =>               
-              vis.colorGenesLocal
-                ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
-                : colors['gray-7']
-              )
-              tooltip.transition().duration(200).style("visibility", 'hidden');
-              tooltipText.transition().duration(200).style("visibility", 'hidden');
-              this.genomeStore.highlightedHomologyGroups = undefined
-              })
+                timer = setTimeout(() => {
+                  const target = event.currentTarget
+                  d3.select(target).attr('fill', d =>               
+                  vis.colorGenesLocal
+                    ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
+                    : colors['gray-7']
+                  )
+                  tooltip.transition().duration(200).style("visibility", 'hidden');
+                  tooltipText.transition().duration(200).style("visibility", 'hidden');
+                  this.genomeStore.highlightedHomologyGroups = undefined
+                }, 300);
+                })
               .on('click', handleClick)
               ,
           (update) =>
