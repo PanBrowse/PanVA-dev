@@ -103,9 +103,9 @@ export default defineComponent({
         if (!isInitialized.value) {
           geneSetStore.initialize()
         }
-        if (!isInitializedGenome.value) {
-          genomeStore.loadGenomeData()
-        }
+        // if (!isInitializedGenome.value) {
+        //   genomeStore.loadGenomeData()
+        // }
       } catch (error) {
         console.error('Error during component initialization:', error)
       }
@@ -146,7 +146,6 @@ export default defineComponent({
       <ACol :span="12" :gutter="8" class="col full-height">
         <div class="content-overview" ref="parentElementUMAP">
           <PixiUMAP
-            :distanceMatrix="distanceMatrix"
             :embedding="selectedEmbedding"
             @loaded="handlePixiLoaded"
           />

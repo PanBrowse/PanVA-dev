@@ -44,11 +44,25 @@ DATASET_CONFIG = {
         "labels_filtered": os.path.join(db_path, "geneSet", "yeast", "filtered_protein_distance_labels.json"),
         "labels": os.path.join(db_path, "geneSet", "yeast", "protein_distance_labels.json"),
         "distance_matrix": os.path.join(db_path, "geneSet", "yeast", "protein_distance_matrix.npy"),
+    },
+     "yeast14": {
+        "embedding_filtered": os.path.join(db_path, "geneSet", "yeast14", "filtered_embedding_yeast14_neighbors2_minDist0.1_seed42.json"),
+        "embedding": os.path.join(db_path, "geneSet", "yeast14", "embedding_yeast14_neighbors10_minDist0.1_seed42.json"),
+        "labels_filtered": os.path.join(db_path, "geneSet", "yeast14", "filtered_protein_distance_labels.json"),
+        "labels": os.path.join(db_path, "geneSet", "yeast14", "protein_distance_labels.json"),
+        "distance_matrix": os.path.join(db_path, "geneSet", "yeast14", "protein_distance_matrix.npy"),
+    },
+    "capsicum": {
+        "embedding_filtered": os.path.join(db_path, "geneSet", "capsicum", "filtered_embedding_capsicum_neighbors2_minDist0.1_seed42.json"),
+        "embedding": os.path.join(db_path, "geneSet", "capsicum", "embedding_capsicum_neighbors360_minDist0.2_seed42.json"),
+        "labels_filtered": os.path.join(db_path, "geneSet", "capsicum", "filtered_protein_distance_labels.json"),
+        "labels": os.path.join(db_path, "geneSet", "capsicum", "protein_distance_labels.json"),
+        "distance_matrix": os.path.join(db_path, "geneSet", "capsicum", "filtered_protein_distance_matrix.npy"),
     }
 }
 
 # Default dataset
-DEFAULT_DATASET = "yeast"  # Change to yeast or rose
+DEFAULT_DATASET = "yeast"  
 
 
 # Instantiate the app.
