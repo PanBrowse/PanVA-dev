@@ -537,20 +537,22 @@ export default {
 
     ///////////////////////////////////////////////////////////////////////////////Update chart////////////////////////////////////
     updateChartBrushing({
-      selection,
+      selection: selection,
     }: {
-      selection: [number, number]
+      selection: [[number, number,],[number, number,]]
     }): NodeJS.Timeout | undefined {
       console.log('brush selection', selection)
-
       // If no selection, back to initial coordinate. Otherwise, update X axis domain
       if (!selection) {
         return
       }
+      const selectionX = [selection[0][0], selection[1][0]]
+      const selectionY = [selection[0][1], selection[1][1]]
+
 
       this.xScale.domain([
-        this.xScale.invert(selection[0] - this.margin.yAxis - this.margin.left),
-        this.xScale.invert(selection[1] - this.margin.yAxis - this.margin.left),
+        this.xScale.invert(selectionX[0] - this.margin.yAxis - this.margin.left),
+        this.xScale.invert(selectionX[1] - this.margin.yAxis - this.margin.left),
       ])
       const globalRangeWidth =
         compressionViewWindowRange.value[1] -
@@ -559,8 +561,8 @@ export default {
         compressionViewWindowRange.value
       const rangeWidth = this.windowRange[1] - this.windowRange[0]
       const selectionPercentages = [
-        (selection[0] - this.margin.yAxis - this.margin.left) / rangeWidth,
-        (selection[1] - this.margin.yAxis - this.margin.left) / rangeWidth,
+        (selectionX[0] - this.margin.yAxis - this.margin.left) / rangeWidth,
+        (selectionX[1] - this.margin.yAxis - this.margin.left) / rangeWidth,
       ]
       const newRangeBoundsGlobal: [number, number] = [
         currentGlobalRangeBounds[0] +
@@ -568,7 +570,28 @@ export default {
         currentGlobalRangeBounds[0] +
           selectionPercentages[1] * globalRangeWidth,
       ]
-      compressionViewWindowRange.value = newRangeBoundsGlobal
+      // compressionViewWindowRange.value = newRangeBoundsGlobal
+
+      // const key: string = d.uid ?? ''
+      // const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+      const  indexTop =  Math.floor((selectionY[0] - 2* this.margin.top ) / (this.barHeight + 10)) + 1
+      const  indexBottom = Math.floor( (selectionY[1] - 2* this.margin.top ) / (this.barHeight + 10))
+
+      const sequenceIdNumberElement = [...this.indexMap.entries()].find(d => d[1] === indexTop)
+      const sequenceIdNumber = sequenceIdNumberElement ? sequenceIdNumberElement[0] : ''
+      const sequenceUidElement = [...Object.entries(this.genomeStore.sequenceUidLookup)].find(d=> d[1] === sequenceIdNumber)
+      const sequenceUid = sequenceUidElement ? sequenceUidElement[0] : ''
+      
+      const affectedGenes = this.genomeStore.genomeData.genes.filter(d => {
+        const key: string = d.sequence_uid ?? ''
+        if(this.geneToWindowScales[key] === undefined) {return false}
+        const start = this.geneToWindowScales[key](d.start)
+        const end = this.geneToWindowScales[key](d.end)
+        const outOfRange = start > selectionX[1]  || end < selectionX[0] 
+        // console.log(d.sequence_uid)
+        return (d.sequence_uid === sequenceUid) && (!outOfRange)
+      })
+      this.genomeStore.showLinesHomologyGroups = affectedGenes.map(d => d.homology_groups[0]?.uid)
 
       this.svg().select('.brush').call(brush.value?.move, null) // This remove the grey brush area as soon as the selection has been done
       this.svg()
@@ -972,7 +995,12 @@ export default {
       this.svg().selectAll('path.connection').remove()
       let currentHomologyGroups: string[] = [...new Set(genes.flatMap(d => d.homology_groups.map(p =>p.uid)))]
 
-      if (this.showLinks === false) {
+      if(this.genomeStore.showLinesHomologyGroups.length > 0){
+
+        currentHomologyGroups = this.genomeStore.showLinesHomologyGroups
+        console.log('brushed:', currentHomologyGroups)
+      }
+      else if (this.showLinks === false) {
         currentHomologyGroups = currentHomologyGroups.filter((d) =>
           crossingHomologyGroups.value.includes(d)
         )
@@ -1145,7 +1173,7 @@ export default {
                   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
                   drawingIndex * (vis.barHeight + 10) + this.barHeight / 2
-                let rotation = d.strand === 0 ? 0 : 180
+                let rotation = d.strand === 1 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('class', 'gene')
@@ -1230,8 +1258,7 @@ export default {
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('d', geneSymbol)
-              .attr('z-index', 1000)
-,
+              .attr('z-index', 1000),
           (exit) => exit.remove()
         )
 
@@ -1458,7 +1485,7 @@ export default {
 
     // Add brushing
     var newBrush = d3
-      .brushX() // Add the brush feature using the d3.brush function
+      .brush() // Add the brush feature using the d3.brush function
       .extent([
         [this.windowRange[0], 0],
         [this.windowRange[1], this.visHeight],
