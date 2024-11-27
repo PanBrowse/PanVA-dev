@@ -78,6 +78,8 @@ export const useGenomeStore = defineStore({
     sequencePositions: {},
     sequenceHomologyLinks: {},
     isInitialized: false,
+    centeredHomologyGroup: undefined as undefined | number,
+    highlightedHomologyGroups: undefined as undefined | number,
   }),
   getters: {
     genomeCount: (state) => state.genomeData?.genomes?.length || 0,

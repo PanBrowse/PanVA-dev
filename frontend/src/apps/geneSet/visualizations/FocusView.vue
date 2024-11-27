@@ -293,6 +293,9 @@ export default {
       'scaleRepulsion',
       'minimumDistance'
     ]),
+    ...mapState(useGenomeStore, [
+      'highlightedHomologyGroups'
+    ]),
     containerWidth() {
       return this.showTable ? this.svgWidth / 2 : this.svgWidth
     },
@@ -983,9 +986,13 @@ export default {
         acc[homologyId].push(gene);
         return acc;
     }, {});
+      
+      const highlightedHomologyGroupUid = genes.flatMap(d => d.homology_groups)
+        .find(d => d.id === vis.highlightedHomologyGroups)?.uid
 
       currentHomologyGroups.forEach((homology) => {
-        const lineColor = vis.colorGenesLocal
+        const highlighted = homology === highlightedHomologyGroupUid
+        const lineColor = vis.colorGenesLocal || highlighted
                 ? (vis.colorScale(String(homology)) as string)
                 : colors['gray-5']
 
@@ -1036,7 +1043,7 @@ export default {
         }
 
         // Add the line
-        if (vis.colorGenesLocal !== true) {
+        if (vis.colorGenesLocal !== true || vis.showLinks === true) {
           this.svg()
             .select('g.bar-context')
             .append('path')
@@ -1044,12 +1051,30 @@ export default {
             .attr('class', 'connection')
             .attr('fill', 'none')
             .attr('stroke', lineColor )
+            .attr('opacity', d =>  {  
+                if(vis.highlightedHomologyGroups === undefined) {return 0.8}
+                
+                if(highlighted) {
+                  return 1
+                }       
+                return 0.5}    
+              )
             .attr('stroke-width', 1)
             .attr('d', (d) => {
+              console.log('adding connections')
               return connectionsLine(d).toString()
             })
         }
       })
+
+      const handleClick = (event: any, d: Gene) => {
+
+        const homologyGroups = d.homology_groups[0]?.id
+        if(this.genomeStore.centeredHomologyGroup === homologyGroups) {
+          this.genomeStore.centeredHomologyGroup = undefined
+        }
+        this.genomeStore.centeredHomologyGroup = homologyGroups
+      }
 
       const geneSymbol = d3
         .symbol()
@@ -1091,12 +1116,13 @@ export default {
         let xScale = vis.geneToWindowScales[sequence ?? '']
         if (
           xScale === undefined ||
-          xScale(d.end) < this.windowRange[0] - 50 ||
-          xScale(d.start) > this.windowRange[1] + 50
+          xScale(d.end) < (this.windowRange[0] - 50) ||
+          xScale(d.start) > (this.windowRange[1] + 50)
           ) {return false}
         return true
       })
 
+      // const highlightedHomologyGroups = this.genomeStore.highlightedHomologyGroups
       //draw genes
       this.svg()
         .select('g.gene-context')
@@ -1128,23 +1154,36 @@ export default {
                 (d: Gene) => d.homology_groups?.map((entry) => entry.id) ?? []
               )
               .attr('stroke-width', '5px')
-              .attr('fill', d =>               
-              vis.colorGenesLocal
-                ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
-                : colors['gray-7']
-              )
+              .attr('fill', d =>  {  
+                const currentHG = d.homology_groups[0]?.id
+                if(currentHG === vis.highlightedHomologyGroups) {
+                  return (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
+                }           
+                return vis.colorGenesLocal
+                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
+                  : colors['gray-7']
+              })
               .attr('z-index', 1000)
-              .attr('opacity', 0.8)
+              .attr('opacity', d =>  {  
+                const currentHG = d.homology_groups[0]?.id
+                if(currentHG === vis.highlightedHomologyGroups) {
+                  return 1
+                }       
+                return 0.8}    
+              )
               .attr('pointer-events', 'visible')
               .on('mouseenter', (event, d) => {  
+                const homologyGroups = d.homology_groups[0]?.id
+                this.genomeStore.highlightedHomologyGroups = homologyGroups
                 const target = event.currentTarget
                 const container = this.svg().select('g.tooltip-context').nodes()[0].getBoundingClientRect()
-                d3.select(target).attr('fill', 'pink')
+                // d3.select(target).attr('fill', 'pink')
                 tooltip.transition().duration(100).style("visibility", 'visible')
                 tooltip.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 10);  
                 tooltipText.attr("x",  event.x -container.x + 22).attr("y", event.y - container.y + 22);  
                 tooltipText.text(d.homology_groups ? `${d.homology_groups[0]?.id}`: '')
                 tooltipText.transition().duration(100).style("visibility", 'visible')
+
 
               })
               .on('mouseleave',  (event, d) => {
@@ -1156,10 +1195,29 @@ export default {
               )
               tooltip.transition().duration(200).style("visibility", 'hidden');
               tooltipText.transition().duration(200).style("visibility", 'hidden');
+              this.genomeStore.highlightedHomologyGroups = undefined
               })
+              .on('click', handleClick)
               ,
           (update) =>
             update
+              .attr('fill', (d) => {
+                const currentHG = d.homology_groups[0]?.id
+                if(currentHG === vis.highlightedHomologyGroups) {
+                  return (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
+                }
+                return vis.colorGenesLocal
+                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
+                  : colors['gray-7']
+              })
+              .attr('opacity', d =>  {  
+                if(vis.highlightedHomologyGroups === undefined) {return 0.8}
+                const currentHG = d.homology_groups[0]?.id
+                if(currentHG === vis.highlightedHomologyGroups) {
+                  return 1
+                }       
+                return 0.5}    
+              )
               .transition()
               .duration(this.transitionTime)
               .attr('transform', (d) => {
@@ -1177,11 +1235,7 @@ export default {
               })
               .attr('d', geneSymbol)
               .attr('z-index', 1000)
-              .attr('fill', (d) => {
-                return vis.colorGenesLocal
-                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
-                  : colors['gray-7']
-              }),
+,
           (exit) => exit.remove()
         )
 
@@ -1538,6 +1592,11 @@ export default {
       },
       deep: true,
       immediate: true,
+    },
+    highlightedHomologyGroups: {
+      handler() {
+        this.drawGenes()
+      }
     },
     colorGenes() {
       this.drawGenes()
