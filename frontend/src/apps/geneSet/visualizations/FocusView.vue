@@ -1139,9 +1139,13 @@ export default {
         })
 
       const tooltip = this.svg().select('g.tooltip-context').append('rect').style('position', 'absolute').attr('fill', 'white') 
-      .attr('width', 80).attr('height', 15).style('visibility', 'hidden')// d3.select("body").select('div.tooltip').style('position', 'absolute').select('rect')
+      .attr('width', 120).attr('height', 30).style('visibility', 'hidden')// d3.select("body").select('div.tooltip').style('position', 'absolute').select('rect')
       const tooltipText = this.svg().select('g.tooltip-context').append('text').style('position', 'absolute').attr('fill', 'black') 
       .style('visibility', 'hidden').attr('text-anchor', 'start').attr('height', 12)
+      const tooltipText2 = this.svg().select('g.tooltip-context').append('text').style('position', 'absolute').attr('fill', 'black') 
+      .style('visibility', 'hidden').attr('text-anchor', 'start').attr('height', 12)
+
+
 
         // filter out genes out of view
       const genesInView = vis.filteredGenes.filter(d => {
@@ -1213,9 +1217,13 @@ export default {
                 const container = this.svg().select('g.tooltip-context').nodes()[0].getBoundingClientRect()
                 tooltip.transition().duration(100).style("visibility", 'visible')
                 tooltip.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 10);  
-                tooltipText.attr("x",  event.x -container.x + 22).attr("y", event.y - container.y + 22);  
-                tooltipText.text(d.homology_groups ? `${d.homology_groups[0]?.id}`: '')
+                tooltipText.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 22);  
+                tooltipText2.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 34);  
+                const geneName = d.names[0]
+                tooltipText.text(d.homology_groups ? `Group: ${d.homology_groups[0]?.id}`: '')
                 tooltipText.transition().duration(100).style("visibility", 'visible')
+                tooltipText2.text( geneName)
+                tooltipText2.transition().duration(100).style("visibility", 'visible')
 
 
               })
