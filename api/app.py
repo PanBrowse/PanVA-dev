@@ -222,6 +222,30 @@ def get_distance_matrix(dataset):
     except Exception as e:
         print("Error loading distance matrix:", str(e))
         return jsonify({"error": str(e)}), 500
+    
+
+@app.route("/geneSet/<dataset>/clustering.json", methods=["GET", "POST"])
+def get_clustering_order_new():
+
+    if request.method == "POST":
+
+        # get scores and multiply with matrices
+        protein_score = request.json["proteinScore"]/100
+        order_score = request.json["orderScore"]/100
+        orientation_score = request.json["orientationScore"]/100
+        size_score = request.json["sizeScore"]/100
+        location_score = request.json["locationScore"]/100
+        jaccard_score = request.json["jaccardScore"]/100
+        print('proteinScore', protein_score)
+        print('orderScore', order_score)
+        print('orientationScore', orientation_score)
+        print('sizeScore', size_score)
+        print('locationScore', location_score)
+        print('jaccardScore', jaccard_score)
+
+    return
+
+
 
 @app.route("/geneSet/clustering.json", methods=["GET", "POST"])
 def get_clustering_order():
