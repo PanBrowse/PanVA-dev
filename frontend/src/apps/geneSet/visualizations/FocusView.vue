@@ -575,13 +575,18 @@ export default {
       // const key: string = d.uid ?? ''
       // const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
       const  indexTop =  Math.floor((selectionY[0] - 2* this.margin.top ) / (this.barHeight + 10)) + 1
-      const  indexBottom = Math.floor( (selectionY[1] - 2* this.margin.top ) / (this.barHeight + 10))
+      const  indexBottom = Math.floor( (selectionY[1] - 2* this.margin.top ) / (this.barHeight + 10)) + 1
+      const affectedSequenceUids: string[] = []
 
-      const sequenceIdNumberElement = [...this.indexMap.entries()].find(d => d[1] === indexTop)
-      const sequenceIdNumber = sequenceIdNumberElement ? sequenceIdNumberElement[0] : ''
-      const sequenceUidElement = [...Object.entries(this.genomeStore.sequenceUidLookup)].find(d=> d[1] === sequenceIdNumber)
-      const sequenceUid = sequenceUidElement ? sequenceUidElement[0] : ''
-      
+      // find the sequences in the brushing area
+      for(let affectedIndex = indexTop; affectedIndex < indexBottom; affectedIndex++) {
+        const sequenceIdNumberElement = [...this.indexMap.entries()].find(d => d[1] === affectedIndex)
+        const sequenceIdNumber = sequenceIdNumberElement ? sequenceIdNumberElement[0] : ''
+        const sequenceUidElement = [...Object.entries(this.genomeStore.sequenceUidLookup)].find(d=> d[1] === sequenceIdNumber)
+        const sequenceUid = sequenceUidElement ? sequenceUidElement[0] : ''
+        affectedSequenceUids.push(sequenceUid)
+      }
+      //find the genes in the brushing area
       const affectedGenes = this.genomeStore.genomeData.genes.filter(d => {
         const key: string = d.sequence_uid ?? ''
         if(this.geneToWindowScales[key] === undefined) {return false}
@@ -589,7 +594,7 @@ export default {
         const end = this.geneToWindowScales[key](d.end)
         const outOfRange = start > selectionX[1]  || end < selectionX[0] 
         // console.log(d.sequence_uid)
-        return (d.sequence_uid === sequenceUid) && (!outOfRange)
+        return (affectedSequenceUids.includes(d.sequence_uid ?? '')) && (!outOfRange)
       })
       this.genomeStore.showLinesHomologyGroups = affectedGenes.map(d => d.homology_groups[0]?.uid)
 
