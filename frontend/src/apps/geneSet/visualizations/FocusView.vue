@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <ACard
     title="Focus View"
     :style="{
@@ -7,6 +7,7 @@
     }"
     :bordered="false"
     size="small"
+    v-if="!rerunSimulation"
   >
     <template #extra
       ><AButton type="text" size="small"
@@ -18,7 +19,8 @@
       :height="svgHeight"
     ></svg>
   </ACard>
-</template>
+  <LoadingScreen v-else>Loading data, please wait...</LoadingScreen>
+</template> -->
 
 <script lang="ts">
 import { CloseCircleOutlined, ConsoleSqlOutlined } from '@ant-design/icons-vue'
@@ -27,6 +29,8 @@ import * as d3 from 'd3'
 import { type Dictionary } from 'lodash'
 import { mapActions, mapState } from 'pinia'
 import { computed, defineComponent, ref, watch } from 'vue'
+
+import LoadingScreen from '@/components/LoadingScreen.vue'
 
 import colors from '@/assets/colors.module.scss'
 import {
@@ -46,6 +50,7 @@ import type { Gene, GroupInfo, Locus, Sequence, SequenceInfo, SequenceMetrics } 
 import { drawSquish } from './compressibleScale';
 import { arrayRange } from '@/helpers/arrayRange';
 
+
 // states
 const compressionViewWindowRange = ref<[number, number]>([0, 1])
 const geneToCompressionScales = ref<
@@ -53,12 +58,13 @@ const geneToCompressionScales = ref<
 >({})
 const globalCompressionFactor = ref<number>(1)
 const currentHeat = ref<number>(1000)
-const crossingHomologyGroups = ref<number[]>([])
+const crossingHomologyGroups = ref<string[]>([])
 const showGeneBars = ref<boolean>(true)
 const brush = ref<d3.BrushBehavior<unknown>>(d3.brushX())
 const anchorMax = ref<number>(0)
 const anchorMin = ref<number>(0)
 const anchorLookup = ref<Dictionary<number>>({})
+// const isLoading = ref<boolean>(true)
 
 export default {
   name: 'FocusView',
@@ -77,6 +83,7 @@ export default {
     ACard: Card,
     AButton: Button,
     CloseCircleOutlined: CloseCircleOutlined,
+    LoadingScreen
   },
   setup() {
     const genomeStore = useGenomeStore()
@@ -89,7 +96,6 @@ export default {
     // const selectedGeneUids = ref<string[]>([])
     const selectedGeneUids = computed(() => genomeStore.selectedGeneUids)
     const geneToLocusSequenceLookup = genomeStore.geneToLocusSequenceLookup
-    const rerunSimulation = computed(() => useGeneSetStore().rerunSimulation)
 
     // watch(
     //   () => genomeStore.selectedGeneUids,
@@ -220,83 +226,6 @@ export default {
       { immediate: true }
     )
 
-    watch(
-      rerunSimulation, 
-      (rerun) => {
-        if(!rerun ) {return}
-        useGeneSetStore().rerunSimulation = false
-        let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] =
-        runSpringSimulation(
-          genomeStore.genomeData.genes ?? [],
-          genomeStore.genomeData.sequences ?? [],
-          currentHeat.value,
-          1,
-          736740
-        )
-        console.log('rerunning')
-
-
-        crossingHomologyGroups.value = crossDetection(newGenePositions)
-
-        let xScaleGeneToWindowInit: Dictionary<
-          d3.ScaleLinear<number, number, never>
-        > = {}
-        let xScaleGeneToCompressionInit: Dictionary<
-          d3.ScaleLinear<number, number, never>
-        > = {}
-        //determine global ranges'
-        const sortedCompressionRangeGlobal = newGenePositions
-          .map((d) => d.position)
-          .sort((a, b) => a - b)
-
-        const edgesOfNewRangeGlobal: [number, number] = [
-          sortedCompressionRangeGlobal[0],
-          sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length - 1],
-        ]
-
-        const oldRanges = newGenePositions
-        .map((d) => d.originalPosition)
-        .sort((a, b) => a - b)
-        const edgesOfOldRange = [oldRanges[0], oldRanges[oldRanges.length - 1]]
-        // const overallCompressionFactor =
-        //   (edgesOfOldRange[1] - edgesOfOldRange[0]) /
-        //   (edgesOfNewRangeGlobal[1] - edgesOfNewRangeGlobal[0])
-        //   globalCompressionFactor.value = overallCompressionFactor
-        compressionViewWindowRange.value = edgesOfNewRangeGlobal
-        const compressions: number[] = []
-
-        genomeStore.genomeData.sequences.forEach((sequence) => {
-          //find gene positions
-          const key = sequence.uid
-          let genePositionsOnSequence = newGenePositions
-            .filter((d) => String(d.sequenceId) === key)
-            .sort((d) => d.originalPosition)
-
-            // create scales
-          const [geneToCompression, scaleGeneToWindow] = calculateIndividualScales(
-            genePositionsOnSequence,
-            edgesOfNewRangeGlobal,
-          )
-          xScaleGeneToCompressionInit[key] = geneToCompression
-          xScaleGeneToWindowInit[key] = scaleGeneToWindow
-
-          //  calculate compression
-          if(genePositionsOnSequence.length === 0) { return }
-          const compressedWidth = geneToCompression(sequence.sequence_length_nuc) - geneToCompression(0)
-          const compression = sequence.sequence_length_nuc / compressedWidth
-          compressions.push(compression)
-        })
-        //assign scale dictionaries
-        geneToCompressionScales.value = xScaleGeneToCompressionInit
-        // find median compression
-        compressions.sort((a,b)  => a - b)
-
-        const medianCompression = compressions[Math.floor(compressions.length / 2)]
-        globalCompressionFactor.value = medianCompression
-      },
-      {immediate: true}
-    ) 
-
     return {
       filteredSequences,
       sequenceIndicesInLookup,
@@ -336,6 +265,7 @@ export default {
     transcriptSpacing: 2,
     transcriptHeight: 2,
     transcriptWidth: 2,
+    isLoading: true
   }),
   computed: {
     ...mapState(useGeneSetStore, [
@@ -354,8 +284,17 @@ export default {
       'showNotificationsDetail',
       'homologyFocus',
       'anchor',
-      // 'colorGenes',
+      'colorGenes',
       'showLinks',
+      'rerunSimulation',
+      'scaleXForce',
+      'scaleYForce',
+      'scaleContraction',
+      'scaleRepulsion',
+      'minimumDistance'
+    ]),
+    ...mapState(useGenomeStore, [
+      'highlightedHomologyGroups'
     ]),
     containerWidth() {
       return this.showTable ? this.svgWidth / 2 : this.svgWidth
@@ -394,7 +333,7 @@ export default {
     colorScale(): d3.ScaleOrdinal<string, unknown, never> {
       return d3
         .scaleOrdinal()
-        .domain(this.homologyGroups.map(toString))
+        .domain(this.homologyGroups.sort((a,b) => a - b).map(toString))
         .range(d3.schemeCategory10)
     },
     colorScaleGC() {
@@ -409,17 +348,34 @@ export default {
         .domain(['1', '2', '3', '4', '5'])
         .range(d3.schemeCategory10)
     },
-    colorGenes() {
-      let nGenesTotal = 0
-      let nOfGenomes = 0
-      for (const [key, value] of Object.entries(this.geneToWindowScales)) {
-        nGenesTotal = nGenesTotal + value.domain().length - 2
-        nOfGenomes = nOfGenomes + 1
-      }
-      if (nGenesTotal / nOfGenomes < 15) {
+    colorGenesLocal() {
+      if(this.colorGenes) {return true}
+      // let nGenesTotal = 0
+      // let nOfGenomes = 0
+      // for (const [key, value] of Object.entries(this.geneToWindowScales)) {
+      //   nGenesTotal = nGenesTotal + value.domain().length - 2
+      //   nOfGenomes = nOfGenomes + 1
+      // }
+      // if (nGenesTotal / nOfGenomes < 15) {
+      //   return true
+      // }
+      // return false
+
+      const genesInView = this.filteredGenes.filter(d => {
+        const sequence = d.sequence_uid
+        let xScale = this.geneToWindowScales[sequence ?? '']
+        if (
+          xScale === undefined ||
+          xScale(d.end) < this.windowRange[0]||
+          xScale(d.start) > this.windowRange[1]
+          ) {return false}
         return true
-      }
-      return false
+      })
+      const homologyGroupsInView = 
+        new Set(genesInView.flatMap(
+          gene => gene.homology_groups.map(d => d.uid)
+        ))
+      return [...homologyGroupsInView].length < 20
     },
     shapeGenerator() {
       const shapes = [
@@ -497,22 +453,106 @@ export default {
         .attr('y', 0)
     },
 
+    async runSimulation() {
+      const response = await this.simulationAsync()
+      let [newGenePositions, _]: [GraphNode[], GraphNodeGroup[]] = response
+      useGeneSetStore().rerunSimulation = false
+
+      crossingHomologyGroups.value = crossDetection(newGenePositions)
+
+      let xScaleGeneToWindowInit: Dictionary<
+        d3.ScaleLinear<number, number, never>
+      > = {}
+      let xScaleGeneToCompressionInit: Dictionary<
+        d3.ScaleLinear<number, number, never>
+      > = {}
+      //determine global ranges'
+      const sortedCompressionRangeGlobal = newGenePositions
+        .map((d) => d.startPosition)
+        .sort((a, b) => a - b)
+
+      const edgesOfNewRangeGlobal: [number, number] = [
+        sortedCompressionRangeGlobal[0],
+        sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length - 1],
+      ]
+
+      const oldRanges = newGenePositions
+      .map((d) => d.originalPosition)
+      .sort((a, b) => a - b)
+      const edgesOfOldRange = [oldRanges[0], oldRanges[oldRanges.length - 1]]
+
+      compressionViewWindowRange.value = edgesOfNewRangeGlobal
+      const compressions: number[] = []
+
+      useGenomeStore().genomeData.sequences.forEach((sequence) => {
+        //find gene positions
+        const key = sequence.uid
+        let genePositionsOnSequence = newGenePositions
+          .filter((d) => String(d.sequenceId) === key)
+          .sort((d) => d.originalPosition)
+
+          // create scales
+        const [geneToCompression, scaleGeneToWindow] = calculateIndividualScales(
+          genePositionsOnSequence,
+          edgesOfNewRangeGlobal,
+        )
+        xScaleGeneToCompressionInit[key] = geneToCompression
+        xScaleGeneToWindowInit[key] = scaleGeneToWindow
+
+        //  calculate compression
+        if(genePositionsOnSequence.length === 0) { return }
+        const compressedWidth = geneToCompression(sequence.sequence_length_nuc) - geneToCompression(0)
+        const compression = sequence.sequence_length_nuc / compressedWidth
+        compressions.push(compression)
+      })
+      //assign scale dictionaries
+      geneToCompressionScales.value = xScaleGeneToCompressionInit
+      // find median compression
+      compressions.sort((a,b)  => a - b)
+
+      const medianCompression = compressions[Math.floor(compressions.length / 2)]
+      globalCompressionFactor.value = medianCompression
+      this.isLoading = false
+    },
+
+    async simulationAsync() {
+      this.isLoading = true
+      const endHeat = 10
+      const response = new Promise<[GraphNode[], GraphNodeGroup[]]>((resolve) => 
+        resolve(runSpringSimulation(
+          this.filteredGenes ?? [],
+          useGenomeStore().genomeData.sequences ?? [],
+          currentHeat.value,
+          endHeat,
+          {scaleXForce: useGeneSetStore().scaleXForce,
+          scaleYForce: useGeneSetStore().scaleYForce,
+          scaleContraction: useGeneSetStore().scaleContraction,
+          scaleRepulsion: useGeneSetStore().scaleRepulsion,
+          minimumDistance: useGeneSetStore().minimumDistance,
+          },
+        )
+      ))
+      return response
+    },
+
     ///////////////////////////////////////////////////////////////////////////////Update chart////////////////////////////////////
     updateChartBrushing({
-      selection,
+      selection: selection,
     }: {
-      selection: [number, number]
+      selection: [[number, number,],[number, number,]]
     }): NodeJS.Timeout | undefined {
       console.log('brush selection', selection)
-
       // If no selection, back to initial coordinate. Otherwise, update X axis domain
       if (!selection) {
         return
       }
+      const selectionX = [selection[0][0], selection[1][0]]
+      const selectionY = [selection[0][1], selection[1][1]]
+
 
       this.xScale.domain([
-        this.xScale.invert(selection[0] - this.margin.yAxis - this.margin.left),
-        this.xScale.invert(selection[1] - this.margin.yAxis - this.margin.left),
+        this.xScale.invert(selectionX[0] - this.margin.yAxis - this.margin.left),
+        this.xScale.invert(selectionX[1] - this.margin.yAxis - this.margin.left),
       ])
       const globalRangeWidth =
         compressionViewWindowRange.value[1] -
@@ -521,8 +561,8 @@ export default {
         compressionViewWindowRange.value
       const rangeWidth = this.windowRange[1] - this.windowRange[0]
       const selectionPercentages = [
-        (selection[0] - this.margin.yAxis - this.margin.left) / rangeWidth,
-        (selection[1] - this.margin.yAxis - this.margin.left) / rangeWidth,
+        (selectionX[0] - this.margin.yAxis - this.margin.left) / rangeWidth,
+        (selectionX[1] - this.margin.yAxis - this.margin.left) / rangeWidth,
       ]
       const newRangeBoundsGlobal: [number, number] = [
         currentGlobalRangeBounds[0] +
@@ -530,7 +570,33 @@ export default {
         currentGlobalRangeBounds[0] +
           selectionPercentages[1] * globalRangeWidth,
       ]
-      compressionViewWindowRange.value = newRangeBoundsGlobal
+      // compressionViewWindowRange.value = newRangeBoundsGlobal
+
+      // const key: string = d.uid ?? ''
+      // const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+      const  indexTop =  Math.floor((selectionY[0] - 2* this.margin.top ) / (this.barHeight + 10)) + 1
+      const  indexBottom = Math.floor( (selectionY[1] - 2* this.margin.top ) / (this.barHeight + 10)) + 1
+      const affectedSequenceUids: string[] = []
+
+      // find the sequences in the brushing area
+      for(let affectedIndex = indexTop; affectedIndex < indexBottom; affectedIndex++) {
+        const sequenceIdNumberElement = [...this.indexMap.entries()].find(d => d[1] === affectedIndex)
+        const sequenceIdNumber = sequenceIdNumberElement ? sequenceIdNumberElement[0] : ''
+        const sequenceUidElement = [...Object.entries(this.genomeStore.sequenceUidLookup)].find(d=> d[1] === sequenceIdNumber)
+        const sequenceUid = sequenceUidElement ? sequenceUidElement[0] : ''
+        affectedSequenceUids.push(sequenceUid)
+      }
+      //find the genes in the brushing area
+      const affectedGenes = this.genomeStore.genomeData.genes.filter(d => {
+        const key: string = d.sequence_uid ?? ''
+        if(this.geneToWindowScales[key] === undefined) {return false}
+        const start = this.geneToWindowScales[key](d.start)
+        const end = this.geneToWindowScales[key](d.end)
+        const outOfRange = start > selectionX[1]  || end < selectionX[0] 
+        // console.log(d.sequence_uid)
+        return (affectedSequenceUids.includes(d.sequence_uid ?? '')) && (!outOfRange)
+      })
+      this.genomeStore.showLinesHomologyGroups = affectedGenes.map(d => d.homology_groups[0]?.uid)
 
       this.svg().select('.brush').call(brush.value?.move, null) // This remove the grey brush area as soon as the selection has been done
       this.svg()
@@ -544,7 +610,7 @@ export default {
 
       this.svg().selectAll('circle.density').remove()
       this.svg().selectAll('text.density-value-focus').remove()
-      this.draw()
+      // this.draw()
     },
     /////////////////////////////////////////////////////////////////////////////// Reset zoom ////////////////////////////////////
     resetZoom() {
@@ -707,7 +773,7 @@ export default {
 
       this.svg().selectAll('circle.density').remove()
       this.svg().selectAll('text.density-value-focus').remove()
-      this.draw()
+      // this.draw()
     },
     ///////////////////////////////////////////////////////////////////////////////Draw bars ////////////////////////////////////
     drawSquishBars() {
@@ -716,10 +782,25 @@ export default {
         return
       }
 
+      const segmentsInView = vis.filteredSegments.filter(segment => {
+        const key: string = segment.uid ?? ''
+        const currentGeneToWindowScale = this.geneToWindowScales[key]
+        if(currentGeneToWindowScale === undefined) {return false}
+
+        const start = currentGeneToWindowScale(segment.start)
+        const end = currentGeneToWindowScale(segment.end)
+        if ( start > vis.windowRange[1] + 20) { return false; }
+        if (end < vis.windowRange[0] - 20) { return false; }
+
+        //visibility
+        const width = end-start
+        if(width < 0.1) {return false; }
+        return true
+      })
       this.svg()
         .select('g.bar-context')
         .selectAll('path.bar-chr-context')
-        .data(vis.filteredSegments, d => d.uid + d.start)
+        .data(segmentsInView, d => d.uid + d.start)
         .join(
           (enter) =>
             enter
@@ -728,8 +809,6 @@ export default {
               .attr('d', (d) => {
                 const key: string = d.uid ?? ''
                 const xPos = d.start
-                const geneIndex = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
-                const ypos = geneIndex  * (this.barHeight + 10)
 
                 const currentGeneToWindowScale = this.geneToWindowScales[key]
                 if(currentGeneToWindowScale === undefined || currentGeneToWindowScale === null) {
@@ -743,9 +822,10 @@ export default {
                   xPos,
                   d.end,
                   this.barHeight,
-                  ypos,
+                  0,
                   this.defaultConnectionThickness,
-                  globalCompressionFactor.value
+                  globalCompressionFactor.value,
+                  vis.windowRange
                 )
               })
               .attr('fill', (d) => {
@@ -761,6 +841,12 @@ export default {
                 return 1
               })
               .attr('z-index', 100)
+              .attr('transform', d => {
+                const key: string = d.uid ?? ''
+                const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+                const ypos = index * (this.barHeight + 10)
+                return `translate(0,${ypos})`
+              })
               .attr('clip-path', 'url(#clipDetails)'),
           (update) =>
             update
@@ -789,7 +875,8 @@ export default {
                   this.barHeight,
                   yPos,
                   this.defaultConnectionThickness,
-                  globalCompressionFactor.value
+                  globalCompressionFactor.value,
+                  vis.windowRange
                 )
               })
               .attr('fill', (d) => {
@@ -873,47 +960,7 @@ export default {
         )
     },
     /////////////////////////////////////////////////////////////////////////////// Add values ////////////////////////////////////
-    addValues() {
-      if (this.genomeStore.genomeData.sequences === undefined) {
-        return
-      }
-      this.svg()
-        .selectAll('text.value-chr')
-        .data(this.genomeStore.genomeData.sequences)
-        .join(
-          (enter) =>
-            enter
-              .append('text')
-              .attr(
-                'transform',
-                `translate(${this.margin.left},${this.margin.top * 2})`
-              )
-              .attr('class', 'value-chr')
-              .attr('dominant-baseline', 'hanging')
-              .attr('x', 0)
-              .attr('dx', 2)
-              .attr(
-                'y',
-                (d, i) =>
-                  this.genomeStore.sequenceUidLookup[d.uid] *
-                  (this.barHeight + 10)
-              )
-              .attr('dy', this.barHeight / 4)
-              .text((d) => Math.floor(d.sequence_length_nuc).toLocaleString()),
 
-          (update) =>
-            update
-              .transition()
-              .duration(this.transitionTime)
-              .attr(
-                'y',
-                (d, i) =>
-                  this.genomeStore.sequenceUidLookup[d.uid] *
-                  (this.barHeight + 10)
-              ),
-          (exit) => exit.remove()
-        )
-    },
     ///////////////////////////////////////////////////////////////////////////////Draw x-axis ////////////////////////////////////
     drawXAxis() {
       this.svg().select('g.x-axis').remove() //needed because otherwise draws twice in some cases. To-do: fix side effect
@@ -944,36 +991,52 @@ export default {
     ///////////////////////////////////////////////////////////////////////////// Draw genes ////////////////////////////////////////////////
     drawGenes() {
       let vis = this
-      if (this.genomeStore.genomeData.genes === undefined) {
+      if (this.filteredGenes === undefined) {
         return
       }
-      const genes: Gene[] = this.genomeStore.genomeData.genes
+      const genes: Gene[] = this.filteredGenes
 
       /// connection lines
       this.svg().selectAll('path.connection').remove()
-      let currentHomologyGroups = this.homologyGroups
+      let currentHomologyGroups: string[] = [...new Set(genes.flatMap(d => d.homology_groups.map(p =>p.uid)))]
 
-      if (this.showLinks === false) {
-        currentHomologyGroups = this.homologyGroups.filter((d) =>
+      if(this.genomeStore.showLinesHomologyGroups.length > 0){
+
+        currentHomologyGroups = this.genomeStore.showLinesHomologyGroups
+        console.log('brushed:', currentHomologyGroups)
+      }
+      else if (this.showLinks === false) {
+        currentHomologyGroups = currentHomologyGroups.filter((d) =>
           crossingHomologyGroups.value.includes(d)
         )
       }
       // draw the lines
+      const genesByHomology: { [key: string]: Gene[] } = genes.reduce((acc:{ [key: string]: Gene[] }, gene) => {
+        const homologyId = gene.homology_groups[0]?.uid;
+        if (!acc[homologyId]) {
+            acc[homologyId] = [];
+        }
+        acc[homologyId].push(gene);
+        return acc;
+    }, {});
+      
+      const highlightedHomologyGroupUid = genes.flatMap(d => d.homology_groups)
+        .find(d => d.id === vis.highlightedHomologyGroups)?.uid
+
       currentHomologyGroups.forEach((homology) => {
-        const path_focus = genes.filter(
-          (d) => d.homology_groups[0].id == homology //this.homologyFocus
-        )
+        const highlighted = homology === highlightedHomologyGroupUid
+        const lineColor = vis.colorGenesLocal || highlighted
+                ? (vis.colorScale(String(homology)) as string)
+                : colors['gray-5']
 
-        const newPathFocus = path_focus.map((v) => ({
-          ...v,
-          sequence_id: v.sequence_uid ?? '',
-        }))
+        const newPathFocus: Gene[] = genesByHomology[homology]
 
-        let sortOrder = Object.keys(this.sequenceIdLookup[this.chromosomeNr])
+        let sortedPath = newPathFocus.sort(function (a, b) {
+          let sequence_a = vis.genomeStore.sequenceUidLookup[a.sequence_uid ?? '']
+          let sequence_b = vis.genomeStore.sequenceUidLookup[b.sequence_uid ?? '']
 
-        let sortedPath = [...newPathFocus].sort(function (a, b) {
           return (
-            sortOrder.indexOf(a.sequence_id) - sortOrder.indexOf(b.sequence_id)
+            (vis.indexMap.get(sequence_a) ?? 0) - (vis.indexMap.get(sequence_b) ?? 0)
           )
         })
 
@@ -981,16 +1044,20 @@ export default {
           const currentPath = d3.path()
           let previousWasRendered = false
           sortedPath.forEach((node, i) => {
+            
             const key = node.sequence_uid ?? ''
             const currentGeneToWindow = this.geneToWindowScales[key]
+            if(currentGeneToWindow === undefined) {return ''}
             const nodePosition =
               (currentGeneToWindow(node.start) +
                 currentGeneToWindow(node.end)) /
               2
+            const yIndex = vis.indexMap.get(
+                    vis.genomeStore.sequenceUidLookup[key]
+                  ) ?? 0
             const y =
-              vis.margin.top * 2 +
               vis.barHeight / 2 +
-              vis.sequenceIdLookup[vis.chromosomeNr][key] * (vis.barHeight + 10)
+              yIndex * (vis.barHeight + 10)
             if (
               nodePosition < this.windowRange[0] ||
               nodePosition > this.windowRange[1]
@@ -1009,21 +1076,38 @@ export default {
         }
 
         // Add the line
-        if (vis.colorGenes !== true) {
+        if (vis.colorGenesLocal !== true || vis.showLinks === true) {
           this.svg()
+            .select('g.bar-context')
             .append('path')
             .datum(sortedPath)
             .attr('class', 'connection')
             .attr('fill', 'none')
-            .attr('stroke', (d) =>
-              vis.colorGenes
-                ? (vis.colorScale(String(homology)) as string)
-                : colors['gray-7']
-            )
-            .attr('stroke-width', 1.5)
-            .attr('d', (d) => connectionsLine(d).toString())
+            .attr('stroke', lineColor )
+            .attr('opacity', d =>  {  
+                if(vis.highlightedHomologyGroups === undefined) {return 0.8}
+                
+                if(highlighted) {
+                  return 1
+                }       
+                return 0.5}    
+              )
+            .attr('stroke-width', 1)
+            .attr('d', (d) => {
+              console.log('adding connections')
+              return connectionsLine(d).toString()
+            })
         }
       })
+
+      const handleClick = (event: any, d: Gene) => {
+
+        const homologyGroups = d.homology_groups[0]?.id
+        if(this.genomeStore.centeredHomologyGroup === homologyGroups) {
+          this.genomeStore.centeredHomologyGroup = undefined
+        }
+        this.genomeStore.centeredHomologyGroup = homologyGroups
+      }
 
       const geneSymbol = d3
         .symbol()
@@ -1040,12 +1124,7 @@ export default {
             vis.barHeight,
             showGeneBars.value
           )
-          if (
-            currentGeneToWindow(d.start) > this.windowRange[1] ||
-            currentGeneToWindow(d.end) < this.windowRange[0]
-          ) {
-            return 0
-          }
+
           return size
         })
         .type((d) => {
@@ -1059,27 +1138,51 @@ export default {
           )
         })
 
+      const tooltip = this.svg().select('g.tooltip-context').append('rect').style('position', 'absolute').attr('fill', 'white') 
+      .attr('width', 120).attr('height', 30).style('visibility', 'hidden')// d3.select("body").select('div.tooltip').style('position', 'absolute').select('rect')
+      const tooltipText = this.svg().select('g.tooltip-context').append('text').style('position', 'absolute').attr('fill', 'black') 
+      .style('visibility', 'hidden').attr('text-anchor', 'start').attr('height', 12)
+      const tooltipText2 = this.svg().select('g.tooltip-context').append('text').style('position', 'absolute').attr('fill', 'black') 
+      .style('visibility', 'hidden').attr('text-anchor', 'start').attr('height', 12)
+
+
+
+        // filter out genes out of view
+      const genesInView = vis.filteredGenes.filter(d => {
+        const sequence = d.sequence_uid
+        let xScale = vis.geneToWindowScales[sequence ?? '']
+        if (
+          xScale === undefined ||
+          xScale(d.end) < (this.windowRange[0] - 50) ||
+          xScale(d.start) > (this.windowRange[1] + 50)
+          ) {return false}
+        return true
+      })
+      let timer: string | number | NodeJS.Timeout | undefined = undefined
+      // const highlightedHomologyGroups = this.genomeStore.highlightedHomologyGroups
+      //draw genes
       this.svg()
         .select('g.gene-context')
         .selectAll('path.gene')
-        .data(vis.filteredGenes, d => d.uid)
+        .data(genesInView, d => d.uid + d.sequence_uid)
         .join(
           (enter) =>
             enter
               .append('path')
-              .attr('d', geneSymbol)
-              .attr('transform', function (d, i) {
-                const sequence = d.sequence_uid
-                let xTransform = vis.geneToWindowScales[sequence ?? ''](
-                  d.start + (d.end - d.start) / 2
-                )
+              .attr('d', d => {
+                return geneSymbol
+              })
+              .attr('transform', (d) => {
+                const key = d.sequence_uid ?? '' //vis.geneToLocusSequenceLookup.get(d.uid)?.sequence
+                const scale = this.geneToWindowScales[key]
+                let xTransform = this.geneToWindowScales[key](
+                  d.start 
+                ) + (scale(d.end) - scale(d.start) ) /2
                 let drawingIndex =
-                  vis.indexMap.get(
-                    vis.genomeStore.sequenceUidLookup[sequence ?? '']
-                  ) ?? 0
+                  vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
-                  drawingIndex * (vis.barHeight + 10) + vis.barHeight / 2
-                let rotation = d.strand === 0 ? 0 : 180
+                  drawingIndex * (vis.barHeight + 10) + this.barHeight / 2
+                let rotation = d.strand === 1 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('class', 'gene')
@@ -1087,12 +1190,71 @@ export default {
                 'hg',
                 (d: Gene) => d.homology_groups?.map((entry) => entry.id) ?? []
               )
-              .attr('stroke-width', '3px')
-              .attr('fill', colors['gray-7'])
+              .attr('stroke-width', '5px')
+              .attr('fill', d =>  {  
+                const currentHG = d.homology_groups[0]?.id
+                if(currentHG === vis.highlightedHomologyGroups) {
+                  return (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
+                }           
+                return vis.colorGenesLocal
+                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
+                  : colors['gray-7']
+              })
               .attr('z-index', 1000)
-              .attr('opacity', 0.8),
+              .attr('opacity', d =>  {
+                if(vis.highlightedHomologyGroups === undefined) {return 0.8}
+                const currentHG = d.homology_groups[0]?.id
+                if(currentHG === vis.highlightedHomologyGroups) {
+                  return 1
+                }       
+                return 0.5}    
+              )
+              .attr('pointer-events', 'visible')
+              .on('mouseenter', (event, d) => {  
+                clearTimeout(timer)
+                const homologyGroups = d.homology_groups[0]?.id
+                this.genomeStore.highlightedHomologyGroups = homologyGroups
+                const container = this.svg().select('g.tooltip-context').nodes()[0].getBoundingClientRect()
+                tooltip.transition().duration(100).style("visibility", 'visible')
+                tooltip.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 10);  
+                tooltipText.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 22);  
+                tooltipText2.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 34);  
+                const geneName = d.names[0]
+                tooltipText.text(d.homology_groups ? `Group: ${d.homology_groups[0]?.id}`: '')
+                tooltipText.transition().duration(100).style("visibility", 'visible')
+                tooltipText2.text( geneName)
+                tooltipText2.transition().duration(100).style("visibility", 'visible')
+
+
+              })
+              .on('mouseleave',  (event, d) => {
+                timer = setTimeout(() => {
+                  this.genomeStore.highlightedHomologyGroups = undefined
+                }, 300);
+                tooltip.transition().duration(200).style("visibility", 'hidden');
+                tooltipText.transition().duration(200).style("visibility", 'hidden');
+                })
+              .on('click', handleClick)
+              ,
           (update) =>
             update
+              .attr('fill', (d) => {
+                const currentHG = d.homology_groups[0]?.id
+                if(currentHG === vis.highlightedHomologyGroups) {
+                  return (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
+                }
+                return vis.colorGenesLocal
+                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
+                  : colors['gray-7']
+              })
+              .attr('opacity', d =>  {  
+                if(vis.highlightedHomologyGroups === undefined) {return 0.8}
+                const currentHG = d.homology_groups[0]?.id
+                if(currentHG === vis.highlightedHomologyGroups) {
+                  return 1
+                }       
+                return 0.5}    
+              )
               .transition()
               .duration(this.transitionTime)
               .attr('transform', (d) => {
@@ -1109,13 +1271,7 @@ export default {
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('d', geneSymbol)
-              .attr('z-index', 1000)
-              .attr('fill', (d) => {
-                return vis.colorGenes
-                  ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
-                  : 'gray'
-              }),
-          // .attr('fill', colors['gray-7']),
+              .attr('z-index', 1000),
           (exit) => exit.remove()
         )
 
@@ -1123,7 +1279,7 @@ export default {
         this.svg()
         .select('g.gene-context')
         .selectAll('path.mrna')
-        .data(vis.filteredGenes, (d:Gene) => d.uid + d.sequence)
+        .data(genesInView, (d:Gene) => d.uid + d.sequence)
         .join(
           (enter) =>
             enter.append('path')
@@ -1132,7 +1288,7 @@ export default {
                 if(nTranscripts < 2) {return ''}
                 const key = d.sequence_uid ?? ''
                 const size = getGeneSymbolSize(d, this.geneToWindowScales[key], this.barHeight, true)
-                if(size <= this.barHeight * 4) {return ''}
+                // if(size <= this.barHeight ) {return ''}
                 const renderedNTranscripts = Math.min(nTranscripts, this.maxNTranscripts)
                 const transcriptsWidth = 
                   (this.transcriptWidth + this.transcriptSpacing) * 
@@ -1158,13 +1314,13 @@ export default {
                 let drawingIndex =
                   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
-                  drawingIndex * (vis.barHeight + 10) + this.barHeight / 2 +5
+                  drawingIndex * (vis.barHeight + 10) + this.barHeight  /2
                 let rotation = d.strand === 0 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('stroke', (d) => {
-                return vis.colorGenes
-                  ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                return vis.colorGenesLocal
+                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
                   : 'gray'
               })
               .attr('class', 'mrna')
@@ -1179,8 +1335,7 @@ export default {
                 if(nTranscripts < 2) {return ''}
 
                 const key = d.sequence_uid ?? ''
-                const size = getGeneSymbolSize(d, this.geneToWindowScales[key], this.barHeight, true)
-                if(size <= this.barHeight *4) {return ''}
+                // if(size <= this.barHeight ) {return ''}
 
                 const renderedNTranscripts = Math.min(nTranscripts, this.maxNTranscripts)
                 
@@ -1209,13 +1364,13 @@ export default {
                 let rowNumber =
                   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
-                  rowNumber * (vis.barHeight + 10) + this.barHeight / 2
+                  rowNumber * (vis.barHeight + 10) + this.barHeight / 2 
 
                 return `translate(${xTransform},${yTransform})`
               })
               .attr('stroke', (d) => {
-                return vis.colorGenes
-                  ? (vis.colorScale(String(d.homology_groups[0].uid)) as string)
+                return vis.colorGenesLocal
+                  ? (vis.colorScale(String(d.homology_groups[0]?.uid)) as string)
                   : 'gray'
               })
               .attr('opacity', 1)
@@ -1236,7 +1391,7 @@ export default {
     ////
     //1.find all cdf 1
     const homologyAnchor = this.genomeStore.genomeData.genes.filter(
-      (gene) => gene.homology_groups[0].id === this.homologyFocus
+      (gene) => gene.homology_groups[0]?.id === this.homologyFocus
     )
 
     let newAnchorLookup: Dictionary<number> = {}
@@ -1260,15 +1415,21 @@ export default {
 
     let newAnchorMax = d3.max(divergentScale)
     anchorMax.value = newAnchorMax ?? 0
-
-    let [newGenePositions, nodeGroups]: [GraphNode[], GraphNodeGroup[]] =
+    const endHeat = 10
+    let [newGenePositions, _]: [GraphNode[], GraphNodeGroup[]] =
       runSpringSimulation(
         this.genomeStore.genomeData.genes ?? [],
         this.genomeStore.genomeData.sequences ?? [],
         currentHeat.value,
-        1,
-        736740
+        endHeat,
+        {scaleXForce: useGeneSetStore().scaleXForce,
+        scaleYForce: useGeneSetStore().scaleYForce,
+        scaleContraction: useGeneSetStore().scaleContraction,
+        scaleRepulsion: useGeneSetStore().scaleRepulsion,
+        minimumDistance: useGeneSetStore().minimumDistance,
+        },
       )
+    this.isLoading = false
 
     // let newGenePositions = genesToNodes(this.filteredGenes)
     //used for alignment
@@ -1284,7 +1445,7 @@ export default {
     > = {}
     //determine global ranges'
     const sortedCompressionRangeGlobal = newGenePositions
-      .map((d) => d.position)
+      .map((d) => d.startPosition)
       .sort((a, b) => a - b)
 
     const edgesOfNewRangeGlobal: [number, number] = [
@@ -1337,7 +1498,7 @@ export default {
 
     // Add brushing
     var newBrush = d3
-      .brushX() // Add the brush feature using the d3.brush function
+      .brush() // Add the brush feature using the d3.brush function
       .extent([
         [this.windowRange[0], 0],
         [this.windowRange[1], this.visHeight],
@@ -1351,12 +1512,16 @@ export default {
     selection.call(zoom)
     // this.call(zoom)
     // Add brushing
-    this.svg().append('g').attr('class', 'brush').call(brush.value)
+    this.svg().append('g').append('g').attr('class', 'brush').call(brush.value)
 
     // create groups for focus view drawing
     this.svg().append('g').attr('class', 'bar-context')
       .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
+ 
     this.svg().append('g').attr('class', 'gene-context')
+    .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
+    
+    this.svg().append('g').attr('class', 'tooltip-context')
     .attr('transform', `translate(${0} ,${this.margin.top * 2})`)
 
     this.addClipPath()
@@ -1424,6 +1589,9 @@ export default {
   // unmounted() {
   //   this.resizeObserver?.disconnect()
   // },
+  actions: {
+
+  },
   watch: {
     //Watch for updates to `mappedIndices` before redrawing
     filteredGenes: {
@@ -1439,8 +1607,6 @@ export default {
       handler(newVal) {
         console.log('mappedIndices updated:', newVal)
         this.addLabels()
-        this.drawSquishBars()
-        this.drawGenes()
       },
       deep: true,
       immediate: true,
@@ -1459,17 +1625,19 @@ export default {
       handler(newVal) {
         console.log('sequenceIndicesInLookup updated:', newVal)
         this.addLabels()
-        this.drawSquishBars()
-        this.drawGenes()
       },
       deep: true,
       immediate: true,
+    },
+    highlightedHomologyGroups: {
+      handler() {
+        this.drawGenes()
+      }
     },
     colorGenes() {
       this.drawGenes()
     },
     showLinks() {
-      this.drawSquishBars()
       this.drawGenes()
     },
     anchor() {
@@ -1484,7 +1652,6 @@ export default {
     colorGenomes() {
       console.log('color genomes')
       this.drawSquishBars()
-      this.drawGenes()
     },
     // percentageGC() {
     //   console.log('show GC')
@@ -1510,10 +1677,43 @@ export default {
       immediate: true,
       deep: true
     },
-
-  },
+    rerunSimulation: {
+      async handler(rerun) {
+        if(!rerun ) {
+          return
+        }
+        this.isLoading = true
+        await this.runSimulation()
+      }
+    }
+  }
 }
 </script>
+
+<template>
+  <ACard
+    title="Focus View"
+    :style="{
+      width: `${100}%`,
+      height: `${100}%`,
+    }"
+    :bordered="false"
+    size="small"
+  >
+    <template #extra
+      ><AButton type="text" size="small"
+        ><CloseCircleOutlined key="edit" /></AButton
+    ></template>
+    <!-- <LoadingScreen>Loading data, please wait...</LoadingScreen> -->
+    <LoadingScreen v-show="rerunSimulation">Loading data, please wait...</LoadingScreen>
+    <svg
+      :id="`container_${name}`"
+      :width="containerWidth"
+      :height="svgHeight"
+    ></svg>
+  </ACard>
+
+</template>
 
 <style lang="scss">
 @import '@/assets/colors.module.scss';

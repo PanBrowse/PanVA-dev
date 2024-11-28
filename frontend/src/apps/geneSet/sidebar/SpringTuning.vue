@@ -53,19 +53,19 @@ export default {
       class="view-options"
     >
       <AFormItem label="Contractive force">
-        <ASlider id="contractive" v-model:value="scaleContraction"  :min=0 :max=1000> </ASlider>
+        <ASlider id="contractive" v-model:value="scaleContraction"  :min=0 :max=10000> </ASlider>
       </AFormItem>
       <AFormItem label="Repulsive force">
-        <ASlider id="repulsive" v-model:value="scaleRepulsion"  :min=0 :max=1000> </ASlider>
+        <ASlider id="repulsive" v-model:value="scaleRepulsion"  :min=0 :max=10000> </ASlider>
       </AFormItem>
       <AFormItem label="Deformation resistance">
-        <ASlider id="x-force" v-model:value="scaleXForce" type="range" :min=0 :max=1000> </ASlider>
+        <ASlider id="x-force" v-model:value="scaleXForce" type="range" :min=0 :max=10000> </ASlider>
       </AFormItem>
       <AFormItem label="Homology group force">
-        <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=1000> </ASlider>
+        <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=10000> </ASlider>
       </AFormItem>
       <AFormItem label="Minimum distance">
-        <ASlider id="distance" v-model:value="minimumDistance"  :min=1 :max=10000> </ASlider>
+        <ASlider id="distance" v-model:value="minimumDistance"  :min=2 :max=10000> </ASlider>
       </AFormItem>
 
     </AForm>
@@ -77,7 +77,7 @@ export default {
             <ARow type="flex" :gutter="40">
               <ACol :span="16">
                 <AButton type="primary" ghost @click="updateSimulation()">
-                  Update simulation
+                  Rerun simulation
                 </AButton>
               </ACol>
             </ARow>

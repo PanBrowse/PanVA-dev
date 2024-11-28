@@ -9,7 +9,7 @@ export const createCompressionScale = (graphNodes: GraphNode[], sequences: Seque
   let xScaleGeneToCompressionInit: Dictionary<d3.ScaleLinear<number, number, never>> = {};
 
   //determine global ranges'
-  const sortedCompressionRangeGlobal = (graphNodes.map(d => d.position)).sort((a, b) => a - b);
+  const sortedCompressionRangeGlobal = (graphNodes.map(d => d.startPosition)).sort((a, b) => a - b);
   const edgesOfNewRangeGlobal: [number, number] = [sortedCompressionRangeGlobal[0], sortedCompressionRangeGlobal[sortedCompressionRangeGlobal.length - 1]];
   const oldRanges = graphNodes.map(d => d.originalPosition).sort((a, b) => a - b);
   const edgesOfOldRange = [oldRanges[0], oldRanges[oldRanges.length - 1]];
@@ -41,22 +41,30 @@ export const drawSquish = (
   barHeight: number,
   ypos: number,
   defaultConnectionThickness: number,
-  overallCompressionFactor?: number
+  overallCompressionFactor?: number,
+  windowRange?: [number, number]
 ) => {
 
   const geneWidth = end - start;
   const compressionWidth = currentGeneToCompressionScale(end) - currentGeneToCompressionScale(start);
-  const windowWidth = currentGeneToWindowScale(end) - currentGeneToWindowScale(start);
+  const geneWindowWidth = currentGeneToWindowScale(end) - currentGeneToWindowScale(start);
+  if (geneWindowWidth < 0.1) { return ''; }
   const normalizationConstant = overallCompressionFactor === undefined ? 1 : 1 / overallCompressionFactor;
   const x0 = currentGeneToWindowScale(start);
-  const x1controlStart = x0 + (windowWidth * 3) / 7;
-  const x1controlEnd = x0 + (windowWidth * 4) / 7;
-  const x1 = x0 + windowWidth / 2;
-  const x2 = x0 + windowWidth;
+  const x1controlStart = x0 + (geneWindowWidth * 3) / 7;
+  const x1controlEnd = x0 + (geneWindowWidth * 4) / 7;
+  const x1 = x0 + geneWindowWidth / 2;
+  const x2 = x0 + geneWindowWidth;
   const x3 = x2;
   const x4 = x1;
   const x5 = x0;
   const x6 = x0;
+
+
+  // gene outside window
+  if (windowRange !== undefined && x0 > windowRange[1]) { return ''; }
+  if (windowRange !== undefined && x2 < windowRange[0]) { return ''; }
+
 
   const y0 = ypos + barHeight / 2 - defaultConnectionThickness / 2;
   const y1 = y0 - defaultConnectionThickness;

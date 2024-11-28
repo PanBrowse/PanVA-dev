@@ -89,6 +89,9 @@ export const useGenomeStore = defineStore({
     // order: 0,
 
     isInitialized: false,
+    centeredHomologyGroup: undefined as undefined | number,
+    highlightedHomologyGroups: undefined as undefined | number,
+    showLinesHomologyGroups: [] as string[]
   }),
   getters: {
     genomeCount: (state) => state.genomeData?.genomes?.length || 0,
@@ -424,6 +427,8 @@ export const useGenomeStore = defineStore({
         },
         {} as Record<string, { id: number; uid: string; }[]>
       );
+
+
     },
     generateSequenceHomologyLinks() {
       const lookup = {};
