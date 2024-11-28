@@ -1191,7 +1191,8 @@ export default {
           let sequence_b = vis.genomeStore.sequenceUidLookup[b.sequence_uid ?? '']
 
           return (
-            (vis.indexMap.get(sequence_a) ?? 0) - (vis.indexMap.get(sequence_b) ?? 0)
+            (vis.newDrawingIndices.get(sequence_a) ?? 0) - 
+            (vis.newDrawingIndices.get(sequence_b) ?? 0)
           )
         })
 
@@ -1207,10 +1208,9 @@ export default {
               (currentGeneToWindow(node.start) +
                 currentGeneToWindow(node.end)) /
               2
-            const yIndex = vis.indexMap.get(
-                    vis.genomeStore.sequenceUidLookup[key]
-                  ) ?? 0
-            debugger;
+            const yIndex = vis.newDrawingIndices.get(
+              vis.genomeStore.sequenceUidLookup[key]
+            )
             // const yIndex = vis.newDrawingIndices.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
             const y =
               vis.barHeight / 2 +
