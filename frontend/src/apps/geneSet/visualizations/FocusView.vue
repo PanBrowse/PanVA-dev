@@ -1124,7 +1124,6 @@ export default {
             vis.barHeight,
             showGeneBars.value
           )
-
           return size
         })
         .type((d) => {
@@ -1182,7 +1181,7 @@ export default {
                   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
                   drawingIndex * (vis.barHeight + 10) + this.barHeight / 2
-                let rotation = d.strand === 1 ? 0 : 180
+                let rotation = 0 // d.strand === 1 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('class', 'gene')
@@ -1233,6 +1232,7 @@ export default {
                 }, 300);
                 tooltip.transition().duration(200).style("visibility", 'hidden');
                 tooltipText.transition().duration(200).style("visibility", 'hidden');
+                tooltipText2.transition().duration(200).style("visibility", 'hidden');
                 })
               .on('click', handleClick)
               ,
@@ -1267,7 +1267,7 @@ export default {
                   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
                   drawingIndex * (vis.barHeight + 10) + this.barHeight / 2
-                let rotation = d.strand === 0 ? 0 : 180
+                let rotation = 0 // d.strand === 0 ? 0 : 180
                 return `translate(${xTransform},${yTransform}) rotate(${rotation})`
               })
               .attr('d', geneSymbol)
