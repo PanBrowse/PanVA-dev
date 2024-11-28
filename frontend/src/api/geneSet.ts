@@ -526,3 +526,39 @@ export const fetchClusteringOrder = async (
 
   return data;
 };
+
+export const fetchClusteringOrderNew = async (
+  method: number,
+  proteinScore: number,
+  orderScore: number,
+  orientationScore: number,
+  sizeScore: number,
+  locationScore: number,
+  jaccardScore: number
+) => {
+  const config = useConfigStore();
+
+  const data = await d3.json(
+    `${config.apiUrl}geneSet/clustering_new.json`,
+
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        method,
+        proteinScore,
+        orderScore,
+        orientationScore,
+        sizeScore,
+        locationScore,
+        jaccardScore,
+      }),
+    }
+  );
+
+  return data;
+};
+

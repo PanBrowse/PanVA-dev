@@ -90,7 +90,11 @@ export default {
     const filteredSequences = ref<SequenceInfo[]>([])
     const filteredGenes = ref<Gene[]>([])
     const indexMap = ref<Map<number, number>>(new Map())
+    const indexMapSort = ref<Map<number, number>>(new Map())
     const mappedIndices = ref<number[]>([])
+    const newDrawingIndices = ref(new Map());
+    const orderedSequenceUids = computed(() => genomeStore.orderedSequenceUids);
+
     const sequenceIndicesInLookup = ref<number[]>([])
     const filteredSegments = ref<(Locus)[]>([])
     // const selectedGeneUids = ref<string[]>([])
@@ -104,6 +108,7 @@ export default {
     //   }
     // )
 
+     
     // Watch for changes in selectedGeneUids and update filteredGenes accordingly
     watch(
       selectedGeneUids,
@@ -149,6 +154,79 @@ export default {
     )
 
     watch(
+      orderedSequenceUids,
+      (newOrderedSequenceUids) => {
+        console.log('orderedSequenceUids updated:', newOrderedSequenceUids);
+
+        // Update indexMapSort        
+          const newIndexMapSort = new Map();
+          indexMap.value.forEach((currentIndex, originalIndex) => {
+            const uid = Object.keys(genomeStore.sequenceUidLookup).find(
+              (key) => genomeStore.sequenceUidLookup[key] === originalIndex
+            );
+
+            if (uid && newOrderedSequenceUids.includes(uid)) {
+              const newIndex = newOrderedSequenceUids.indexOf(uid);
+              newIndexMapSort.set(originalIndex, newIndex);
+            }
+          });
+
+          indexMapSort.value = newIndexMapSort;
+
+          console.log(
+            'Updated indexMapSort:',
+            Array.from(indexMapSort.value.entries())
+          );
+
+        // Sort updatedIndexMapSort by the second value
+        const sortedEntries = Array.from(indexMapSort.value.entries()).sort(
+          (a, b) => a[1] - b[1]
+        );
+
+        console.log("Updated Sorted Entries:", sortedEntries);
+
+        const createSortedEntriesMap = (sortedEntries) => {
+          const sortedEntriesMap = new Map();
+
+          sortedEntries.forEach((entry, index) => {
+            sortedEntriesMap.set(entry.toString(), index);
+          });
+
+          return sortedEntriesMap;
+        };
+
+          // Create a map from sorted entries to indices
+          const sortedEntriesMap = createSortedEntriesMap(sortedEntries);
+
+          console.log("Updated sorted Entries Map:", Array.from(sortedEntriesMap.entries()));
+
+          const createNewMap = (indexMapSort, sortedEntriesMap) => {
+          const newMap = new Map();
+
+          const arrayIndexSort = Array.from(indexMapSort.value.entries())
+
+          arrayIndexSort.forEach((array) => {
+            const key = array[0]; // The first value in the array
+            const index = sortedEntriesMap.get(array.toString()); // Get the index of the array in sortedEntriesMap
+            if (index !== undefined) {
+              newMap.set(key, index); // Map the first value to the index
+            }
+          });
+
+          return newMap;
+        };
+
+        // Create the new map
+        newDrawingIndices.value = createNewMap(indexMapSort, sortedEntriesMap);
+
+        console.log("Updated newDrawingIndices:", Array.from(newDrawingIndices.value.entries()));
+
+        debugger;
+      },
+      { immediate: true }
+    );
+
+    watch(
       filteredSequences,
       (newVal) => {
         console.log('Filtered sequences updated:', newVal)
@@ -172,6 +250,73 @@ export default {
           (index) => indexMap.value.get(index) ?? 0
         )
         console.log('mappedIndices: ', mappedIndices.value, indexMap)
+
+           // Update indexMapSort based on genomeStore.orderedSequenceUids
+          const newIndexMapSort = new Map();
+          const orderedSequenceUids = genomeStore.orderedSequenceUids;
+
+          indexMap.value.forEach((currentIndex, originalIndex) => {
+            const uid = Object.keys(genomeStore.sequenceUidLookup).find(
+              (key) => genomeStore.sequenceUidLookup[key] === originalIndex
+            );
+
+            if (uid && orderedSequenceUids.includes(uid)) {
+              const newIndex = orderedSequenceUids.indexOf(uid);
+              newIndexMapSort.set(originalIndex, newIndex);
+            }
+          });
+
+          indexMapSort.value = newIndexMapSort;
+
+          console.log(
+            'Updated indexMapSort:',
+            Array.from(indexMapSort.value.entries())
+          );
+
+      
+
+        // Sort updatedIndexMapSort by the second value
+        const sortedEntries = Array.from(indexMapSort.value.entries()).sort(
+          (a, b) => a[1] - b[1]
+        );
+
+        console.log("Sorted Entries:", sortedEntries);
+
+        const createSortedEntriesMap = (sortedEntries) => {
+          const sortedEntriesMap = new Map();
+
+          sortedEntries.forEach((entry, index) => {
+            sortedEntriesMap.set(entry.toString(), index);
+          });
+
+          return sortedEntriesMap;
+        };
+
+          // Create a map from sorted entries to indices
+          const sortedEntriesMap = createSortedEntriesMap(sortedEntries);
+
+          console.log("Sorted Entries Map:", Array.from(sortedEntriesMap.entries()));
+
+          const createNewMap = (indexMapSort, sortedEntriesMap) => {
+          const newMap = new Map();
+
+          const arrayIndexSort = Array.from(indexMapSort.value.entries())
+
+          arrayIndexSort.forEach((array) => {
+            const key = array[0]; // The first value in the array
+            const index = sortedEntriesMap.get(array.toString()); // Get the index of the array in sortedEntriesMap
+            if (index !== undefined) {
+              newMap.set(key, index); // Map the first value to the index
+            }
+          });
+
+          return newMap;
+        };
+
+        // Create the new map
+        newDrawingIndices.value = createNewMap(indexMapSort, sortedEntriesMap);
+
+        console.log("New newDrawingIndices:", Array.from(newDrawingIndices.value.entries()));
 
         filteredSegments.value = filteredSequences.value.flatMap(sequence => {
             const genes = filteredGenes.value.filter(d => d.sequence_uid === sequence.uid)
@@ -231,8 +376,11 @@ export default {
       sequenceIndicesInLookup,
       filteredGenes,
       mappedIndices,
+      orderedSequenceUids,
       genomeStore,
       indexMap,
+      indexMapSort,
+      newDrawingIndices,
       selectedGeneUids,
       geneToLocusSequenceLookup,
       filteredSegments
@@ -843,7 +991,8 @@ export default {
               .attr('z-index', 100)
               .attr('transform', d => {
                 const key: string = d.uid ?? ''
-                const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+                // const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+                const index = vis.newDrawingIndices.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
                 const ypos = index * (this.barHeight + 10)
                 return `translate(0,${ypos})`
               })
@@ -854,7 +1003,8 @@ export default {
               .duration(this.transitionTime)
               .attr('transform', d => {
                 const key: string = d.uid ?? ''
-                const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+                // const index = vis.indexMap.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
+                const index = vis.newDrawingIndices.get(this.genomeStore.sequenceUidLookup[key]) ?? 0
                 const ypos = index * (this.barHeight + 10)
                 return `translate(0,${ypos})`
               })
@@ -916,6 +1066,8 @@ export default {
     addLabels() {
       let vis = this
 
+      const updatedDrawIndices = Array.from(this.newDrawingIndices).map(([key, value]) => value);
+
       if (this.filteredSequences === undefined) {
         return
       }
@@ -936,7 +1088,7 @@ export default {
                 'y',
 
                 function (d, i) {
-                  return i * (vis.barHeight + 10)
+                  return updatedDrawIndices[i] * (vis.barHeight + 10)
                 }
               )
 
@@ -955,7 +1107,7 @@ export default {
             update
               .transition()
               .duration(this.transitionTime)
-              .attr('y', (d, i) => i * (this.barHeight + 10)),
+              .attr('y', (d, i) => updatedDrawIndices[i] * (this.barHeight + 10)),
           (exit) => exit.remove()
         )
     },
@@ -991,6 +1143,9 @@ export default {
     ///////////////////////////////////////////////////////////////////////////// Draw genes ////////////////////////////////////////////////
     drawGenes() {
       let vis = this
+
+      const updatedDrawIndices = Array.from(this.newDrawingIndices).map(([key, value]) => value);
+      
       if (this.filteredGenes === undefined) {
         return
       }
@@ -1055,6 +1210,8 @@ export default {
             const yIndex = vis.indexMap.get(
                     vis.genomeStore.sequenceUidLookup[key]
                   ) ?? 0
+            debugger;
+            // const yIndex = vis.newDrawingIndices.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
             const y =
               vis.barHeight / 2 +
               yIndex * (vis.barHeight + 10)
@@ -1177,8 +1334,12 @@ export default {
                 let xTransform = this.geneToWindowScales[key](
                   d.start 
                 ) + (scale(d.end) - scale(d.start) ) /2
-                let drawingIndex =
-                  vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+      
+                // let drawingIndex =
+                //   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+
+                let drawingIndex = vis.newDrawingIndices.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+
                 let yTransform =
                   drawingIndex * (vis.barHeight + 10) + this.barHeight / 2
                 let rotation = 0 // d.strand === 1 ? 0 : 180
@@ -1263,8 +1424,9 @@ export default {
                 let xTransform = this.geneToWindowScales[key](
                   d.start 
                 ) + (scale(d.end) - scale(d.start) ) /2
-                let drawingIndex =
-                  vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+                // let drawingIndex =
+                //   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+                let drawingIndex = vis.newDrawingIndices.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
                   drawingIndex * (vis.barHeight + 10) + this.barHeight / 2
                 let rotation = 0 // d.strand === 0 ? 0 : 180
@@ -1311,8 +1473,10 @@ export default {
                 let xTransform = this.geneToWindowScales[key](
                   d.start + (d.end-d.start)/2
                 )
-                let drawingIndex =
-                  vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+                // let drawingIndex =
+                //   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+                  
+                let drawingIndex = vis.newDrawingIndices.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
                   drawingIndex * (vis.barHeight + 10) + this.barHeight  /2
                 let rotation = d.strand === 0 ? 0 : 180
@@ -1361,8 +1525,9 @@ export default {
                 let xTransform = this.geneToWindowScales[key](
                   d.start + (d.end-d.start)/2
                 ) 
-                let rowNumber =
-                  vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+                // let rowNumber =
+                //   vis.indexMap.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
+                let rowNumber = vis.newDrawingIndices.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
                 let yTransform =
                   rowNumber * (vis.barHeight + 10) + this.barHeight / 2 
 
@@ -1597,6 +1762,16 @@ export default {
     filteredGenes: {
       handler(newVal) {
         console.log('filteredGenes updated:', newVal)
+        this.drawSquishBars()
+        this.drawGenes()
+      },
+      deep: true,
+      immediate: true,
+    },
+    newDrawingIndices: {
+      handler(newVal) {
+        console.log('newDrawingIndices updated:', newVal)
+        this.addLabels()
         this.drawSquishBars()
         this.drawGenes()
       },

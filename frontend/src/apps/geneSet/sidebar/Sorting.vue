@@ -13,6 +13,7 @@ import { mapActions, mapWritableState } from 'pinia'
 
 import SidebarItem from '@/components/SidebarItem.vue'
 import { useGeneSetStore } from '@/stores/geneSet'
+import { useGenomeStore } from '@/stores/geneSet'
 
 export default {
   data: () => ({
@@ -31,9 +32,19 @@ export default {
   },
   methods: {
     ...mapActions(useGeneSetStore, ['changeSorting']),
+    ...mapActions(useGenomeStore, ['resetFocusSorting', 'changeFocusSorting']),
   },
   computed: {
-    ...mapWritableState(useGeneSetStore, [
+    // ...mapWritableState(useGeneSetStore, [
+    //   'linkage',
+    //   'protein',
+    //   'order',
+    //   'orientation',
+    //   'size',
+    //   'jaccard',
+    //   'location',
+    // ]),
+    ...mapWritableState(useGenomeStore, [
       'linkage',
       'protein',
       'order',
@@ -108,15 +119,21 @@ export default {
           <ACol :span="16">
             <ARow type="flex" :gutter="40">
               <ACol :span="8">
-                <AButton type="primary" ghost @click="changeSorting('protein')">
+                <!-- <AButton type="primary" ghost @click="changeSorting('protein')"> -->
+                  <AButton type="primary" ghost @click="changeFocusSorting">
                   Cluster
                 </AButton>
               </ACol>
               <ACol :span="8">
-                <AButton
+                <!-- <AButton
                   danger
                   ghost
                   @click="changeSorting('genome_number_asc')"
+                > -->
+                <AButton
+                  danger
+                  ghost
+                  @click="resetFocusSorting()"
                 >
                   Reset
                 </AButton></ACol
