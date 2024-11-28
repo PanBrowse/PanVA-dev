@@ -1124,9 +1124,6 @@ export default {
             vis.barHeight,
             showGeneBars.value
           )
-          if(size !== 10){
-          console.log(size, d.gene_length_nuc)
-          }
           return size
         })
         .type((d) => {
