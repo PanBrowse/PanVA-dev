@@ -134,7 +134,7 @@ export const calculateAttractingForce = (distanceToNeighbour: number, expectedDi
 
 const calculateAttractingForceY = (distanceToNeighbour: number) => {
   if (abs(distanceToNeighbour) < 1) { return distanceToNeighbour; }
-  const force = Math.log2(abs(distanceToNeighbour)) * 100;
+  const force = Math.log2(abs(distanceToNeighbour)) * 1000;
   const direction = Math.sign(distanceToNeighbour);
   return force * direction;
 };

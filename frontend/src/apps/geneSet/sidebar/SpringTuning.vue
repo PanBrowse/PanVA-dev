@@ -52,19 +52,19 @@ export default {
       :wrapperCol="{ span: 16 }"
       class="view-options"
     >
-      <AFormItem label="Contractive force">
+      <AFormItem label="Evenness">
         <ASlider id="contractive" v-model:value="scaleContraction"  :min=0 :max=10000> </ASlider>
       </AFormItem>
-      <AFormItem label="Repulsive force">
+      <!-- <AFormItem label="Repulsive force">
         <ASlider id="repulsive" v-model:value="scaleRepulsion"  :min=0 :max=10000> </ASlider>
-      </AFormItem>
-      <AFormItem label="Deformation resistance">
+      </AFormItem> -->
+      <AFormItem label="Rigidity">
         <ASlider id="x-force" v-model:value="scaleXForce" type="range" :min=0 :max=10000> </ASlider>
       </AFormItem>
-      <AFormItem label="Homology group force">
+      <AFormItem label="Group alignment">
         <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=10000> </ASlider>
       </AFormItem>
-      <AFormItem label="Minimum distance">
+      <AFormItem label="Separation">
         <ASlider id="distance" v-model:value="minimumDistance"  :min=2 :max=10000> </ASlider>
       </AFormItem>
 

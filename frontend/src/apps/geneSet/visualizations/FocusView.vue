@@ -675,7 +675,7 @@ export default {
           {scaleXForce: useGeneSetStore().scaleXForce,
           scaleYForce: useGeneSetStore().scaleYForce,
           scaleContraction: useGeneSetStore().scaleContraction,
-          scaleRepulsion: useGeneSetStore().scaleRepulsion,
+          scaleRepulsion: useGeneSetStore().scaleContraction,
           minimumDistance: useGeneSetStore().minimumDistance,
           },
         )
@@ -1590,7 +1590,7 @@ export default {
         {scaleXForce: useGeneSetStore().scaleXForce,
         scaleYForce: useGeneSetStore().scaleYForce,
         scaleContraction: useGeneSetStore().scaleContraction,
-        scaleRepulsion: useGeneSetStore().scaleRepulsion,
+        scaleRepulsion: useGeneSetStore().scaleContraction,
         minimumDistance: useGeneSetStore().minimumDistance,
         },
       )
