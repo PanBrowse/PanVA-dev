@@ -133,3 +133,10 @@ def get_clustering_leaves(sequence_info, linkage_matrix, labels):
         sortingDict[i] = [s for s in leaf_labels if s in sequences]
 
     return sortingDict 
+
+def get_clustering_leaves_new(linkage_matrix, labels):
+
+    leaf_indices = leaves_list(linkage_matrix)
+    leaf_labels = [labels[i] for i in leaf_indices]
+
+    return leaf_labels 

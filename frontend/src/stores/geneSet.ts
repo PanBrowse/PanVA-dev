@@ -13,6 +13,7 @@ import {
 } from '@/api/geneSet';
 import {
   fetchClusteringOrder,
+  fetchClusteringOrderNew,
   fetchGroupInfo,
   fetchHomologies,
   fetchSequences,
@@ -78,15 +79,16 @@ export const useGenomeStore = defineStore({
     sequencePositions: {},
     sequenceHomologyLinks: {},
 
-    // // Clustering
-    // linkage: 3,
-    // clusteringOrder: {} as any,
-    // protein: 50,
-    // orientation: 0,
-    // size: 0,
-    // location: 0,
-    // jaccard: 0,
-    // order: 0,
+    // Clustering
+    linkage: 3,
+    clusteringOrder: {} as any,
+    protein: 20,
+    orientation: 0,
+    size: 0,
+    location: 0,
+    jaccard: 0,
+    order: 50,
+    orderedSequenceUids: [],
 
     isInitialized: false,
     centeredHomologyGroup: undefined as undefined | number,
@@ -284,8 +286,74 @@ export const useGenomeStore = defineStore({
 
       this.initializeSelectedSequencesLasso();
 
+      try {
+       this.orderedSequenceUids = await fetchClusteringOrderNew(
+          this.linkage,
+          this.protein,
+          this.order,
+          this.orientation,
+          this.size,
+          this.location,
+          this.jaccard
+        );
+
+        console.log('orderedSequenceUids', this.orderedSequenceUids)
+      } catch (error) {
+        global.setError({
+          message: 'Could not load or parse clustering result.',
+          isFatal: true,
+        });
+        throw error;
+      }
+
       // Set initialized flag only after all API calls complete successfully
       this.isInitialized = true;
+    },
+    async resetFocusSorting(){
+
+      console.log('resetFocusSorting')
+
+      //reset values
+      this.protein = 0
+      this.order = 0
+      this.orientation = 0 
+      this.size = 0 
+      this.location = 0 
+      this.jaccard = 0 
+
+      const sortedKeys = Object.entries(this.sequenceUidLookup) // Get key-value pairs
+      .sort(([, valueA], [, valueB]) => valueA - valueB) // Sort by the values (indices)
+      .map(([key]) => key);
+
+      // reset orderedSequenceUids to sequenceUids from the lookup in the store
+      this.orderedSequenceUids = sortedKeys
+
+      console.log('reset this.orderedSequenceUids', sortedKeys)
+
+      
+
+
+
+    },
+    async changeFocusSorting(){
+
+      console.log('changeFocusSorting')
+
+      this.orderedSequenceUids = await fetchClusteringOrderNew(
+        this.linkage,
+        this.protein,
+        this.order,
+        this.orientation,
+        this.size,
+        this.location,
+        this.jaccard
+      )
+
+      console.log('new orderedSequenceUids', this.orderedSequenceUids)
+
+
+
+
     },
     initializeSelectedSequencesLasso() {
       console.log('initializing lasso selection');
