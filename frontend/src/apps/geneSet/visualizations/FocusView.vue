@@ -1124,7 +1124,9 @@ export default {
             vis.barHeight,
             showGeneBars.value
           )
-
+          if(size !== 10){
+          console.log(size, d.gene_length_nuc)
+          }
           return size
         })
         .type((d) => {
@@ -1233,6 +1235,7 @@ export default {
                 }, 300);
                 tooltip.transition().duration(200).style("visibility", 'hidden');
                 tooltipText.transition().duration(200).style("visibility", 'hidden');
+                tooltipText2.transition().duration(200).style("visibility", 'hidden');
                 })
               .on('click', handleClick)
               ,
