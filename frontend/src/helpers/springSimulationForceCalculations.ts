@@ -2,6 +2,7 @@ import { useGeneSetStore } from "@/stores/geneSet";
 import { abs } from "./math";
 import { GraphNode, GraphNodeGroup, type SpringTuningParameters } from "./springSimulationUtils";
 import { mapWritableState } from "pinia";
+import { TRANSITION_SEQUENCES_THRESHOLD } from "@/constants";
 
 
 export const evaluateForcesY = (currentNode: GraphNode, connectedYNodes: GraphNode[], heat: number, excludedHomologyGroup?: string) => {
@@ -102,14 +103,6 @@ export const evaluateForces = (
     + (scalePartialForceGravity * gravityTotal)
     + (scaleRepelling * repellingTotal)
     + (scalePartialForceY * homologyGroupTotal);
-  if (print) {
-    console.log('force parts',);
-    console.log('x', (scalePartialForceX * dnaStringTotal));
-    console.log(
-      'gravity', (scalePartialForceGravity * gravityTotal)
-      , 'repell', (scaleRepelling * repellingTotal)
-      , 'y', (scalePartialForceY * homologyGroupTotal));
-  }
 
   let forceWithNormal = forceOnNode;
   nodesAreTouching.forEach((nodesAreTouching, i) => {
@@ -119,6 +112,17 @@ export const evaluateForces = (
       forceWithNormal = 0;
     }
   });
+  if (false) {
+    console.log('force parts',);
+    console.log('x', (scalePartialForceX * dnaStringTotal));
+    console.log(
+      'gravity', (scalePartialForceGravity * gravityTotal)
+      , 'repell', (scaleRepelling * repellingTotal)
+      , 'y', (scalePartialForceY * homologyGroupTotal));
+    // console.log('with normal:', forceWithNormal);
+    console.log('on node:', forceOnNode);
+  }
+
   return [forceWithNormal, forceOnNode];
 };
 
@@ -134,7 +138,7 @@ export const calculateAttractingForce = (distanceToNeighbour: number, expectedDi
 
 const calculateAttractingForceY = (distanceToNeighbour: number) => {
   if (abs(distanceToNeighbour) < 1) { return distanceToNeighbour; }
-  const force = Math.log2(abs(distanceToNeighbour)) * 1000;
+  const force = Math.log2(abs(distanceToNeighbour)) * 10;
   const direction = Math.sign(distanceToNeighbour);
   return force * direction;
 };
@@ -166,7 +170,7 @@ export const findNormalForces = (
   allGroups: GraphNodeGroup[],
   springTuning: SpringTuningParameters,
   touchingDistance: number = 1000,
-  maxDepth: number = 1
+  maxDepth: number | undefined = undefined
 ) => {
 
   const touchingLeft = findTouchingNeighboursLeft(

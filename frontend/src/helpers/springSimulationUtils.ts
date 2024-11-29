@@ -10,7 +10,6 @@ import {
   findNormalForces,
 
 } from './springSimulationForceCalculations';
-import { arrayRange } from './arrayRange';
 
 export interface xConnections {
   left: [id: string, distance: number] | undefined;
@@ -473,7 +472,10 @@ export const genesToNodes = (genes: Gene[]) => {
   addXConnections(nodes);
   nodes.forEach((currentGroup) => {
     const yConnections = nodes
-      .filter((d) => d.homologyGroup === currentGroup.homologyGroup)
+      .filter((d) => (
+        (d.homologyGroup !== undefined) &&
+        (d.homologyGroup === currentGroup.homologyGroup)
+      ))
       .map((d) => d.id);
     currentGroup.connectionsY = yConnections;
   });
@@ -605,7 +607,7 @@ export const updateHighStressNodeGroup = (
     const connectionsYSet = new Set(group.connectionsY);
     const connectedYNodes = nodeGroups.filter(d => connectionsYSet.has(d.id));
 
-    let [force, _] = evaluateForces(
+    let [_, forceWithoutNormal] = evaluateForces(
       group,
       connectedXNodes,
       connectedYNodes,
@@ -615,7 +617,7 @@ export const updateHighStressNodeGroup = (
       false
     );
 
-    const maxDepth = 10;
+    const maxDepth = undefined;
     // calculate forces through other blocks "touching" (only maxDepth n of blocks though)
     const [forceFromLeft, forceFromRight] = findNormalForces(
       group,
@@ -624,7 +626,38 @@ export const updateHighStressNodeGroup = (
       touchingDistance,
       maxDepth
     );
-    force = force + forceFromLeft + forceFromRight;
+    let force = forceWithoutNormal + forceFromLeft + forceFromRight;
+
+    if (false) {
+      console.log('total force:', force);
+      // console.log('force with normal:', forceWithNormal);
+      console.log('force without normal:', forceWithoutNormal);
+      console.log('left force:', forceFromLeft);
+      console.log('right force:', forceFromRight);
+      console.log('iteration:', currentIndex);
+    }
+
+    // const neighbourDirection = i === 0 ? -1 : 1;
+    const forceDirection = Math.sign(force);
+    const side = forceDirection < 0 ? 'left' : 'right';
+    const connection = group.connectionsX[side];
+    const connectedNode = connection === undefined ?
+      undefined :
+      connectedXNodes.find(d => d?.id === connection[0]);
+    let nodesAreTouching = false;
+    if (connectedNode !== undefined) {
+      const neighbourDistance = side === 'left' ?
+        connectedNode.endPosition - group.startPosition :
+        connectedNode?.startPosition - group.endPosition;
+      if (abs(neighbourDistance) <= touchingDistance) {
+        nodesAreTouching = true;
+      }
+    }
+
+    // no force if node in the way
+    if (nodesAreTouching) {
+      force = 0;
+    }
 
     // calculate new position
     const deltaPos = force * group.localTempScaling * heat / 1000;

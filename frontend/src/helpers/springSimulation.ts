@@ -60,7 +60,7 @@ export const runSpringSimulation = (
   let currentHeatNIterations = 0;
   let terminateCount = 0;
 
-  const maxTerminateCount = 3;
+  const maxTerminateCount = 10; // arbitrary number
   const maxTime = 3000;
 
   let maxGeneDistance = 0;
@@ -105,7 +105,7 @@ export const runSpringSimulation = (
       });
     }
     if (
-      terminateCount >= maxTerminateCount ||
+      (terminateCount >= maxTerminateCount && nIterations > 1000) ||
       (heat <= toHeat) ||
       Date.now() - startTime > maxTime
     ) {

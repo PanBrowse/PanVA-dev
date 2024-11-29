@@ -52,22 +52,18 @@ export default {
       :wrapperCol="{ span: 16 }"
       class="view-options"
     >
-      <AFormItem label="Evenness">
-        <ASlider id="contractive" v-model:value="scaleContraction"  :min=0 :max=10000> </ASlider>
-      </AFormItem>
-      <!-- <AFormItem label="Repulsive force">
-        <ASlider id="repulsive" v-model:value="scaleRepulsion"  :min=0 :max=10000> </ASlider>
-      </AFormItem> -->
-      <AFormItem label="Rigidity">
-        <ASlider id="x-force" v-model:value="scaleXForce" type="range" :min=0 :max=10000> </ASlider>
-      </AFormItem>
       <AFormItem label="Group alignment">
-        <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=10000> </ASlider>
+        <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=100> </ASlider>
       </AFormItem>
       <AFormItem label="Separation">
         <ASlider id="distance" v-model:value="minimumDistance"  :min=2 :max=10000> </ASlider>
       </AFormItem>
-
+      <AFormItem label="Sequence stiffness">
+        <ASlider id="x-force" v-model:value="scaleXForce" type="range" :min=0 :max=100> </ASlider>
+      </AFormItem>
+      <AFormItem label="Evenness">
+        <ASlider id="contractive" v-model:value="scaleContraction"  :min=0 :max=100> </ASlider>
+      </AFormItem>
     </AForm>
     <AForm class="cluster-options">
       <AFormItem>

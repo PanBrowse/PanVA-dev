@@ -220,8 +220,6 @@ export default {
         newDrawingIndices.value = createNewMap(indexMapSort, sortedEntriesMap);
 
         console.log("Updated newDrawingIndices:", Array.from(newDrawingIndices.value.entries()));
-
-        debugger;
       },
       { immediate: true }
     );
