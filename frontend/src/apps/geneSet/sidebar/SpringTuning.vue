@@ -30,7 +30,7 @@ export default {
     ACol: Col,
   },
   methods: {
-    ...mapActions(useGeneSetStore, ['changeSorting', 'updateSimulation']),
+    ...mapActions(useGeneSetStore, ['changeSorting', 'updateSimulation', 'resetParameters']),
   },
   computed: {
     ...mapWritableState(useGeneSetStore, [
@@ -69,11 +69,16 @@ export default {
       <AFormItem>
         <ARow type="flex">
           <ACol :span="8"> </ACol>
-          <ACol :span="16">
-            <ARow type="flex" :gutter="40">
-              <ACol :span="16">
+          <ACol :span="25">
+            <ARow type="flex" :gutter="12">
+              <ACol :span="12">
                 <AButton type="primary" ghost @click="updateSimulation()">
                   Rerun simulation
+                </AButton>
+              </ACol>
+              <ACol :span="8">
+                <AButton type="primary" danger ghost @click="resetParameters();updateSimulation()">
+                  Reset parameters
                 </AButton>
               </ACol>
             </ARow>
