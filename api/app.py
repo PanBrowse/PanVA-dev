@@ -225,16 +225,18 @@ def get_distance_matrix(dataset):
         return jsonify({"error": str(e)}), 500
     
 
-@app.route("/geneSet/clustering_new.json", methods=["GET", "POST"])
-def get_clustering_order_new():
+@app.route("/geneSet/<dataset>/clustering_new.json", methods=["GET", "POST"])
+def get_clustering_order_new(dataset):
+    dataset = dataset or DEFAULT_DATASET
 
-    sequences_path = os.path.join(db_path, "geneSet", "yeast14", "protein_distance_labels.json")
-    matrix_path_proteins = os.path.join(db_path, "geneSet", "yeast14", "protein_distance_matrix.npy")
-    matrix_path_order = os.path.join(db_path, "geneSet", "yeast14", "levenshtein_distance_matrix.npy")
-    matrix_path_orientation = os.path.join(db_path, "geneSet", "yeast14", "orientation_distance_matrix.npy")
-    matrix_path_size = os.path.join(db_path, "geneSet", "yeast14", "protein_distance_matrix.npy") #replace
-    matrix_path_location = os.path.join(db_path, "geneSet","yeast14", "multiset_jaccard_distance_matrix.npy") #replace
-    matrix_path_jaccard = os.path.join(db_path, "geneSet", "yeast14", "jaccard_distance_matrix.npy")
+
+    sequences_path = os.path.join(db_path, "geneSet", dataset, "protein_distance_labels.json")
+    matrix_path_proteins = os.path.join(db_path, "geneSet", dataset, "protein_distance_matrix.npy")
+    matrix_path_order = os.path.join(db_path, "geneSet", dataset, "levenshtein_distance_matrix.npy")
+    matrix_path_orientation = os.path.join(db_path, "geneSet", dataset, "multiset_jaccard_distance_matrix.npy") #replace
+    matrix_path_size = os.path.join(db_path, "geneSet", dataset, "protein_distance_matrix.npy") #replace
+    matrix_path_location = os.path.join(db_path, "geneSet", dataset, "multiset_jaccard_distance_matrix.npy") #replace
+    matrix_path_jaccard = os.path.join(db_path, "geneSet", dataset, "jaccard_distance_matrix.npy")
 
     # Load the labels from the JSON file
     with open(sequences_path, "r") as f:

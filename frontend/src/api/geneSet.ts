@@ -502,6 +502,7 @@ export const fetchClusteringOrder = async (
   jaccardScore: number
 ) => {
   const config = useConfigStore();
+  
 
   const data = await d3.json(
     `${config.apiUrl}geneSet/clustering.json`,
@@ -537,9 +538,10 @@ export const fetchClusteringOrderNew = async (
   jaccardScore: number
 ) => {
   const config = useConfigStore();
-
+  const dataset = config.geneSet.dataset
   const data = await d3.json(
-    `${config.apiUrl}geneSet/clustering_new.json`,
+    `${config.apiUrl}geneSet/${dataset}/clustering_new.json`,
+   
 
     {
       method: 'POST',
