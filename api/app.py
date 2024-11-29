@@ -233,7 +233,7 @@ def get_clustering_order_new(dataset):
     sequences_path = os.path.join(db_path, "geneSet", dataset, "protein_distance_labels.json")
     matrix_path_proteins = os.path.join(db_path, "geneSet", dataset, "protein_distance_matrix.npy")
     matrix_path_order = os.path.join(db_path, "geneSet", dataset, "levenshtein_distance_matrix.npy")
-    matrix_path_orientation = os.path.join(db_path, "geneSet", dataset, "multiset_jaccard_distance_matrix.npy") #replace
+    matrix_path_orientation = os.path.join(db_path, "geneSet", dataset, "orientation_distance_matrix.npy") #replace
     matrix_path_size = os.path.join(db_path, "geneSet", dataset, "protein_distance_matrix.npy") #replace
     matrix_path_location = os.path.join(db_path, "geneSet", dataset, "multiset_jaccard_distance_matrix.npy") #replace
     matrix_path_jaccard = os.path.join(db_path, "geneSet", dataset, "jaccard_distance_matrix.npy")
