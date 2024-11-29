@@ -146,7 +146,7 @@ const calculateAttractingForceY = (distanceToNeighbour: number) => {
 const calculateRepellingForce = (distanceToNeighbour: number, expectedDistance: number) => {
   if (expectedDistance === 0) { console.log('two identical included'); return 0; }
   const percentageCompressed = (abs(distanceToNeighbour - expectedDistance) / abs(expectedDistance));
-  const force = percentageCompressed * 10 / Math.log2(Math.ceil(abs(distanceToNeighbour / 100)) + 1);
+  const force = percentageCompressed * 10 / Math.log2(abs(distanceToNeighbour / 100) + 1);
   const direction = -1 * Math.sign(distanceToNeighbour);
   return force * direction;
 };
