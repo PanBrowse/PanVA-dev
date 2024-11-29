@@ -205,6 +205,7 @@ export default {
         console.log('Viewport added to stage:', this.viewport)
 
         this.viewport.interactive = true
+        this.viewport.sortableChildren = true; 
 
         this.viewport.drag({
           pressDrag: false, // Enables dragging
@@ -215,12 +216,22 @@ export default {
 
         // Create a container for connection lines
         const linesContainer = new PIXI.Container();
+        linesContainer.zIndex = 0; // Lowest layer for connections
         this.viewport.addChild(linesContainer); // Add the lines container to the viewport
+        this.linesContainer = linesContainer;
 
         // Create a container for sprites
         const spritesContainer = new PIXI.Container();
+        spritesContainer.zIndex = 1; // Above lines
         this.viewport.addChild(spritesContainer); // Add the sprites container to the viewport
         this.spritesContainer = spritesContainer
+
+        const tooltipContainer = new PIXI.Container();
+        tooltipContainer.zIndex = 2; // Above sprites and lines, below lasso
+        tooltipContainer.interactive = false;
+        tooltipContainer.interactiveChildren = false;
+        this.viewport.addChild(tooltipContainer);
+        this.tooltipContainer = tooltipContainer;
 
         const onFocusCanvas = () => {
           console.log('Canvas focused, keyboard events will be captured')
@@ -304,7 +315,6 @@ export default {
             this.linesContainer = new PIXI.Container();
             this.viewport.addChildAt(this.linesContainer,0);
           }
-
 
           this.spritesContainer.children.forEach((sprite) => {
           // this.viewport.children.forEach((sprite) => {
@@ -425,6 +435,7 @@ export default {
         // this.viewport.addChild(circleContainer)
 
         this.drawGrid()
+        this.drawTooltips();
         // this.drawConnections();
 
 
@@ -498,53 +509,150 @@ export default {
     })
   },
   methods: {
-    highlightLinks(sequence_uid, isHovered) {
+    showTooltip(sequence_uid) {
+     
+        // Find the related text and background tooltips in the tooltipContainer
+      const tooltipText = this.tooltipContainer.children.find(
+        (child) => child.sequence_uid === sequence_uid && child instanceof PIXI.Text
+      );
 
-      console.log('highlight links')
+      // const tooltipBackground = this.tooltipContainer.children.find(
+      //   (child) => child.sequence_uid === sequence_uid && child instanceof PIXI.Graphics
+      // );
 
-      if (this.viewport.scale.x > 2) {
+      // Set both text and background to visible, if they exist
+      if (tooltipText){
+        tooltipText.visible = true;
+        // tooltipBackground.visible = true;
 
-        const hoveredLines = [];
-        const nonHoveredLines = [];
+        // Adjust scale dynamically for both
+        tooltipText.scale.set(1 / this.viewport.scale.x);
+        console.log(`Tooltip for sequence_uid ${sequence_uid} is now visible.`);
+      } else {
+        console.warn(`Tooltip for sequence_uid ${sequence_uid} not found.`);
+      }
+   
+    },
+    debugTooltips() {
+      console.log('Tooltips count:', this.tooltipContainer.children.length);
 
-        if (isHovered === true){
-        console.log('highlight links true', this.linesContainer.children)
-        this.linesContainer.children.forEach((line) => {
-          // console.log(line.sourceSequenceUid, sequence_uid)
-          if (line.sourceSequenceUid === sequence_uid) {
-            console.log('source sequence uid', line.startX, line.startY, line.controlX, line.controlY, line.endX, line.endY)
-
-            line.clear();
-            // Redraw the line
-        
-            line.moveTo(line.startX, line.startY);
-            line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
-            line.stroke({width: 2, color: 0xb674e8, alpha: line.identityNorm});
-            hoveredLines.push(line);
-       
-            }
-            else {
-              line.clear();
-              line.moveTo(line.startX, line.startY);
-              line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
-              line.stroke({width:1, color: 0xd3d3d3, alpha: line.identityNorm});
-              nonHoveredLines.push(line);
-            }
+      this.tooltipContainer.children.forEach((tooltip, index) => {
+        console.log(`Tooltip ${index}:`, {
+          x: tooltip.x,
+          y: tooltip.y,
+          visible: tooltip.visible,
+          text: tooltip.text,
+          alpha: tooltip.alpha,
         });
+      });
+    },
+    hideTooltip(sequence_uid) {
+      // Find the tooltip in the tooltipContainer
+      const tooltip = this.tooltipContainer.children.find(
+        (child) => child.sequence_uid === sequence_uid
+      );
 
-        // Clear the container
-        this.linesContainer.removeChildren();
-
-        // Re-add non-hovered lines first, then hovered lines (to render them on top)
-        nonHoveredLines.forEach((line) => this.linesContainer.addChild(line));
-        hoveredLines.forEach((line) => this.linesContainer.addChild(line));
-
-        // Re-render to update the visuals
-        this.app.render();
-
-        }
+      // If tooltip exists, set it to invisible
+      if (tooltip) {
+        tooltip.visible = false;
+        console.log(`Tooltip for sequence_uid ${sequence_uid} is now hidden.`);
+      } else {
+        console.warn(`Tooltip for sequence_uid ${sequence_uid} not found.`);
       }
     },
+    highlightLinks(sequence_uid, isHovered) {
+
+      console.log('highlight links for:', sequence_uid)
+
+        // Ensure tooltips are managed with highlights
+        this.spritesContainer.children.forEach((sprite) => {
+          if (sprite.sequence_uid === sequence_uid) {
+            if (isHovered) {
+              console.log('hovered', this.tooltipContainer.children)
+              this.showTooltip(sequence_uid);
+
+
+         
+
+              if (this.viewport.scale.x > 2) {
+                this.linesContainer.children.forEach((line) => {
+                  if (line.sourceSequenceUid === sequence_uid) {
+                    line.clear();
+                    line.moveTo(line.startX, line.startY);
+                    line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+                    line.stroke({ width: 2, color: 0xb674e8, alpha: line.identityNorm }); // Highlighted line
+                  } else {
+                    line.clear();
+                    line.moveTo(line.startX, line.startY);
+                    line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+                    line.stroke({ width: 1, color: 0xd3d3d3, alpha: line.identityNorm }); // Default line
+                  }
+                });
+              }
+            } else {
+
+              // Hide the tooltip when not hovered
+              this.hideTooltip(sequence_uid);
+
+              if (this.viewport.scale.x > 2) {
+                this.linesContainer.children.forEach((line) => {
+                  if (line.sourceSequenceUid === sequence_uid) {
+                    line.clear();
+                    line.moveTo(line.startX, line.startY);
+                    line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+                    line.stroke({ width: 1, color: 0xd3d3d3, alpha: line.identityNorm }); // Reset line
+                  }
+                });
+              }
+            }
+          }
+        });
+      },
+
+
+    //   if (this.viewport.scale.x > 2) {
+
+    //     const hoveredLines = [];
+    //     const nonHoveredLines = [];
+
+    //     if (isHovered === true){
+    //     console.log('highlight links true', this.linesContainer.children)
+    //     this.linesContainer.children.forEach((line) => {
+    //       // console.log(line.sourceSequenceUid, sequence_uid)
+    //       if (line.sourceSequenceUid === sequence_uid) {
+    //         console.log('source sequence uid', line.startX, line.startY, line.controlX, line.controlY, line.endX, line.endY)
+
+    //         line.clear();
+    //         // Redraw the line
+        
+    //         line.moveTo(line.startX, line.startY);
+    //         line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+    //         line.stroke({width: 2, color: 0xb674e8, alpha: line.identityNorm});
+    //         hoveredLines.push(line);
+       
+    //         }
+    //         else {
+    //           line.clear();
+    //           line.moveTo(line.startX, line.startY);
+    //           line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+    //           line.stroke({width:1, color: 0xd3d3d3, alpha: line.identityNorm});
+    //           nonHoveredLines.push(line);
+    //         }
+    //     });
+
+    //     // Clear the container
+    //     this.linesContainer.removeChildren();
+
+    //     // Re-add non-hovered lines first, then hovered lines (to render them on top)
+    //     nonHoveredLines.forEach((line) => this.linesContainer.addChild(line));
+    //     hoveredLines.forEach((line) => this.linesContainer.addChild(line));
+
+    //     // Re-render to update the visuals
+    //     this.app.render();
+
+    //     }
+    //   }
+    // },
     drawSequenceSprite(sequence, x, y, radius) {
       const circleSprite = new PIXI.Sprite(circleTexture.value);
 
@@ -553,6 +661,7 @@ export default {
       circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3; // Blue if selected, gray otherwise
       circleSprite.alpha = 0.5;
       circleSprite.sequence_uid = sequence.uid;
+      circleSprite.sequence_id = sequence.id
 
       circleSprite.x = x;
       circleSprite.originalX = x;
@@ -560,10 +669,16 @@ export default {
 
       circleSprite.interactive = true;
 
+
    
-      circleSprite.on('mouseover', () => this.highlightLinks(circleSprite.sequence_uid, true)); // Highlight links
-      circleSprite.on('mouseout', () => this.highlightLinks(circleSprite.sequence_uid, false)); // Reset links
-      
+       // Add interactivity for tooltip and highlighting
+        circleSprite.on('mouseover', () => {
+          this.highlightLinks(circleSprite.sequence_uid, true); // Highlight links
+        });
+
+        circleSprite.on('mouseout', () => {
+          this.highlightLinks(circleSprite.sequence_uid, false); // Reset links
+        });
 
 
       // this.viewport.addChild(circleSprite);
@@ -654,6 +769,7 @@ export default {
       });
 
 
+
       // // Collect all circle positions
       // const circlePositions = [];
       // this.viewport.children.forEach((sprite) => {
@@ -704,6 +820,84 @@ export default {
       // }
       
       // this.viewport.addChild(this.connectionGraphics);
+
+      const canvas = this.app.canvas
+      this.initializeLasso(canvas)
+
+      this.app.render();
+    },
+
+
+    drawTooltips() {
+      console.log('Drawing tooltips');
+
+      // Ensure the tooltipContainer is created and ordered correctly
+      if (!this.tooltipContainer) {
+        this.tooltipContainer = new PIXI.Container();
+        this.tooltipContainer.zIndex = 2; // Ensure it is above sprites and lines
+        this.viewport.addChildAt(this.tooltipContainer,2);
+      }
+
+      // Clear existing tooltips
+      this.tooltipContainer.removeChildren(); // Remove any previous tooltips
+
+      // Iterate over the sprites and create tooltips for each
+      this.spritesContainer.children.forEach((sprite) => {
+        if (!sprite.sequence_uid) return; // Skip if the sprite doesn't have a sequence_uid
+
+        // Create a tooltip for the sprite
+        const tooltipText = new PIXI.Text({text: sprite.sequence_id, style:{
+          fontFamily: 'Arial',
+          fontSize: 12 * window.devicePixelRatio * this.viewport.scale.x,
+          fill: 0x000000, 
+          align: 'center',
+        }});
+
+        // const tooltipBackground = new PIXI.Graphics();
+        // const padding = 4; // Padding around the text
+
+        // tooltipBackground.rect(
+        //   sprite.x + 15,
+        //   sprite.y,
+        //   tooltipText.width + padding * 2,
+        //   tooltipText.height + padding * 2
+        // );
+        // tooltipBackground.fill({color:0x00FF00, alpha:0.9}); // White with slight transparency
+
+        // // // Position the background behind the text
+        // tooltipBackground.x = sprite.x + 15; // Offset horizontally
+        // tooltipBackground.y = sprite.y
+        // tooltipBackground.visible = false; // Start hidden
+        // tooltipBackground.scale.set(1 / this.viewport.scale.x); // Scale proportionally
+
+        // Set the tooltip's position relative to the sprite
+        // tooltip.anchor.set(0.5, 1); // Center horizontally, position above the sprite
+        tooltipText.x = sprite.x + 15;
+        tooltipText.y = sprite.y
+        tooltipText.visible = false; // Start hidden
+        tooltipText.sequence_uid = sprite.sequence_uid
+        tooltipText.scale.set(1 / this.viewport.scale.x); 
+
+        // Attach the tooltip to the sprite for interactivity
+        tooltipText.relatedSprite = sprite; //
+
+
+
+        // Add tooltip visibility handlers
+        sprite.interactive = true;
+        sprite.on('mouseover', () => {
+          this.highlightLinks(sprite.sequence_uid, true); // Highlight links when hovering
+        });
+        sprite.on('mouseout', () => {
+          this.highlightLinks(sprite.sequence_uid, false); // Reset links when not hovering
+        });
+
+        // Add the tooltip to the tooltipContainer
+        // this.tooltipContainer.addChild(tooltipBackground);
+        this.tooltipContainer.addChild(tooltipText);
+      });
+
+      console.log('Tooltips created and added to the container.');
 
       const canvas = this.app.canvas
       this.initializeLasso(canvas)
