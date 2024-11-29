@@ -685,7 +685,7 @@ export default {
       // Add the sprite to spritesContainer
       this.spritesContainer.addChild(circleSprite);
     },
-    drawConnections() {
+    drawConnections(useAggregateLinks = true) {
 
       console.log('drawing connections')
       // // Clear existing lines
@@ -720,6 +720,57 @@ export default {
           spriteMap.set(sprite.sequence_uid, sprite);
         }
       });
+
+      if (useAggregateLinks) {
+        // Aggregate connections by source-target pairs
+        const aggregatedLinks = new Map();
+        Object.entries(spriteLinks).forEach(([sourceUid, links]) => {
+            links.forEach((link) => {
+                const targetUid = link.targetUid;
+                const key = sourceUid < targetUid
+                    ? `${sourceUid}-${targetUid}`
+                    : `${targetUid}-${sourceUid}`; // Ensure unique key for source-target pairs
+                
+                if (!aggregatedLinks.has(key)) {
+                    aggregatedLinks.set(key, {
+                        sourceUid,
+                        targetUid,
+                        totalIdentity: 0,
+                    });
+                }
+
+                aggregatedLinks.get(key).totalIdentity += link.identity;
+            });
+        });
+
+        // Draw aggregated connections
+        aggregatedLinks.forEach(({ sourceUid, targetUid, totalIdentity }) => {
+            const sourceSprite = spriteMap.get(sourceUid);
+            const targetSprite = spriteMap.get(targetUid);
+            if (!sourceSprite || !targetSprite) return;
+
+            const sourceX = sourceSprite.x + sourceSprite.totalRadius;
+            const sourceY = sourceSprite.y + sourceSprite.totalRadius;
+            const targetX = targetSprite.x + targetSprite.totalRadius;
+            const targetY = targetSprite.y + targetSprite.totalRadius;
+
+            // Calculate control point for curvature
+            const controlX = (sourceX + targetX) / 2 + (targetY - sourceY) * 0.2;
+            const controlY = (sourceY + targetY) / 2 + (sourceX - targetX) * 0.2;
+
+            // Normalize line width based on total identity
+            const normalizedWidth = Math.log2(totalIdentity + 1); // Adjust log scaling as needed
+
+            // Draw the line
+            const line = new PIXI.Graphics();
+            line.moveTo(sourceX, sourceY);
+            line.quadraticCurveTo(controlX, controlY, targetX, targetY);
+            line.stroke({ width: 1, color: 0xd3d3d3, alpha: 0.7 });
+
+            // Add to the lines container
+            this.linesContainer.addChild(line);
+        });
+    } else {
 
       // Draw connections based on homology links
       this.spritesContainer.children.forEach((sprite) => {
@@ -767,6 +818,7 @@ export default {
           this.linesContainer.addChild(this.connectionGraphics);
         });
       });
+    }
 
 
 
