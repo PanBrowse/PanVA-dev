@@ -59,6 +59,13 @@ DATASET_CONFIG = {
         "labels_filtered": os.path.join(db_path, "geneSet", "capsicum", "filtered_protein_distance_labels.json"),
         "labels": os.path.join(db_path, "geneSet", "capsicum", "protein_distance_labels.json"),
         "distance_matrix": os.path.join(db_path, "geneSet", "capsicum", "filtered_protein_distance_matrix.npy"),
+    },
+     "capsicum_small": {
+        "embedding_filtered": os.path.join(db_path, "geneSet", "capsicum_small", "filtered_embedding_capsicum_small_neighbors2_minDist0.1_seed42.json"),
+        "embedding": os.path.join(db_path, "geneSet", "capsicum_small", "embedding_capsicum_small_neighbors10_minDist0.1_seed42.json"),
+        "labels_filtered": os.path.join(db_path, "geneSet", "capsicum_small", "filtered_protein_distance_labels.json"),
+        "labels": os.path.join(db_path, "geneSet", "capsicum_small", "protein_distance_labels.json"),
+        "distance_matrix": os.path.join(db_path, "geneSet", "capsicum_small", "filtered_protein_distance_matrix.npy"),
     }
 }
 
