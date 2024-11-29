@@ -726,7 +726,7 @@ export default {
 
       // find the sequences in the brushing area
       for(let affectedIndex = indexTop; affectedIndex < indexBottom; affectedIndex++) {
-        const sequenceIdNumberElement = [...this.indexMap.entries()].find(d => d[1] === affectedIndex)
+        const sequenceIdNumberElement = [...this.newDrawingIndices.entries()].find(d => d[1] === affectedIndex)
         const sequenceIdNumber = sequenceIdNumberElement ? sequenceIdNumberElement[0] : ''
         const sequenceUidElement = [...Object.entries(this.genomeStore.sequenceUidLookup)].find(d=> d[1] === sequenceIdNumber)
         const sequenceUid = sequenceUidElement ? sequenceUidElement[0] : ''
@@ -736,8 +736,8 @@ export default {
       const affectedGenes = this.genomeStore.genomeData.genes.filter(d => {
         const key: string = d.sequence_uid ?? ''
         if(this.geneToWindowScales[key] === undefined) {return false}
-        const start = this.geneToWindowScales[key](d.start)
-        const end = this.geneToWindowScales[key](d.end)
+        const start = d.strand === 0 ? this.geneToWindowScales[key](d.start) : this.geneToWindowScales[key](d.end)
+        const end = d.strand === 0 ? this.geneToWindowScales[key](d.end) : this.geneToWindowScales[key](d.start)
         const outOfRange = start > selectionX[1]  || end < selectionX[0] 
         // console.log(d.sequence_uid)
         return (affectedSequenceUids.includes(d.sequence_uid ?? '')) && (!outOfRange)
