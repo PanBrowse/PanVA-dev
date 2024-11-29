@@ -943,6 +943,14 @@ export default {
         if(width < 0.1) {return false; }
         return true
       })
+
+      const tooltip = this.svg().select('g.tooltip-context').append('rect').style('position', 'absolute').attr('fill', 'white') 
+      .attr('width', 120).attr('height', 30).style('visibility', 'hidden')// d3.select("body").select('div.tooltip').style('position', 'absolute').select('rect')
+      const tooltipText = this.svg().select('g.tooltip-context').append('text').style('position', 'absolute').attr('fill', 'black') 
+      .style('visibility', 'hidden').attr('text-anchor', 'start').attr('height', 12)
+
+      let timer: string | number | NodeJS.Timeout | undefined = undefined
+
       this.svg()
         .select('g.bar-context')
         .selectAll('path.bar-chr-context')
@@ -994,7 +1002,46 @@ export default {
                 const ypos = index * (this.barHeight + 10)
                 return `translate(0,${ypos})`
               })
-              .attr('clip-path', 'url(#clipDetails)'),
+              .attr('clip-path', 'url(#clipDetails)')
+              .on('mouseenter', (event, d) => {  
+                clearTimeout(timer)
+                // const homologyGroups = d.homology_groups[0]?.id
+                // this.genomeStore.highlightedHomologyGroups = homologyGroups
+                const container = this.svg().select('g.tooltip-context').nodes()[0].getBoundingClientRect()
+                tooltip.transition().duration(100).style("visibility", 'visible')
+                tooltip.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 10);  
+                tooltipText.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 22);  
+                // tooltipText2.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 34);  
+                // const geneName = d.names[0]
+                const key = d.uid
+                const scale = vis.geneToWindowScales[key]
+                // debugger
+                const position =  Math.floor(scale.invert(event.x ))
+                tooltipText.text(`${position}`)
+                tooltipText.transition().duration(100).style("visibility", 'visible')
+              })
+              .on('mousemove', (event, d)=> {
+                const container = this.svg().select('g.tooltip-context').nodes()[0].getBoundingClientRect()
+
+                const key = d.uid
+                tooltip.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 10);  
+
+                const scale = vis.geneToWindowScales[key]
+                // debugger
+                const position =  Math.floor(scale.invert(event.x ))
+                tooltipText.text(`${position}`)
+                tooltipText.attr("x",  event.x -container.x + 10).attr("y", event.y - container.y + 22);  
+
+              })
+              .on('mouseleave',  (event, d) => {
+                timer = setTimeout(() => {
+                  this.genomeStore.highlightedHomologyGroups = undefined
+                }, 300);
+                tooltip.transition().duration(200).style("visibility", 'hidden');
+                tooltipText.transition().duration(200).style("visibility", 'hidden');
+                // tooltipText2.transition().duration(200).style("visibility", 'hidden');
+                })
+              ,
           (update) =>
             update
               .transition()
@@ -1137,6 +1184,13 @@ export default {
         .call((g) => g.selectAll('line').attr('stroke', '#c0c0c0'))
         .call((g) => g.selectAll('text').attr('fill', '#c0c0c0'))
     },
+
+    // drawTicks() {
+    //   let vis = this
+    //   vis.windowRange
+    //   const tickvalues = 
+
+    // }
 
     ///////////////////////////////////////////////////////////////////////////// Draw genes ////////////////////////////////////////////////
     drawGenes() {
