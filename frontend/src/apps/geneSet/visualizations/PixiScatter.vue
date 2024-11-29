@@ -387,7 +387,7 @@ export default {
           // // this.drawGrid();
         
           // Dynamically toggle links based on zoom level
-          if (zoomLevel > 2) {
+          if (zoomLevel > 1.5) {
             // Draw connections if zoom level is high enough
             this.drawConnections();
           } else {
@@ -396,7 +396,7 @@ export default {
           }
 
           // Ensure visibility of linesContainer at higher zoom levels
-          if (zoomLevel > 2 && !this.linesContainer.visible) {
+          if (zoomLevel > 1.5 && !this.linesContainer.visible) {
             this.linesContainer.visible = true;
           }
 
@@ -562,52 +562,127 @@ export default {
     },
     highlightLinks(sequence_uid, isHovered) {
 
-      console.log('highlight links for:', sequence_uid)
+      // console.log('highlight links for:', sequence_uid)
 
-        // Ensure tooltips are managed with highlights
-        this.spritesContainer.children.forEach((sprite) => {
-          if (sprite.sequence_uid === sequence_uid) {
-            if (isHovered) {
-              console.log('hovered', this.tooltipContainer.children)
-              this.showTooltip(sequence_uid);
+      //   // Ensure tooltips are managed with highlights
+      //   this.spritesContainer.children.forEach((sprite) => {
+      //     if (sprite.sequence_uid === sequence_uid) {
+      //       if (isHovered) {
+      //         console.log('hovered', this.tooltipContainer.children)
+      //         this.showTooltip(sequence_uid);
 
 
          
 
-              if (this.viewport.scale.x > 2) {
-                this.linesContainer.children.forEach((line) => {
-                  if (line.sourceSequenceUid === sequence_uid) {
-                    line.clear();
-                    line.moveTo(line.startX, line.startY);
-                    line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
-                    line.stroke({ width: 2, color: 0xb674e8, alpha: line.identityNorm }); // Highlighted line
-                  } else {
-                    line.clear();
-                    line.moveTo(line.startX, line.startY);
-                    line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
-                    line.stroke({ width: 1, color: 0xd3d3d3, alpha: line.identityNorm }); // Default line
-                  }
-                });
-              }
+      //         if (this.viewport.scale.x > 2) {
+      //           this.linesContainer.children.forEach((line) => {
+      //             if (
+      //                       line.sourceSequenceUid === sequence_uid ||
+      //                       line.targetSequenceUid === sequence_uid
+      //                   ) {
+      //               line.clear();
+      //               line.moveTo(line.startX, line.startY);
+      //               line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+      //               line.stroke({ width: 2, color: 0xb674e8, alpha: 1}); // Highlighted line
+      //             } else {
+      //               line.clear();
+      //               line.moveTo(line.startX, line.startY);
+      //               line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+      //               line.stroke({ width: 1, color: 0xd3d3d3, alpha: 0.7 }); // Default line
+      //             }
+      //           });
+      //         }
+      //       } else {
+
+      //         // Hide the tooltip when not hovered
+      //         this.hideTooltip(sequence_uid);
+
+      //         if (this.viewport.scale.x > 2) {
+      //           this.linesContainer.children.forEach((line) => {
+      //               line.clear();
+      //               line.moveTo(line.startX, line.startY);
+      //               line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+      //               line.stroke({ width: 1, color: 0xd3d3d3, alpha: 0.7 }); // Reset line
+                  
+      //           });
+      //         }
+      //       }
+      //     }
+      //   });
+      // },
+
+    console.log('highlight links for:', sequence_uid)
+
+    // Ensure tooltips are managed with highlights
+    this.spritesContainer.children.forEach((sprite) => {
+        if (sprite.sequence_uid === sequence_uid) {
+            if (isHovered) {
+                console.log('hovered', this.tooltipContainer.children);
+                this.showTooltip(sequence_uid);
+
+
+
+                if (this.viewport.scale.x > 1.5) {
+                    this.linesContainer.children.forEach((line) => {
+                      console.log(this.linesContainer.children)
+                        // Highlight lines connected to the hovered sprite
+                        if (
+                            line.sourceSequenceUid === sequence_uid 
+                        ) {
+                            line.clear();
+                            line.moveTo(line.startX, line.startY);
+                            line.quadraticCurveTo(
+                                line.controlX,
+                                line.controlY,
+                                line.endX,
+                                line.endY
+                            );
+                            line.stroke({
+                                width: line.aggregatedWidth || 1,
+                                color: 0xb674e8, // Highlight color
+                                alpha: 1, // Full opacity for highlighted lines
+                            });
+                            
+                        }
+                    });
+                }
             } else {
+                // Hide the tooltip when not hovered
+                this.hideTooltip(sequence_uid);
 
-              // Hide the tooltip when not hovered
-              this.hideTooltip(sequence_uid);
-
-              if (this.viewport.scale.x > 2) {
-                this.linesContainer.children.forEach((line) => {
-                  if (line.sourceSequenceUid === sequence_uid) {
-                    line.clear();
-                    line.moveTo(line.startX, line.startY);
-                    line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
-                    line.stroke({ width: 1, color: 0xd3d3d3, alpha: line.identityNorm }); // Reset line
-                  }
-                });
-              }
+                if (this.viewport.scale.x > 1.5) {
+                    this.linesContainer.children.forEach((line) => {
+                        // Reset all lines to their default styles, but do not remove them
+                        line.clear();
+                        line.moveTo(line.startX, line.startY);
+                        line.quadraticCurveTo(
+                            line.controlX,
+                            line.controlY,
+                            line.endX,
+                            line.endY
+                        );
+                        line.stroke({
+                            width: line.aggregatedWidth || 1, // Default width
+                            color: 0xd3d3d3, // Default color
+                            alpha: 0.7, // Default opacity
+                        });
+                    });
+                }
             }
-          }
-        });
-      },
+       
+        }
+    });
+      // //   Clear the container
+      // this.linesContainer.removeChildren();
+
+      // // Re-add non-hovered lines first, then hovered lines (to render them on top)
+      // nonHoveredLines.forEach((line) => this.linesContainer.addChild(line));
+      // hoveredLines.forEach((line) => this.linesContainer.addChild(line));
+
+      // // Re-render to update the visuals
+      this.app.render();
+  },
+
 
 
     //   if (this.viewport.scale.x > 2) {
@@ -724,27 +799,31 @@ export default {
       if (useAggregateLinks) {
         // Aggregate connections by source-target pairs
         const aggregatedLinks = new Map();
+
         Object.entries(spriteLinks).forEach(([sourceUid, links]) => {
             links.forEach((link) => {
                 const targetUid = link.targetUid;
                 const key = sourceUid < targetUid
                     ? `${sourceUid}-${targetUid}`
                     : `${targetUid}-${sourceUid}`; // Ensure unique key for source-target pairs
-                
+
                 if (!aggregatedLinks.has(key)) {
                     aggregatedLinks.set(key, {
                         sourceUid,
                         targetUid,
-                        totalIdentity: 0,
+                        totalMetric: 0, // Store the sum of metrics
                     });
                 }
 
-                aggregatedLinks.get(key).totalIdentity += link.identity;
+                // Increment the totalMetric with the current link's identity (or other metric)
+                aggregatedLinks.get(key).totalMetric += 1; // Use `identity` as the metric
+
+
             });
         });
 
         // Draw aggregated connections
-        aggregatedLinks.forEach(({ sourceUid, targetUid, totalIdentity }) => {
+        aggregatedLinks.forEach(({ sourceUid, targetUid, totalMetric }) => {
             const sourceSprite = spriteMap.get(sourceUid);
             const targetSprite = spriteMap.get(targetUid);
             if (!sourceSprite || !targetSprite) return;
@@ -758,18 +837,29 @@ export default {
             const controlX = (sourceX + targetX) / 2 + (targetY - sourceY) * 0.2;
             const controlY = (sourceY + targetY) / 2 + (sourceX - targetX) * 0.2;
 
-            // Normalize line width based on total identity
-            const normalizedWidth = Math.log2(totalIdentity + 1); // Adjust log scaling as needed
+            // Normalize line width directly as the sum of metrics
+            const normalizedWidth = Math.max(totalMetric, 1); // Ensure minimum width
 
             // Draw the line
-            const line = new PIXI.Graphics();
-            line.moveTo(sourceX, sourceY);
-            line.quadraticCurveTo(controlX, controlY, targetX, targetY);
-            line.stroke({ width: 1, color: 0xd3d3d3, alpha: 0.7 });
+            this.connectionGraphics = new PIXI.Graphics();
+            this.connectionGraphics.moveTo(sourceX, sourceY);
+            this.connectionGraphics.quadraticCurveTo(controlX, controlY, targetX, targetY);
+            this.connectionGraphics.stroke({ width: 1, color: 0xd3d3d3, alpha: 0.7 });
+            
+            this.connectionGraphics.sourceSequenceUid = sourceSprite.sequence_uid;
+            this.connectionGraphics.targetSequenceUid = targetSprite.sequence_uid;
+
+            this.connectionGraphics.startX = sourceX;
+            this.connectionGraphics.startY = sourceY;
+            this.connectionGraphics.controlX = controlX;
+            this.connectionGraphics.controlY = controlY;
+            this.connectionGraphics.endX = targetX;
+            this.connectionGraphics.endY = targetY;
 
             // Add to the lines container
-            this.linesContainer.addChild(line);
+            this.linesContainer.addChild(this.connectionGraphics);
         });
+        console.log('aggregatedLinks', aggregatedLinks)
     } else {
 
       // Draw connections based on homology links
@@ -818,6 +908,7 @@ export default {
           this.linesContainer.addChild(this.connectionGraphics);
         });
       });
+
     }
 
 
