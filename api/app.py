@@ -244,6 +244,8 @@ def get_clustering_order_new(dataset):
     matrix_path_size = os.path.join(db_path, "geneSet", dataset, "protein_distance_matrix.npy") #replace
     matrix_path_location = os.path.join(db_path, "geneSet", dataset, "multiset_jaccard_distance_matrix.npy") #replace
     matrix_path_jaccard = os.path.join(db_path, "geneSet", dataset, "jaccard_distance_matrix.npy")
+    matrix_path_multijaccard = os.path.join(db_path, "geneSet", dataset, "multiset_jaccard_distance_matrix.npy") #replace
+
 
     # Load the labels from the JSON file
     with open(sequences_path, "r") as f:
@@ -263,6 +265,8 @@ def get_clustering_order_new(dataset):
     np.fill_diagonal(data_matrix_location, 0)
     data_matrix_jaccard = np.load(matrix_path_jaccard)
     np.fill_diagonal(data_matrix_jaccard, 0)
+    data_matrix_multijaccard = np.load(matrix_path_multijaccard)
+    np.fill_diagonal(data_matrix_multijaccard, 0)
 
      # Create default linkage matrix
     print("using default linkage matrix")
@@ -277,12 +281,14 @@ def get_clustering_order_new(dataset):
         size_score = request.json["sizeScore"]/100
         location_score = request.json["locationScore"]/100
         jaccard_score = request.json["jaccardScore"]/100
+        multijaccard_score = request.json["multiJaccardScore"]/100
         print('proteinScore', protein_score)
         print('orderScore', order_score)
         print('orientationScore', orientation_score)
         print('sizeScore', size_score)
         print('locationScore', location_score)
         print('jaccardScore', jaccard_score)
+        print('multiJaccardScore', multijaccard_score)
 
         matrix_proteins = protein_score * data_matrix_proteins
         matrix_order = order_score * data_matrix_order
@@ -290,8 +296,10 @@ def get_clustering_order_new(dataset):
         matrix_size = size_score * data_matrix_size
         matrix_location = location_score * data_matrix_location
         matrix_jaccard = jaccard_score * data_matrix_jaccard
+        matrix_multijaccard = multijaccard_score * data_matrix_multijaccard
 
-        list_matrices = [matrix_proteins, matrix_order, matrix_orientation, matrix_size, matrix_location, matrix_jaccard]
+
+        list_matrices = [matrix_proteins, matrix_order, matrix_orientation, matrix_size, matrix_location, matrix_jaccard, matrix_multijaccard]
 
         matrix_combined = np.sum(list_matrices, axis=0)
         matrix_combined = (matrix_combined + matrix_combined.T) / 2

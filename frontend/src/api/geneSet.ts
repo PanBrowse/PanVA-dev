@@ -535,7 +535,8 @@ export const fetchClusteringOrderNew = async (
   orientationScore: number,
   sizeScore: number,
   locationScore: number,
-  jaccardScore: number
+  jaccardScore: number,
+  multiJaccardScore: number,
 ) => {
   const config = useConfigStore();
   const dataset = config.geneSet.dataset
@@ -557,6 +558,7 @@ export const fetchClusteringOrderNew = async (
         sizeScore,
         locationScore,
         jaccardScore,
+        multiJaccardScore,
       }),
     }
   );

@@ -51,6 +51,7 @@ export default {
       'orientation',
       'size',
       'jaccard',
+      'multijaccard',
       'location',
     ]),
   },
@@ -74,14 +75,17 @@ export default {
       <AFormItem label="Orientation">
         <ASlider id="orientation" v-model:value="orientation"> </ASlider>
       </AFormItem>
+      <AFormItem label="PAV">
+        <ASlider id="jaccard" v-model:value="jaccard"> </ASlider>
+      </AFormItem>
+      <AFormItem label="CNV">
+        <ASlider id="mutlijaccard" v-model:value="multijaccard"> </ASlider>
+      </AFormItem>
       <AFormItem label="Size">
-        <ASlider id="size" v-model:value="size"> </ASlider>
+        <ASlider id="size" v-model:value="size" disabled="true"> </ASlider>
       </AFormItem>
       <AFormItem label="Location">
-        <ASlider id="location" v-model:value="location"> </ASlider>
-      </AFormItem>
-      <AFormItem label="Jaccard / CNV">
-        <ASlider id="jaccard" v-model:value="jaccard"> </ASlider>
+        <ASlider id="location" v-model:value="location" disabled="true"> </ASlider>
       </AFormItem>
       <AFormItem label="Linkage">
         <ARadioGroup v-model:value="linkage">

@@ -87,6 +87,7 @@ export const useGenomeStore = defineStore({
     size: 0,
     location: 0,
     jaccard: 0,
+    multijaccard: 0,
     order: 50,
     orderedSequenceUids: [],
 
@@ -294,7 +295,8 @@ export const useGenomeStore = defineStore({
           this.orientation,
           this.size,
           this.location,
-          this.jaccard
+          this.jaccard,
+          this.multijaccard,
         );
 
         console.log('orderedSequenceUids', this.orderedSequenceUids);
@@ -320,6 +322,7 @@ export const useGenomeStore = defineStore({
       this.size = 0;
       this.location = 0;
       this.jaccard = 0;
+      this.multijaccard = 0;
 
       const sortedKeys = Object.entries(this.sequenceUidLookup) // Get key-value pairs
         .sort(([, valueA], [, valueB]) => valueA - valueB) // Sort by the values (indices)
@@ -346,7 +349,8 @@ export const useGenomeStore = defineStore({
         this.orientation,
         this.size,
         this.location,
-        this.jaccard
+        this.jaccard,
+        this.multijaccard,
       );
 
       console.log('new orderedSequenceUids', this.orderedSequenceUids);
