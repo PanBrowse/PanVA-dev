@@ -30,7 +30,7 @@ export default {
     ACol: Col,
   },
   methods: {
-    ...mapActions(useGeneSetStore, ['changeSorting', 'updateSimulation']),
+    ...mapActions(useGeneSetStore, ['changeSorting', 'updateSimulation', 'resetParameters']),
   },
   computed: {
     ...mapWritableState(useGeneSetStore, [
@@ -52,32 +52,33 @@ export default {
       :wrapperCol="{ span: 16 }"
       class="view-options"
     >
-      <AFormItem label="Contractive force">
-        <ASlider id="contractive" v-model:value="scaleContraction"  :min=0 :max=10000> </ASlider>
+      <AFormItem label="Group alignment">
+        <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=100> </ASlider>
       </AFormItem>
-      <AFormItem label="Repulsive force">
-        <ASlider id="repulsive" v-model:value="scaleRepulsion"  :min=0 :max=10000> </ASlider>
-      </AFormItem>
-      <AFormItem label="Deformation resistance">
-        <ASlider id="x-force" v-model:value="scaleXForce" type="range" :min=0 :max=10000> </ASlider>
-      </AFormItem>
-      <AFormItem label="Homology group force">
-        <ASlider id="homology" v-model:value="scaleYForce" :min=0 :max=10000> </ASlider>
-      </AFormItem>
-      <AFormItem label="Minimum distance">
+      <AFormItem label="Separation">
         <ASlider id="distance" v-model:value="minimumDistance"  :min=2 :max=10000> </ASlider>
       </AFormItem>
-
+      <AFormItem label="Sequence stiffness">
+        <ASlider id="x-force" v-model:value="scaleXForce" type="range" :min=0 :max=100> </ASlider>
+      </AFormItem>
+      <AFormItem label="Evenness">
+        <ASlider id="contractive" v-model:value="scaleContraction"  :min=0 :max=100> </ASlider>
+      </AFormItem>
     </AForm>
     <AForm class="cluster-options">
       <AFormItem>
         <ARow type="flex">
           <ACol :span="8"> </ACol>
-          <ACol :span="16">
-            <ARow type="flex" :gutter="40">
-              <ACol :span="16">
+          <ACol :span="25">
+            <ARow type="flex" :gutter="12">
+              <ACol :span="12">
                 <AButton type="primary" ghost @click="updateSimulation()">
                   Rerun simulation
+                </AButton>
+              </ACol>
+              <ACol :span="8">
+                <AButton type="primary" danger ghost @click="resetParameters();updateSimulation()">
+                  Reset parameters
                 </AButton>
               </ACol>
             </ARow>

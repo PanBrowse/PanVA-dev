@@ -287,7 +287,7 @@ export const useGenomeStore = defineStore({
       this.initializeSelectedSequencesLasso();
 
       try {
-       this.orderedSequenceUids = await fetchClusteringOrderNew(
+        this.orderedSequenceUids = await fetchClusteringOrderNew(
           this.linkage,
           this.protein,
           this.order,
@@ -297,7 +297,7 @@ export const useGenomeStore = defineStore({
           this.jaccard
         );
 
-        console.log('orderedSequenceUids', this.orderedSequenceUids)
+        console.log('orderedSequenceUids', this.orderedSequenceUids);
       } catch (error) {
         global.setError({
           message: 'Could not load or parse clustering result.',
@@ -309,35 +309,35 @@ export const useGenomeStore = defineStore({
       // Set initialized flag only after all API calls complete successfully
       this.isInitialized = true;
     },
-    async resetFocusSorting(){
+    async resetFocusSorting() {
 
-      console.log('resetFocusSorting')
+      console.log('resetFocusSorting');
 
       //reset values
-      this.protein = 0
-      this.order = 0
-      this.orientation = 0 
-      this.size = 0 
-      this.location = 0 
-      this.jaccard = 0 
+      this.protein = 0;
+      this.order = 0;
+      this.orientation = 0;
+      this.size = 0;
+      this.location = 0;
+      this.jaccard = 0;
 
       const sortedKeys = Object.entries(this.sequenceUidLookup) // Get key-value pairs
-      .sort(([, valueA], [, valueB]) => valueA - valueB) // Sort by the values (indices)
-      .map(([key]) => key);
+        .sort(([, valueA], [, valueB]) => valueA - valueB) // Sort by the values (indices)
+        .map(([key]) => key);
 
       // reset orderedSequenceUids to sequenceUids from the lookup in the store
-      this.orderedSequenceUids = sortedKeys
+      this.orderedSequenceUids = sortedKeys;
 
-      console.log('reset this.orderedSequenceUids', sortedKeys)
+      console.log('reset this.orderedSequenceUids', sortedKeys);
 
-      
+
 
 
 
     },
-    async changeFocusSorting(){
+    async changeFocusSorting() {
 
-      console.log('changeFocusSorting')
+      console.log('changeFocusSorting');
 
       this.orderedSequenceUids = await fetchClusteringOrderNew(
         this.linkage,
@@ -347,9 +347,9 @@ export const useGenomeStore = defineStore({
         this.size,
         this.location,
         this.jaccard
-      )
+      );
 
-      console.log('new orderedSequenceUids', this.orderedSequenceUids)
+      console.log('new orderedSequenceUids', this.orderedSequenceUids);
 
 
 
@@ -612,7 +612,7 @@ export const useGeneSetStore = defineStore('geneSet', {
 
     // Spring simulation forces
     scaleXForce: 1,
-    scaleYForce: 1,
+    scaleYForce: 10,
     scaleContraction: 1,
     scaleRepulsion: 1,
     minimumDistance: 1000,
@@ -882,6 +882,13 @@ export const useGeneSetStore = defineStore('geneSet', {
       // crossingHomologyGroups.value = crossDetection(newGenePositions)
 
       // currentGraphNodeGroups.value = nodeGroups
+    },
+    resetParameters() {
+      this.scaleXForce = 1,
+        this.scaleYForce = 10,
+        this.scaleContraction = 1,
+        this.scaleRepulsion = 1,
+        this.minimumDistance = 1000;
     },
   },
   getters: {

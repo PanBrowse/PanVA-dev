@@ -220,7 +220,6 @@ export default {
         newDrawingIndices.value = createNewMap(indexMapSort, sortedEntriesMap);
 
         console.log("Updated newDrawingIndices:", Array.from(newDrawingIndices.value.entries()));
-
       },
       { immediate: true }
     );
@@ -674,7 +673,7 @@ export default {
           {scaleXForce: useGeneSetStore().scaleXForce,
           scaleYForce: useGeneSetStore().scaleYForce,
           scaleContraction: useGeneSetStore().scaleContraction,
-          scaleRepulsion: useGeneSetStore().scaleRepulsion,
+          scaleRepulsion: useGeneSetStore().scaleContraction,
           minimumDistance: useGeneSetStore().minimumDistance,
           },
         )
@@ -1190,7 +1189,8 @@ export default {
           let sequence_b = vis.genomeStore.sequenceUidLookup[b.sequence_uid ?? '']
 
           return (
-            (vis.indexMap.get(sequence_a) ?? 0) - (vis.indexMap.get(sequence_b) ?? 0)
+            (vis.newDrawingIndices.get(sequence_a) ?? 0) - 
+            (vis.newDrawingIndices.get(sequence_b) ?? 0)
           )
         })
 
@@ -1206,9 +1206,9 @@ export default {
               (currentGeneToWindow(node.start) +
                 currentGeneToWindow(node.end)) /
               2
-            const yIndex = vis.indexMap.get(
-                    vis.genomeStore.sequenceUidLookup[key]
-                  ) ?? 0
+            const yIndex = vis.newDrawingIndices.get(
+              vis.genomeStore.sequenceUidLookup[key]
+            )
             // const yIndex = vis.newDrawingIndices.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
             const y =
               vis.barHeight / 2 +
@@ -1588,7 +1588,7 @@ export default {
         {scaleXForce: useGeneSetStore().scaleXForce,
         scaleYForce: useGeneSetStore().scaleYForce,
         scaleContraction: useGeneSetStore().scaleContraction,
-        scaleRepulsion: useGeneSetStore().scaleRepulsion,
+        scaleRepulsion: useGeneSetStore().scaleContraction,
         minimumDistance: useGeneSetStore().minimumDistance,
         },
       )

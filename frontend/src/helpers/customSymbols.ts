@@ -147,10 +147,10 @@ export const getGeneSymbolType = (
     currentGeneToWindow(d.end) -
     currentGeneToWindow(d.start);
   return geneSize > barHeight && showBars
-    ? d.strand === 0
+    ? d.strand === 1
       ? geneTriangleRectForward
       : geneTriangleRectReverse
-    : d.strand === 0
+    : d.strand === 1
       ? geneTriangleForward
       : geneTriangleReverse;
 };
