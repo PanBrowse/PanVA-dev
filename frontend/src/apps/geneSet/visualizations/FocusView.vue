@@ -1184,7 +1184,9 @@ export default {
 
         const newPathFocus: Gene[] = genesByHomology[homology]
 
-        let sortedPath = newPathFocus.sort(function (a, b) {
+        let sortedPath: Gene[] = []
+        if(newPathFocus !== undefined){
+        sortedPath = newPathFocus.sort(function (a, b) {
           let sequence_a = vis.genomeStore.sequenceUidLookup[a.sequence_uid ?? '']
           let sequence_b = vis.genomeStore.sequenceUidLookup[b.sequence_uid ?? '']
 
@@ -1193,6 +1195,7 @@ export default {
             (vis.newDrawingIndices.get(sequence_b) ?? 0)
           )
         })
+      }
 
         let connectionsLine = (sortedPath: Gene[]) => {
           const currentPath = d3.path()
