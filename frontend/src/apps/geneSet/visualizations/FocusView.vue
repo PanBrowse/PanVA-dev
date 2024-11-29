@@ -221,7 +221,6 @@ export default {
 
         console.log("Updated newDrawingIndices:", Array.from(newDrawingIndices.value.entries()));
 
-        debugger;
       },
       { immediate: true }
     );
@@ -1210,7 +1209,6 @@ export default {
             const yIndex = vis.indexMap.get(
                     vis.genomeStore.sequenceUidLookup[key]
                   ) ?? 0
-            debugger;
             // const yIndex = vis.newDrawingIndices.get(vis.genomeStore.sequenceUidLookup[key]) ?? 0
             const y =
               vis.barHeight / 2 +
