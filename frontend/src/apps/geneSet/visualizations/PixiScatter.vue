@@ -629,6 +629,11 @@ export default {
                         if (
                             line.sourceSequenceUid === sequence_uid 
                         ) {
+
+                            // Move the hovered line to the end of the container for rendering on top
+                            this.linesContainer.removeChild(line);
+                            this.linesContainer.addChild(line);
+
                             line.clear();
                             line.moveTo(line.startX, line.startY);
                             line.quadraticCurveTo(
