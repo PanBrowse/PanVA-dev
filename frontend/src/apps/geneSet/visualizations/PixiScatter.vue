@@ -645,7 +645,7 @@ export default {
                             line.stroke({
                                 width: line.linkCount/5 || 1,
                                 color: 0xb674e8, // Highlight color
-                                alpha: 1, // Full opacity for highlighted lines
+                                alpha: 0.7, // Full opacity for highlighted lines
                             });
                             
                         }
@@ -994,8 +994,11 @@ export default {
       this.spritesContainer.children.forEach((sprite) => {
         if (!sprite.sequence_uid) return; // Skip if the sprite doesn't have a sequence_uid
 
+        const geneCount = this.genomeStore.sequenceToLociGenesLookup.get(sprite.sequence_uid)
+                  ?.genes.length || 1
+
         // Create a tooltip for the sprite
-        const tooltipText = new PIXI.Text({text: sprite.sequence_id, style:{
+        const tooltipText = new PIXI.Text({text: sprite.sequence_id+' | '+geneCount+' genes', style:{
           fontFamily: 'Arial',
           fontSize: 12 * window.devicePixelRatio * this.viewport.scale.x,
           fill: 0x000000, 
