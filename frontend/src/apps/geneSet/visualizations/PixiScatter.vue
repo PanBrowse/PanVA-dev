@@ -643,7 +643,7 @@ export default {
                                 line.endY
                             );
                             line.stroke({
-                                width: line.aggregatedWidth || 1,
+                                width: line.linkCount/5 || 1,
                                 color: 0xb674e8, // Highlight color
                                 alpha: 1, // Full opacity for highlighted lines
                             });
@@ -667,7 +667,7 @@ export default {
                             line.endY
                         );
                         line.stroke({
-                            width: line.aggregatedWidth || 1, // Default width
+                            width: line.linkCount/5|| 1, // Default width
                             color: 0xd3d3d3, // Default color
                             alpha: 0.7, // Default opacity
                         });
@@ -849,10 +849,11 @@ export default {
             this.connectionGraphics = new PIXI.Graphics();
             this.connectionGraphics.moveTo(sourceX, sourceY);
             this.connectionGraphics.quadraticCurveTo(controlX, controlY, targetX, targetY);
-            this.connectionGraphics.stroke({ width: 1, color: 0xd3d3d3, alpha: 0.7 });
+            this.connectionGraphics.stroke({ width: totalMetric/5, color: 0xd3d3d3, alpha: 0.7 });
             
             this.connectionGraphics.sourceSequenceUid = sourceSprite.sequence_uid;
             this.connectionGraphics.targetSequenceUid = targetSprite.sequence_uid;
+            this.connectionGraphics.linkCount = totalMetric;
 
             this.connectionGraphics.startX = sourceX;
             this.connectionGraphics.startY = sourceY;
