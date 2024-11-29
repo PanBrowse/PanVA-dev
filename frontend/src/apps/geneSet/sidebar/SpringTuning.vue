@@ -45,7 +45,7 @@ export default {
 </script>
 
 <template>
-  <SidebarItem title="Spring settings">
+  <SidebarItem title="Spring Settings">
     <AForm
       layout="horizontal"
       :labelCol="{ span: 8 }"
