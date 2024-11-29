@@ -133,12 +133,12 @@ export default defineComponent({
   <Layout v-if="isInitialized && isInitializedGenome">
     <template #sidebar>
       <OverviewFilters />
-      <Filters />
+      <!-- <Filters /> -->
       <Sorting />
       <SpringTuning />
       <GraphicsOptions />
-      <ContextOptions />
-      <Unphased />
+      <!-- <ContextOptions /> -->
+      <!-- <Unphased /> -->
     </template>
 
     <!-- Row 1: PixiCanvas Visualization -->
