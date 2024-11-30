@@ -25,10 +25,17 @@ import * as PIXI from 'pixi.js'
 import seedrandom from 'seedrandom'
 import { UMAP } from 'umap-js'
 import { DistanceFn } from 'umap-js/dist/umap'
+import { Viewport } from 'pixi-viewport'
 import { defineComponent, onMounted, ref, watch } from 'vue'
 
 import { lasso } from '@/components/Lasso.js'
 import { useGenomeStore } from '@/stores/geneSet'
+
+const globalSelectedSprites = ref<string[]>([])
+// to-do: need to use these again:
+const circleTexture = ref<PIXI.Texture>()
+const lassoInstance = ref<lasso>()
+
 
 // PIXI.Sprite.prototype.getBoundingClientRect = function () {
 
@@ -173,7 +180,6 @@ export default defineComponent({
   },
   setup(props) {
     const genomeStore = useGenomeStore()
-
     const selectedGeneUids = ref<string[]>([])
 
     // Fetch default selection on mount if it's already set in the store
@@ -210,6 +216,10 @@ export default defineComponent({
     this.$nextTick(async () => {
       try {
         const genomeStore = this.genomeStore
+        const isShiftPressed = ref(false)
+        this.isShiftPressed = isShiftPressed
+        console.log(isShiftPressed.value)
+        const focusContainer = this.$refs.focusContainer;
 
         //////////////// when using UMAP-js ///////////////////////////////
         // const seed = 42
@@ -241,21 +251,74 @@ export default defineComponent({
           width: window.innerWidth,
           height: window.innerHeight,
           backgroundColor: 0xffffff,
-          // resolution: window.devicePixelRatio || 1,
+          resolution: 3,
+          autoResize: true,
+          autoDensity: true,
           antialias: true,
           canvas: this.$refs.pixi,
           resizeTo: this.$refs.view, // or window
         })
+
+        // Create the viewport
+        const viewport = new Viewport({
+          screenWidth: window.innerWidth,
+          screenHeight: window.innerHeight,
+          worldWidth: 2000, // Adjust this value to fit your data
+          worldHeight: 2000,
+          autoResize: true,
+          resolution: 3,
+          canvas: this.$refs.pixi,
+          resizeTo: this.$refs.view,
+          events: app.renderer.events,
+        })
+        this.viewport = viewport
+
+
+        // Add the viewport to the PIXI stage
+        app.stage.addChild(this.viewport)
+        console.log('Viewport added to stage:', this.viewport)
+
+        this.viewport.interactive = true
+        this.viewport.sortableChildren = true; 
+
+        this.viewport.drag({
+          pressDrag: false, // Enables dragging
+        })
+
+        // Enable viewport plugins
+        this.viewport.wheel().decelerate() // Enable mouse wheel zoom and panning
+
 
         const foregroundContainer = new PIXI.Container()
         const circleContainer = new PIXI.Container({
           isRenderGroup: true, // Enable GPU-accelerated rendering
         })
 
+
+        // Create a container for connection lines
+        const linesContainer = new PIXI.Container();
+        linesContainer.zIndex = 0; // Lowest layer for connections
+        this.viewport.addChild(linesContainer); // Add the lines container to the viewport
+        this.linesContainer = linesContainer;
+
+        // Create a container for sprites
+        const spritesContainer = new PIXI.Container();
+        spritesContainer.zIndex = 1; // Above lines
+        this.viewport.addChild(spritesContainer); // Add the sprites container to the viewport
+        this.spritesContainer = spritesContainer
+
+        const tooltipContainer = new PIXI.Container();
+        tooltipContainer.zIndex = 2; // Above sprites and lines, below lasso
+        tooltipContainer.interactive = false;
+        tooltipContainer.interactiveChildren = false;
+        this.viewport.addChild(tooltipContainer);
+        this.tooltipContainer = tooltipContainer;
+
         this.foregroundContainer = foregroundContainer
         this.circleContainer = circleContainer
 
-        this.renderEmbedding(embedding)
+        // this.renderEmbedding(embedding)
+        this.drawEmbedding(embedding)
 
          // Add watcher for selectedSequencesLasso
          this.$watch(
@@ -286,7 +349,8 @@ export default defineComponent({
 
             // genomeStore.selectedSequencesLasso = [];
 
-            this.renderEmbedding(newEmbedding)
+            // this.renderEmbedding(newEmbedding)
+            this.drawEmbedding(embedding)
           },
           { immediate: true, deep: true }
         )
@@ -307,6 +371,144 @@ export default defineComponent({
     })
   },
   methods: {
+    drawEmbedding(embedding){
+
+      // Ensure spritesContainer is created
+      if (!this.spritesContainer) {
+        this.spritesContainer = new PIXI.Container();
+        this.viewport.addChild(this.spritesContainer); // Add spritesContainer to the viewport
+      }
+
+        // Clear the spritesContainer
+        this.spritesContainer.removeChildren();
+
+      if (!this.viewport) {
+        console.error("Viewport is not initialized.");
+        return;
+      }
+
+      const app = this.app
+      // const circleContainer = this.circleContainer
+      const devicePixelRatio = window.devicePixelRatio || 1
+      const padding = 10
+      const circleRadius = 5 * devicePixelRatio
+      const zoomLevel = this.viewport.scale.x
+      const resolution = window.devicePixelRatio * zoomLevel
+
+      // Create the circle texture
+      const { texture, totalRadius } = this.createCircleTextureNew(circleRadius, resolution, 0.5)
+      circleTexture.value = texture
+
+      // Check and log canvas size
+      const canvas = this.app.canvas
+      console.log('Initial Canvas Size:', canvas.width, 'x', canvas.height)
+
+      // Set the canvas size dynamically
+      this.resizeWindow(this.app)
+
+      // Get canvas dimensions
+      const canvasWidth = app.renderer.width
+      const canvasHeight = app.renderer.height
+
+      // Calculate the min and max values for x and y in the embedding
+      const xValues = embedding.map(([x]) => x)
+      const yValues = embedding.map(([, y]) => y)
+      const minX = Math.min(...xValues)
+      const maxX = Math.max(...xValues)
+      const minY = Math.min(...yValues)
+      const maxY = Math.max(...yValues)
+
+      // Calculate scaling factors based on the canvas size, accounting for padding
+      const scaleX = (canvasWidth - 10 * padding) / (maxX - minX)
+      const scaleY = (canvasHeight - 10 * padding) / (maxY - minY)
+      const scale = Math.min(scaleX, scaleY) // Use the smaller scale to maintain aspect ratio
+
+      // Determine the labels based on filterEmpty
+      const labels = this.genomeStore.filterEmpty
+        ? this.createReverseLookup(
+            this.genomeStore.distanceMatrixLabelsFiltered
+          )
+        : this.createReverseLookup(this.genomeStore.distanceMatrixLabels)
+
+      embedding.forEach(([x, y], index) => {
+        const scaledX = (x - minX) * scale + padding
+        const scaledY = (y - minY) * scale + padding
+
+        this.drawSequenceSprite(scaledX, scaledY, index, labels)
+
+      })
+
+
+      this.app.render()
+
+      //  Reinitialize the lasso
+      this.initializeLasso(canvas)
+
+    },
+    createCircleTextureNew(circleRadius, resolution, borderThickness) {
+      const res =
+        Math.max(1, window.devicePixelRatio) * (this.viewport?.scale.x || 1)
+      // console.log('Generating texture with resolution:', res)
+
+      // Adjust circle radius based on the zoom level to keep it constant
+      const adjustedRadius = circleRadius / (this.viewport?.scale.x || 1);
+      const adjustedBorderThickness = borderThickness * devicePixelRatio / (this.viewport?.scale.x || 1);
+
+      // console.log('Adjusted circle radius:', adjustedRadius);
+      // console.log('Adjusted border thickness:', adjustedBorderThickness);
+
+
+      // Use PIXI.Graphics to draw a circle
+      const graphics = new PIXI.Graphics()
+
+      // Draw border and circle
+      // const borderRadius = adjustedRadius + 0.5 * devicePixelRatio;
+      const borderRadius = adjustedRadius + adjustedBorderThickness;
+      const totalRadius = borderRadius;
+      // const totalRadius = Math.max(borderRadius, adjustedRadius);
+      const borderColor = 0x000000; // Black border
+      graphics.circle(totalRadius, totalRadius, borderRadius)
+      graphics.fill(borderColor)
+      graphics.circle(totalRadius, totalRadius, adjustedRadius)
+      graphics.fill(0xffffff)
+
+      // Draw border and cicle
+      // const borderRadius = circleRadius + 0.5 * devicePixelRatio
+      // const totalRadius =
+      //   borderRadius > circleRadius ? borderRadius : circleRadius
+      // const borderColor = 0x000000
+      // graphics.circle(totalRadius, totalRadius, borderRadius)
+      // graphics.fill(borderColor)
+      // // Draw the circle
+      // graphics.circle(totalRadius, totalRadius, circleRadius)
+      // graphics.fill(0xffffff)
+
+      // // Generate a texture from the Graphics object
+      // // const resolution = 10 * this.viewport.scale.x
+      // const texture = this.app.renderer.generateTexture(graphics, {
+      //   resolution: window.devicePixelRatio * (this.viewport?.scale.x || 1),
+      // })
+      // // texture.baseTexture.update();
+      // console.log('Base texture resolution:', texture.source.resolution, this.viewport?.scale.x);
+      // return texture
+      // Create a render texture for the circle
+      const renderTexture = PIXI.RenderTexture.create({
+        // width: circleRadius * 2.5,
+        // height: circleRadius * 2.5,
+        width: totalRadius * 2, // Adjust for border and padding
+        height: totalRadius * 2,
+        resolution: Math.max(
+          2,
+          window.devicePixelRatio * this.viewport.scale.x
+        ), // Adjust resolution based on zoom
+      })
+
+      // Render the graphics to the texture
+      this.app.renderer.render(graphics, {renderTexture})
+
+      // Return both the texture and totalRadius
+      return { texture: renderTexture, totalRadius };
+    },
     renderEmbedding(embedding) {
       console.log('Rendering embedding:', embedding)
 
@@ -445,6 +647,42 @@ export default defineComponent({
       }
 
       return reverseLookup
+    },
+    drawSequenceSprite(x, y, index, labels) {
+      const circleSprite = new PIXI.Sprite(circleTexture.value);
+
+      
+
+      // Check if this sequence is part of the selectedSequencesLasso
+      const isSelected = this.genomeStore.selectedSequencesLasso.includes(labels[index]);
+      circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3; // Blue if selected, gray otherwise
+      circleSprite.alpha = 0.5;
+      circleSprite.index = index
+      circleSprite.sequence_uid = labels[index]
+
+      circleSprite.sequence_id = labels[index]
+
+      circleSprite.x = x;
+      circleSprite.originalX = x;
+      circleSprite.y = y;
+
+      circleSprite.interactive = true;
+
+
+   
+      //  // Add interactivity for tooltip and highlighting
+      //   circleSprite.on('mouseover', () => {
+      //     this.highlightLinks(circleSprite.sequence_uid, true); // Highlight links
+      //   });
+
+      //   circleSprite.on('mouseout', () => {
+      //     this.highlightLinks(circleSprite.sequence_uid, false); // Reset links
+      //   });
+
+
+      // this.viewport.addChild(circleSprite);
+      // Add the sprite to spritesContainer
+      this.spritesContainer.addChild(circleSprite);
     },
     createSprites(
       x: number,

@@ -1,10 +1,3 @@
-<!-- <template>
-  <div class="child-container" ref="view">
-    <canvas ref="pixi"></canvas>
-    <svg ref="lasso"><g class="lasso"></g></svg>
-  </div>
-</template> -->
-
 <template>
   <ACard
     title="Grid Overview"
