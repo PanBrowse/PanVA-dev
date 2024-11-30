@@ -468,7 +468,7 @@ export default {
 
         // app.stage.addChild(foregroundContainer)
 
-        // Watch for embedding changes
+        // Watch for filterEmpty changes
         this.$watch(
           () => this.genomeStore.filterEmpty,
           (value) => {
@@ -1892,5 +1892,9 @@ svg {
 
 .not-selected {
   opacity: 0.3; /* Dim items that are not selected */
+}
+
+canvas {
+  outline: none; /* Removes blue border on focus */
 }
 </style>
