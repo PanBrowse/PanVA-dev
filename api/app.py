@@ -39,6 +39,13 @@ DATASET_CONFIG = {
         "labels": os.path.join(db_path, "geneSet", "rose", "protein_distance_labels.json"),
         "distance_matrix": os.path.join(db_path, "geneSet", "rose", "protein_distance_matrix.npy"),
     },
+       "rose_myb114": {
+        "embedding_filtered": os.path.join(db_path, "geneSet", "rose_myb114", "filtered_embedding_rose_myb114_neighbors2_minDist0.2_seed42.json"),
+        "embedding": os.path.join(db_path, "geneSet", "rose_myb114", "embedding_rose_myb114_neighbors200_minDist0.3_seed42.json"),
+        "labels_filtered": os.path.join(db_path, "geneSet", "rose_myb114", "filtered_protein_distance_labels.json"),
+        "labels": os.path.join(db_path, "geneSet", "rose_myb114", "protein_distance_labels.json"),
+        "distance_matrix": os.path.join(db_path, "geneSet", "rose_myb114", "protein_distance_matrix.npy"),
+    },
     "yeast": {
         "embedding_filtered": os.path.join(db_path, "geneSet", "yeast", "filtered_embedding_yeast_neighbors2_minDist0.1_seed42.json"),
         "embedding": os.path.join(db_path, "geneSet", "yeast", "embedding_neighbors10_minDist0.1_seed42.json"),
