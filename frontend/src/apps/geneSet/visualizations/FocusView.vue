@@ -381,7 +381,7 @@ export default {
       newDrawingIndices,
       selectedGeneUids,
       geneToLocusSequenceLookup,
-      filteredSegments
+      filteredSegments,
       }
   },
   data: () => ({
@@ -1112,6 +1112,8 @@ export default {
       let vis = this
 
       const updatedDrawIndices = Array.from(this.newDrawingIndices).map(([key, value]) => value);
+      const hoveredSequence = this.genomeStore.hoveredSequence; // Get hoveredSequence from the store
+
 
       if (this.filteredSequences === undefined) {
         return
@@ -1138,6 +1140,10 @@ export default {
               )
 
               .attr('dy', -this.barHeight / 2)
+              .attr('fill', (d) => (d.uid === hoveredSequence ? '#FFA500' : '#c0c0c0')) // Orange if hovered, black otherwise
+              .attr('font-weight', (d) => (d.uid === hoveredSequence ? 'bold' : 'normal')) // Bold if hovered
+              // .classed('highlight', (d) => d.uid === hoveredSequence) // Add 'highlight' class if hovered
+
               .text(
                 (d, i) =>
                   getSequenceIdByUid(
@@ -1147,12 +1153,31 @@ export default {
                     ][0]
                   ) ?? 'undefined' //provide default undefined label if undefined
               ),
+              
 
           (update) =>
             update
               .transition()
               .duration(this.transitionTime)
-              .attr('y', (d, i) => updatedDrawIndices[i] * (this.barHeight + 10)),
+              .attr('fill', (d) => (d.uid === hoveredSequence ? '#FFA500' : '#c0c0c0')) // Orange if hovered, black otherwise
+              .attr('font-weight', (d) => (d.uid === hoveredSequence ? 'bold' : 'normal')) // Bold if hovered
+              .attr('y', (d, i) => updatedDrawIndices[i] * (this.barHeight + 10))
+              .on('end', function (d) {
+                d3.select(this)
+                  .on('mouseenter', (event, d) => {
+                    // Update the store's hoveredSequence with the current sequence UID
+                    vis.genomeStore.hoveredSequence = d.uid; // Assuming you're using Pinia and have access to the store
+                  })
+                  .on('mouseleave', () => {
+                    // Clear the hoveredSequence when the mouse leaves
+                    vis.genomeStore.hoveredSequence = null;
+                  });
+              }),
+              // .on('end', function (d) {
+              //   // Add the class conditionally after the transition ends
+              //   d3.select(this).classed('highlight', d.uid === hoveredSequence);
+              // }),
+                
           (exit) => exit.remove()
         )
     },
@@ -1833,6 +1858,14 @@ export default {
       deep: true,
       immediate: true,
     },
+    'genomeStore.hoveredSequence': {
+      handler(newVal) {
+        console.log('Hovered sequence updated:', newVal);
+        this.addLabels(); 
+      },
+      deep: true,
+      immediate: true,
+    },
     mappedIndices: {
       handler(newVal) {
         console.log('mappedIndices updated:', newVal)
@@ -1993,9 +2026,16 @@ export default {
 }
 
 .label-seq {
-  fill: #c0c0c0;
   font-size: 12;
   font-family: sans-serif;
+  // fill: #c0c0c0
+}
+
+
+.label-seq.highlight {
+  font-weight: bold;
+  text-shadow: 1px 1px 2px orange, 0 0 1em orange;
+ 
 }
 
 .asterisk {
