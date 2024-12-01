@@ -769,70 +769,66 @@ export default defineComponent({
       });
 
       if (useAggregateLinks) {
-        // Aggregate connections by source-target pairs
-        const aggregatedLinks = new Map();
+        const sequenceOrder = this.genomeStore.sequenceHomologyMatrixlabels;
+        const homologyMatrix = this.genomeStore.sequenceHomologyMatrix;
 
-        Object.entries(spriteLinks).forEach(([sourceUid, links]) => {
-            links.forEach((link) => {
-                const targetUid = link.targetUid;
-                const key = sourceUid < targetUid
-                    ? `${sourceUid}-${targetUid}`
-                    : `${targetUid}-${sourceUid}`; // Ensure unique key for source-target pairs
+        // Iterate over the matrix
+        for (let i = 0; i < sequenceOrder.length; i++) {
+          for (let j = i + 1; j < sequenceOrder.length; j++) { // Upper triangle only
+            const sourceUid = sequenceOrder[i];
+            const targetUid = sequenceOrder[j];
+            const sharedCount = homologyMatrix[i][j];
 
-                if (!aggregatedLinks.has(key)) {
-                    aggregatedLinks.set(key, {
-                        sourceUid,
-                        targetUid,
-                        totalMetric: 0, // Store the sum of metrics
-                    });
-                }
+            if (sharedCount > 0) {
+              const sourceSprite = spriteMap.get(sourceUid);
+              const targetSprite = spriteMap.get(targetUid);
+              if (!sourceSprite || !targetSprite) continue;
 
-                // Increment the totalMetric with the current link's identity (or other metric)
-                aggregatedLinks.get(key).totalMetric += 1; // Use `identity` as the metric
+              const sourceX = sourceSprite.x + sourceSprite.totalRadius;
+              const sourceY = sourceSprite.y + sourceSprite.totalRadius;
+              const targetX = targetSprite.x + targetSprite.totalRadius;
+              const targetY = targetSprite.y + targetSprite.totalRadius;
 
+              // Calculate control point for curvature
+              const controlX = (sourceX + targetX) / 2 + (targetY - sourceY) * 0.2;
+              const controlY = (sourceY + targetY) / 2 + (sourceX - targetX) * 0.2;
 
-            });
-        });
+              // Normalize line width directly based on sharedCount
+              const normalizedWidth = Math.max(sharedCount / 5, 1); // Ensure minimum width
 
-        // Draw aggregated connections
-        aggregatedLinks.forEach(({ sourceUid, targetUid, totalMetric }) => {
-            const sourceSprite = spriteMap.get(sourceUid);
-            const targetSprite = spriteMap.get(targetUid);
-            if (!sourceSprite || !targetSprite) return;
+              // Draw the line
+              const connectionGraphics = new PIXI.Graphics();
+              connectionGraphics.moveTo(sourceX, sourceY);
+              connectionGraphics.quadraticCurveTo(
+                controlX,
+                controlY,
+                targetX,
+                targetY
+              );
+              connectionGraphics.stroke({
+                width: normalizedWidth,
+                color: 0xd3d3d3,
+                alpha: 0.7,
+              });
 
-            const sourceX = sourceSprite.x + sourceSprite.totalRadius;
-            const sourceY = sourceSprite.y + sourceSprite.totalRadius;
-            const targetX = targetSprite.x + targetSprite.totalRadius;
-            const targetY = targetSprite.y + targetSprite.totalRadius;
+              // Add metadata for interaction/debugging
+              connectionGraphics.sourceSequenceUid = sourceUid;
+              connectionGraphics.targetSequenceUid = targetUid;
+              connectionGraphics.linkCount = sharedCount;
 
-            // Calculate control point for curvature
-            const controlX = (sourceX + targetX) / 2 + (targetY - sourceY) * 0.2;
-            const controlY = (sourceY + targetY) / 2 + (sourceX - targetX) * 0.2;
+              connectionGraphics.startX = sourceX;
+              connectionGraphics.startY = sourceY;
+              connectionGraphics.controlX = controlX;
+              connectionGraphics.controlY = controlY;
+              connectionGraphics.endX = targetX;
+              connectionGraphics.endY = targetY;
 
-            // Normalize line width directly as the sum of metrics
-            const normalizedWidth = Math.max(totalMetric, 1); // Ensure minimum width
-
-            // Draw the line
-            this.connectionGraphics = new PIXI.Graphics();
-            this.connectionGraphics.moveTo(sourceX, sourceY);
-            this.connectionGraphics.quadraticCurveTo(controlX, controlY, targetX, targetY);
-            this.connectionGraphics.stroke({ width: totalMetric/5, color: 0xd3d3d3, alpha: 0.7 });
-            
-            this.connectionGraphics.sourceSequenceUid = sourceSprite.sequence_uid;
-            this.connectionGraphics.targetSequenceUid = targetSprite.sequence_uid;
-            this.connectionGraphics.linkCount = totalMetric;
-
-            this.connectionGraphics.startX = sourceX;
-            this.connectionGraphics.startY = sourceY;
-            this.connectionGraphics.controlX = controlX;
-            this.connectionGraphics.controlY = controlY;
-            this.connectionGraphics.endX = targetX;
-            this.connectionGraphics.endY = targetY;
-
-            // Add to the lines container
-            this.linesContainer.addChild(this.connectionGraphics);
-        });
-        console.log('aggregatedLinks', aggregatedLinks)
+              // Add to the lines container
+              this.linesContainer.addChild(connectionGraphics);
+              }
+            }
+          }
+      
       } else {
 
       // Draw connections based on homology links
@@ -898,7 +894,7 @@ export default defineComponent({
         if (sprite.sequence_uid === sequence_uid) {
             if (isHovered) {
                 console.log('hovered', sprite.sequence_id, sprite.sequence_name);
-                this.showTooltip(sprite);
+                // this.showTooltip(sprite);
                 
 
                 if (this.viewport.scale.x > 0.5) {
@@ -906,7 +902,7 @@ export default defineComponent({
                       console.log(this.linesContainer.children)
                         // Highlight lines connected to the hovered sprite
                         if (
-                            line.sourceSequenceUid === sequence_uid 
+                            line.sourceSequenceUid === sequence_uid || line.targetSequenceUid === sequence_uid
                         ) {
 
                             // Move the hovered line to the end of the container for rendering on top
@@ -922,7 +918,7 @@ export default defineComponent({
                                 line.endY
                             );
                             line.stroke({
-                                width: line.linkCount/5 || 1,
+                                width: line.linkCount || 1,
                                 color: 0xb674e8, // Highlight color
                                 alpha: 0.7, // Full opacity for highlighted lines
                             });
@@ -933,8 +929,8 @@ export default defineComponent({
             } else {
                 // Hide the tooltip when not hovered
                 // this.hideTooltip(sequence_uid);
-                this.tooltipContainer.removeChildren(); // Clear previous connection
-                this.app.render();
+                // this.tooltipContainer.removeChildren(); // Clear previous connection
+                // this.app.render();
 
                 if (this.viewport.scale.x > 0.5) {
                     this.linesContainer.children.forEach((line) => {

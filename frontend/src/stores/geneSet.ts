@@ -79,6 +79,9 @@ export const useGenomeStore = defineStore({
     sequencePositions: {},
     sequenceHomologyLinks: {},
     sequencePropertiesLookup: new Map<string, any>(),
+    sequenceToHomologyGroupLookup: new Map<string, string[]>(),
+    sequenceHomologyMatrix: [] as number[][],
+    sequenceHomologyMatrixlabels: [] as string[],
 
     // Clustering
     linkage: 3,
@@ -178,6 +181,68 @@ export const useGenomeStore = defineStore({
       }
 
       return positions;
+    },
+    generateSequenceToHomologyGroupLookup() {
+      const lookup = new Map<string, string[]>();
+  
+      this.genomeData.genes.forEach((gene) => {
+        const sequenceUid = this.geneToLocusSequenceLookup.get(gene.uid)?.sequence;
+        if (!sequenceUid) return;
+  
+        const homologyGroupUids = gene.homology_groups.map((group) => group.uid);
+        if (!lookup.has(sequenceUid)) {
+          lookup.set(sequenceUid, []);
+        }
+        // Merge the homology groups into the sequence key
+        lookup.set(sequenceUid, [...new Set([...lookup.get(sequenceUid), ...homologyGroupUids])]);
+      });
+  
+      this.sequenceToHomologyGroupLookup = lookup;
+      console.log("Sequence to Homology Group Lookup:", this.sequenceToHomologyGroupLookup);
+
+    },
+    generateSequenceHomologyMatrix() {
+      const sequenceUids = Array.from(this.sequenceToHomologyGroupLookup.keys());
+     
+
+      const matrixSize = sequenceUids.length;
+  
+      // Initialize an empty matrix
+      const matrix = Array.from({ length: matrixSize }, () =>
+        Array(matrixSize).fill(0)
+      );
+  
+      // Populate the matrix with counts of shared homology groups
+      for (let i = 0; i < matrixSize; i++) {
+        for (let j = i; j < matrixSize; j++) {
+          const sequenceA = sequenceUids[i];
+          const sequenceB = sequenceUids[j];
+  
+          const homologyGroupsA = new Set(
+            this.sequenceToHomologyGroupLookup.get(sequenceA) || []
+          );
+          const homologyGroupsB = new Set(
+            this.sequenceToHomologyGroupLookup.get(sequenceB) || []
+          );
+  
+          // Calculate intersection
+          const sharedGroups = [...homologyGroupsA].filter((group) =>
+            homologyGroupsB.has(group)
+          );
+  
+          const sharedCount = sharedGroups.length;
+  
+          // Update the matrix for both [i, j] and [j, i]
+          matrix[i][j] = sharedCount;
+          matrix[j][i] = sharedCount;
+        }
+      }
+  
+      // Store the matrix in the state
+      this.sequenceHomologyMatrix = matrix;
+      this.sequenceHomologyMatrixlabels = sequenceUids;
+      console.log("Sequence Homology Matrix:", this.sequenceHomologyMatrix);
+      console.log("Sequence Order:", this.sequenceHomologyMatrixlabels);
     },
     async loadGenomeData() {
       const global = useGlobalStore();
@@ -290,7 +355,11 @@ export const useGenomeStore = defineStore({
         });
         throw error;
       }
+
       this.generateSequenceHomologyLinks();
+      this.generateSequenceToHomologyGroupLookup();
+      this.generateSequenceHomologyMatrix();
+
 
       this.initializeSelectedSequencesLasso();
 
