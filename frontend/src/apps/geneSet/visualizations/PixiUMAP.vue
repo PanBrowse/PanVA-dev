@@ -315,13 +315,17 @@ export default defineComponent({
         tooltipContainer.interactiveChildren = false;
         this.viewport.addChild(tooltipContainer);
         this.tooltipContainer = tooltipContainer;
+   
+
+
+
 
         this.foregroundContainer = foregroundContainer
         this.circleContainer = circleContainer
 
         // this.renderEmbedding(embedding)
         this.drawEmbedding(embedding);
-        this.drawTooltips();
+        // this.drawTooltips();
 
         const onFocusCanvas = () => {
           console.log('UMAP Canvas focused, keyboard events will be captured')
@@ -448,6 +452,8 @@ export default defineComponent({
               sprite.x = sprite.originalX * spacingFactor; // `originalX` holds the base position
             }
           });
+
+          
           this.app.render()
         
           // if (zoomLevel>2){
@@ -605,6 +611,7 @@ export default defineComponent({
       const circleRadius = 5 * devicePixelRatio
       const zoomLevel = this.viewport.scale.x
       const resolution = window.devicePixelRatio * zoomLevel
+      
 
       // Create the circle texture
       const { texture, totalRadius } = this.createCircleTextureNew(circleRadius, resolution, 0.5)
@@ -641,11 +648,15 @@ export default defineComponent({
           )
         : this.createReverseLookup(this.genomeStore.distanceMatrixLabels)
 
+      const sequencePropertiesLookup = this.genomeStore.sequencePropertiesLookup
+
+
       embedding.forEach(([x, y], index) => {
         const scaledX = (x - minX) * scale + padding
         const scaledY = (y - minY) * scale + padding
 
-        this.drawSequenceSprite(scaledX, scaledY, index, labels)
+
+        this.drawSequenceSprite(scaledX, scaledY, index, labels, sequencePropertiesLookup)
 
       })
 
@@ -676,13 +687,15 @@ export default defineComponent({
         const geneCount = this.genomeStore.sequenceToLociGenesLookup.get(sprite.sequence_uid)
                   ?.genes.length || 1
 
-        // Create a tooltip for the sprite
-        const tooltipText = new PIXI.Text({text: 'label', style:{
+        const textStyle = new PIXI.TextStyle({
           fontFamily: 'Arial',
-          fontSize: 12 * window.devicePixelRatio * this.viewport.scale.x,
-          fill: 0x000000, 
+          fontSize: 12, // Ensure this is a valid number
+          fill: 0x000000, // Hex color or valid CSS color string
           align: 'center',
-        }});
+        });
+
+        // Create a tooltip for the sprite
+        const tooltipText = new PIXI.Text({text: sprite.sequence_id, style: textStyle});
 
         tooltipText.x = sprite.x + 15;
         tooltipText.y = sprite.y
@@ -707,6 +720,7 @@ export default defineComponent({
 
         // Add the tooltip to the tooltipContainer
         // this.tooltipContainer.addChild(tooltipBackground);
+
         this.tooltipContainer.addChild(tooltipText);
 
       });
@@ -883,8 +897,8 @@ export default defineComponent({
       this.spritesContainer.children.forEach((sprite) => {
         if (sprite.sequence_uid === sequence_uid) {
             if (isHovered) {
-                console.log('hovered', this.tooltipContainer.children);
-                // this.showTooltip(sequence_uid);
+                console.log('hovered', sprite.sequence_id, sprite.sequence_name);
+                this.showTooltip(sprite);
                 
 
                 if (this.viewport.scale.x > 0.5) {
@@ -919,6 +933,8 @@ export default defineComponent({
             } else {
                 // Hide the tooltip when not hovered
                 // this.hideTooltip(sequence_uid);
+                this.tooltipContainer.removeChildren(); // Clear previous connection
+                this.app.render();
 
                 if (this.viewport.scale.x > 0.5) {
                     this.linesContainer.children.forEach((line) => {
@@ -944,20 +960,30 @@ export default defineComponent({
       });
       this.app.render();
     },
-    showTooltip(sequence_uid) {
+    showTooltip(sprite) {
+
+      this.tooltipContainer.removeChildren(); // Clear previous connections
+
+      const tooltipTextDebug = new PIXI.Text({text: sprite.sequence_id +' | '+ sprite.sequence_name});
+      tooltipTextDebug.x = sprite.x + 15;
+      tooltipTextDebug.y = sprite.y - 15
+      tooltipTextDebug.visible = false;
+
+      this.tooltipContainer.addChild(tooltipTextDebug)
       
       // Find the related text and background tooltips in the tooltipContainer
-      const tooltipText = this.tooltipContainer.children.find(
-        (child) => child.sequence_uid === sequence_uid
-      );
+      // const tooltipText = this.tooltipContainer.children.find(
+      //   (child) => child.sequence_uid === sequence_uid
+      // );
 
       // const tooltipBackground = this.tooltipContainer.children.find(
       //   (child) => child.sequence_uid === sequence_uid && child instanceof PIXI.Graphics
       // );
 
     // Set both text and background to visible, if they exist
-    if (tooltipText){
-      tooltipText.visible = true;
+    if (tooltipTextDebug){
+       tooltipTextDebug.scale.set(1 / this.viewport.scale.x);
+      tooltipTextDebug.visible = true;
 
       // tooltipBackground.visible = true;
 
@@ -967,23 +993,23 @@ export default defineComponent({
     } else {
       console.warn(`Tooltip for sequence_uid ${sequence_uid} not found.`);
     }
-
-    this.app?.render()
+    this.app.render
 
   },
   hideTooltip(sequence_uid) {
-    // Find the tooltip in the tooltipContainer
-    const tooltip = this.tooltipContainer.children.find(
-      (child) => child.sequence_uid === sequence_uid
-    );
+    // // Find the tooltip in the tooltipContainer
+    // const tooltip = this.tooltipContainer.children.find(
+    //   (child) => child.sequence_uid === sequence_uid
+    // );
 
-    // If tooltip exists, set it to invisible
-    if (tooltip) {
-      tooltip.visible = false;
-      console.log(`Tooltip for sequence_uid ${sequence_uid} is now hidden.`);
-    } else {
-      console.warn(`Tooltip for sequence_uid ${sequence_uid} not found.`);
-    }
+    // // If tooltip exists, set it to invisible
+    // if (tooltip) {
+    //   tooltip.visible = false;
+    //   console.log(`Tooltip for sequence_uid ${sequence_uid} is now hidden.`);
+    // } else {
+    //   console.warn(`Tooltip for sequence_uid ${sequence_uid} not found.`);
+    // }
+  
   },
     createCircleTextureNew(circleRadius, resolution, borderThickness) {
       const res =
@@ -1251,11 +1277,10 @@ export default defineComponent({
 
       return reverseLookup
     },
-    drawSequenceSprite(x, y, index, labels) {
+    drawSequenceSprite(x, y, index, labels, sequencePropertiesLookup) {
       const circleSprite = new PIXI.Sprite(circleTexture.value);
 
-      
-
+ 
       // Check if this sequence is part of the selectedSequencesLasso
       const isSelected = this.genomeStore.selectedSequencesLasso.includes(labels[index]);
       circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3; // Blue if selected, gray otherwise
@@ -1263,7 +1288,9 @@ export default defineComponent({
       circleSprite.index = index
       circleSprite.sequence_uid = labels[index]
 
-      circleSprite.sequence_id = labels[index]
+      circleSprite.sequence_name = sequencePropertiesLookup.get(labels[index]).name
+      circleSprite.sequence_id = sequencePropertiesLookup.get(labels[index]).id
+
 
       circleSprite.x = x;
       circleSprite.originalX = x;

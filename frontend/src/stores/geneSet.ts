@@ -78,6 +78,7 @@ export const useGenomeStore = defineStore({
     filteredSequencePositions: {}, // Precomputed positions for filtered sequences
     sequencePositions: {},
     sequenceHomologyLinks: {},
+    sequencePropertiesLookup: new Map<string, any>(),
 
     // Clustering
     linkage: 3,
@@ -183,6 +184,12 @@ export const useGenomeStore = defineStore({
 
       try {
         this.genomeData = await fetchGenomeData();
+
+        // Populate the sequencePropertiesLookup map
+        this.sequencePropertiesLookup = new Map(
+          this.genomeData.sequences.map(sequence => [sequence.uid, sequence])
+        );
+
         this.generateIndicesAndLookup();
         this.sequenceToLociGenesLookup = createSequenceToLociGenesLookup(
           this.genomeData
