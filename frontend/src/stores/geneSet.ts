@@ -46,6 +46,7 @@ export const useGenomeStore = defineStore({
     selectedGenomes: [] as string[],
     selectedSequences: [] as string[],
     selectedSequencesLasso: [] as string[],
+    hoveredSequence: null as string | null,
     selectedGeneUids: [] as string[],
     sequenceToLociGenesLookup: new Map<
       string,
@@ -122,6 +123,9 @@ export const useGenomeStore = defineStore({
     },
   },
   actions: {
+    setHoveredSequence(sequenceUid: string | null) {
+      this.hoveredSequence = sequenceUid;
+    },
     toggleFilterEmpty() {
       this.filterEmpty = !this.filterEmpty;
     },

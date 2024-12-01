@@ -556,6 +556,37 @@ export default defineComponent({
           { immediate: true }
         )
 
+        this.$watch(
+          () => this.genomeStore.hoveredSequence,
+          (newHoveredSequence, oldHoveredSequence) => {
+            // Reset the previously hovered sprite
+            if (oldHoveredSequence) {
+              const oldSprite = this.spritesContainer.children.find(
+                (sprite) => sprite.sequence_uid === oldHoveredSequence
+              );
+              if (oldSprite) {
+                if (this.genomeStore.selectedSequencesLasso.includes(oldSprite.sequence_uid)) {
+                  oldSprite.tint = 0x007bff; // Blue for lasso-selected
+                } else {
+                  oldSprite.tint = 0xd3d3d3; // Default color
+                }
+              }
+            }
+
+            // Highlight the new hovered sprite
+            if (newHoveredSequence) {
+              const newSprite = this.spritesContainer.children.find(
+                (sprite) => sprite.sequence_uid === newHoveredSequence
+              );
+              if (newSprite) {
+                newSprite.tint = 0xFF8C00; // Highlight color for hovered
+              }
+            }
+
+            this.app.render();
+          }
+        );
+
         // Watch for embedding changes
         this.$watch(
           () => this.embedding,
@@ -895,7 +926,6 @@ export default defineComponent({
             if (isHovered) {
                 // console.log('hovered', sprite.sequence_id, sprite.sequence_name);
                 // this.showTooltip(sprite);
-                
 
                 if (this.viewport.scale.x > 0.5) {
                     this.linesContainer.children.forEach((line) => {
@@ -931,6 +961,7 @@ export default defineComponent({
                 // this.hideTooltip(sequence_uid);
                 // this.tooltipContainer.removeChildren(); // Clear previous connection
                 // this.app.render();
+
 
                 if (this.viewport.scale.x > 0.5) {
                     this.linesContainer.children.forEach((line) => {
@@ -1298,11 +1329,30 @@ export default defineComponent({
    
        // Add interactivity for tooltip and highlighting
         circleSprite.on('mouseover', () => {
+          this.genomeStore.setHoveredSequence(circleSprite.sequence_uid); // Update store
+          circleSprite.tint = 0xFF8C00; // Highlight color for selected
+          // Dim all other sprites
+        this.spritesContainer.children.forEach((sprite) => {
+          if (sprite.sequence_uid !== circleSprite.sequence_uid) {
+              sprite.alpha = 0.3; // Dimmed color for non-hovered
+          }
+          })
           this.highlightLinks(circleSprite.sequence_uid, true); // Highlight links
+          this.app.render()
         });
 
         circleSprite.on('mouseout', () => {
+          this.genomeStore.setHoveredSequence(null);
+          circleSprite.tint = 0xd3d3d3;
+          circleSprite.alpha = 0.5; // Dimmed color for non-hovered
+          this.spritesContainer.children.forEach((sprite) => {
+          if (sprite.sequence_uid !== circleSprite.sequence_uid) {
+              sprite.alpha = 0.5; // Dimmed color for non-hovered
+          }
+          })
+
           this.highlightLinks(circleSprite.sequence_uid, false); // Reset links
+          this.app.render();
         });
 
       // Add interactivity for command/control key + click
