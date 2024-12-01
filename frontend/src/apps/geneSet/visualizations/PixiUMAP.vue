@@ -893,7 +893,7 @@ export default defineComponent({
       this.spritesContainer.children.forEach((sprite) => {
         if (sprite.sequence_uid === sequence_uid) {
             if (isHovered) {
-                console.log('hovered', sprite.sequence_id, sprite.sequence_name);
+                // console.log('hovered', sprite.sequence_id, sprite.sequence_name);
                 // this.showTooltip(sprite);
                 
 
@@ -1305,6 +1305,36 @@ export default defineComponent({
           this.highlightLinks(circleSprite.sequence_uid, false); // Reset links
         });
 
+      // Add interactivity for command/control key + click
+      circleSprite.on('pointerdown', (event) => {
+        if (event.originalEvent.metaKey || event.originalEvent.ctrlKey) {
+          console.log('control or command pressed')
+          event.stopPropagation();
+          // Check if the sprite is already selected
+          const isAlreadySelected = this.genomeStore.selectedSequencesLasso.includes(circleSprite.sequence_uid);
+
+          if (!isAlreadySelected) {
+            // Add to lasso selection
+            this.genomeStore.selectedSequencesLasso.push(circleSprite.sequence_uid);
+
+            // Update sprite appearance
+            circleSprite.tint = 0x007bff; // Highlight color for selected
+            circleSprite.alpha = 0.8; // Slightly more opaque
+
+            console.log(`Added ${circleSprite.sequence_uid} to lasso selection.`);
+          } else {
+            console.log(`${circleSprite.sequence_uid} is already selected.`);
+          }
+
+          // Trigger Vue reactivity for `selectedSequencesLasso`
+          this.genomeStore.setSelectedSequencesLasso([...this.genomeStore.selectedSequencesLasso]);
+
+          this.initializeLasso(this.app.canvas)
+          // Re-render
+          this.app.render();
+
+        }
+      });
 
       // this.viewport.addChild(circleSprite);
       // Add the sprite to spritesContainer
