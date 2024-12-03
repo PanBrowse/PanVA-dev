@@ -8,7 +8,7 @@ export const AVAILABLE_APPS: App[] = [
   },
   {
     id: 'geneSet',
-    name: 'Gene sets',
+    name: '',
     description: 'This is another app you are able to use.',
   },
 ]

@@ -31,7 +31,7 @@ export const useConfigStore = defineStore('config', {
       dataset: 'rose_myb114' as string, // Default dataset for geneSet
       datasets: ['yeast', 'yeast14', 'rose', 'rose_myb114', 'capsicum', 'capsiscum_small'] as string[], // Available datasets
     },
-    title: 'PanVA' as string,
+    title: 'Multipla' as string,
   }),
   getters: {
     sequenceMetadataLookup(): Record<string, ConfigMetadata> {
