@@ -1008,9 +1008,9 @@ export function lasso() {
       setTimeout(() => {
         dyn_path.attr('d', null) // Clear the lasso path after a delay if needed
         close_path.attr('d', null) // Clear the close path after a delay if needed
-      }, 1000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
+      }, 2000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
 
-      // // Hide the origin node
+      // // // Hide the origin node
       origin_node.attr('display', 'none')
 
       // Run user defined end function

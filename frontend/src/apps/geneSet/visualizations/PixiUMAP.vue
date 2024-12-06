@@ -449,7 +449,7 @@ export default defineComponent({
               // Spread out sprites in the x-direction based on zoom level
               // The higher the zoom level, the greater the spacing factor
               const spacingFactor = 1 + Math.max(0, (zoomLevel -1)); // Adjust factor to control spacing sensitivity
-              sprite.x = sprite.originalX * spacingFactor; // `originalX` holds the base position
+              sprite.x = sprite.originalX / spacingFactor; // `originalX` holds the base position
             }
           });
 
@@ -484,7 +484,7 @@ export default defineComponent({
           // // this.drawGrid();
         
           // Dynamically toggle links based on zoom level
-          if (zoomLevel > 0.5) {
+          if (zoomLevel > 1.5) {
             // Draw connections if zoom level is high enough
             this.drawConnections();
           } else {
@@ -493,7 +493,7 @@ export default defineComponent({
           }
 
           // Ensure visibility of linesContainer at higher zoom levels
-          if (zoomLevel > 0.5 && !this.linesContainer.visible) {
+          if (zoomLevel > 1.5 && !this.linesContainer.visible) {
             this.linesContainer.visible = true;
           }
 
@@ -927,7 +927,7 @@ export default defineComponent({
                 // console.log('hovered', sprite.sequence_id, sprite.sequence_name);
                 // this.showTooltip(sprite);
 
-                if (this.viewport.scale.x > 0.5) {
+                if (this.viewport.scale.x > 1.5) {
                     this.linesContainer.children.forEach((line) => {
                       console.log(this.linesContainer.children)
                         // Highlight lines connected to the hovered sprite
@@ -963,7 +963,7 @@ export default defineComponent({
                 // this.app.render();
 
 
-                if (this.viewport.scale.x > 0.5) {
+                if (this.viewport.scale.x > 1.5) {
                     this.linesContainer.children.forEach((line) => {
                         // Reset all lines to their default styles, but do not remove them
                         line.clear();
