@@ -31,50 +31,17 @@ db_path = os.environ.get("API_DB_PATH")
 print("db_path", db_path)
 
 # Configuration for datasets
+# Load dataset configuration from external JSON file
+with open("dataset_config.json", "r") as f:
+    raw_dataset_config = json.load(f)
+
+
 DATASET_CONFIG = {
-    "rose": {
-        "embedding_filtered": os.path.join(db_path, "geneSet", "rose", "filtered_embedding_rose_neighbors4_minDist0.1_seed42.json"),
-        "embedding": os.path.join(db_path, "geneSet", "rose", "embedding_rose_neighbors10_minDist0.5_seed42.json"),
-        "labels_filtered": os.path.join(db_path, "geneSet", "rose", "filtered_protein_distance_labels.json"),
-        "labels": os.path.join(db_path, "geneSet", "rose", "protein_distance_labels.json"),
-        "distance_matrix": os.path.join(db_path, "geneSet", "rose", "protein_distance_matrix.npy"),
-    },
-       "rose_myb114": {
-        "embedding_filtered": os.path.join(db_path, "geneSet", "rose_myb114", "filtered_embedding_rose_myb114_neighbors2_minDist0.2_seed42.json"),
-        "embedding": os.path.join(db_path, "geneSet", "rose_myb114", "embedding_rose_myb114_neighbors200_minDist0.3_seed42.json"),
-        "labels_filtered": os.path.join(db_path, "geneSet", "rose_myb114", "filtered_protein_distance_labels.json"),
-        "labels": os.path.join(db_path, "geneSet", "rose_myb114", "protein_distance_labels.json"),
-        "distance_matrix": os.path.join(db_path, "geneSet", "rose_myb114", "protein_distance_matrix.npy"),
-    },
-    "yeast": {
-        "embedding_filtered": os.path.join(db_path, "geneSet", "yeast", "filtered_embedding_yeast_neighbors2_minDist0.1_seed42.json"),
-        "embedding": os.path.join(db_path, "geneSet", "yeast", "embedding_neighbors10_minDist0.1_seed42.json"),
-        "labels_filtered": os.path.join(db_path, "geneSet", "yeast", "filtered_protein_distance_labels.json"),
-        "labels": os.path.join(db_path, "geneSet", "yeast", "protein_distance_labels.json"),
-        "distance_matrix": os.path.join(db_path, "geneSet", "yeast", "protein_distance_matrix.npy"),
-    },
-     "yeast14": {
-        "embedding_filtered": os.path.join(db_path, "geneSet", "yeast14", "filtered_embedding_yeast14_neighbors2_minDist0.1_seed42.json"),
-        "embedding": os.path.join(db_path, "geneSet", "yeast14", "embedding_yeast14_neighbors10_minDist0.1_seed42.json"),
-        "labels_filtered": os.path.join(db_path, "geneSet", "yeast14", "filtered_protein_distance_labels.json"),
-        "labels": os.path.join(db_path, "geneSet", "yeast14", "protein_distance_labels.json"),
-        "distance_matrix": os.path.join(db_path, "geneSet", "yeast14", "protein_distance_matrix.npy"),
-    },
-    "capsicum": {
-        "embedding_filtered": os.path.join(db_path, "geneSet", "capsicum", "filtered_embedding_capsicum_neighbors2_minDist0.1_seed42.json"),
-        "embedding": os.path.join(db_path, "geneSet", "capsicum", "embedding_capsicum_neighbors360_minDist0.2_seed42.json"),
-        "labels_filtered": os.path.join(db_path, "geneSet", "capsicum", "filtered_protein_distance_labels.json"),
-        "labels": os.path.join(db_path, "geneSet", "capsicum", "protein_distance_labels.json"),
-        "distance_matrix": os.path.join(db_path, "geneSet", "capsicum", "filtered_protein_distance_matrix.npy"),
-    },
-     "capsicum_small": {
-        "embedding_filtered": os.path.join(db_path, "geneSet", "capsicum_small", "filtered_embedding_capsicum_small_neighbors2_minDist0.1_seed42.json"),
-        "embedding": os.path.join(db_path, "geneSet", "capsicum_small", "embedding_capsicum_small_neighbors10_minDist0.1_seed42.json"),
-        "labels_filtered": os.path.join(db_path, "geneSet", "capsicum_small", "filtered_protein_distance_labels.json"),
-        "labels": os.path.join(db_path, "geneSet", "capsicum_small", "protein_distance_labels.json"),
-        "distance_matrix": os.path.join(db_path, "geneSet", "capsicum_small", "filtered_protein_distance_matrix.npy"),
+    dataset_name: {
+        key: os.path.join(db_path, rel_path)
+        for key, rel_path in dataset_paths.items()
     }
-}
+    for dataset_name, dataset_paths in raw_dataset_config.items()
 
 # Default dataset
 DEFAULT_DATASET = "yeast"  

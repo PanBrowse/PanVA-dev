@@ -146,6 +146,17 @@
             },
             "type": "array"
         },
+        "geneSet": {
+            "type": "object",
+            "properties": {
+                "dataset": { "type": "string" },
+                "datasets": {
+                "type": "array",
+                "items": { "type": "string" }
+                }
+            },
+            "required": ["dataset", "datasets"]
+        },
         "homology": {
             "additionalProperties": false,
             "properties": {
