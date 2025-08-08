@@ -751,6 +751,8 @@ export function lasso() {
     isPathClosed = false,
     hoverSelect = true,
     targetArea,
+    scaleFactor = 1, // Default scale factor
+    translation = { x: 0, y: 0 }, // Default translation
     on = { start: function () {}, draw: function () {}, end: function () {} }
 
   // Function to execute on call
@@ -792,107 +794,197 @@ export function lasso() {
     _this.dragmove = dragmove
     _this.dragend = dragend
 
+    // function dragstart(event) {
+    //   // Init coordinates
+    //   drawnCoords = []
+
+    //   // Initialize paths
+    //   tpath = ''
+    //   dyn_path.attr('d', null)
+    //   close_path.attr('d', null)
+
+    //   // Set every item to have a false selection and reset their center point and counters
+    //   items.forEach(function (e) {
+    //     e.__lasso.possible = false
+    //     e.__lasso.selected = false
+    //     e.__lasso.hoverSelect = false
+    //     e.__lasso.loopSelect = false
+
+    //     const box = e.getBoundingClientRect()
+    //     e.__lasso.lassoPoint = [
+    //       Math.round(box.left + box.width / 2),
+    //       Math.round(box.top + box.height / 2),
+    //     ]
+    //   })
+
+    //   // if hover is on, add hover function
+    //   if (hoverSelect) {
+    //     // CUSTOM:  Disabled this, items passed is a direct list, on does not exist.
+    //     // items.on('mouseover.lasso', function () {
+    //     //   // if hovered, change lasso selection attribute to true
+    //     //   this.__lasso.hoverSelect = true
+    //     // })
+    //   }
+
+    //   // Run user defined start function
+    //   on.start(event.sourceEvent)
+    // }
+
+    // function dragmove(event) {
+    //   // Get mouse position within body, used for calculations
+    //   let x, y
+    //   if (event.sourceEvent.type === 'touchmove') {
+    //     x = event.sourceEvent.touches[0].clientX
+    //     y = event.sourceEvent.touches[0].clientY
+    //   } else {
+    //     x = event.sourceEvent.clientX
+    //     y = event.sourceEvent.clientY
+    //   }
+
+    //   // Get mouse position within drawing area, used for rendering
+    //   const [tx, ty] = pointer(event, this)
+
+    //   // Initialize the path or add the latest point to it
+    //   if (tpath === '') {
+    //     tpath = tpath + 'M ' + tx + ' ' + ty
+    //     origin = [x, y]
+    //     torigin = [tx, ty]
+    //     // Draw origin node
+    //     origin_node
+    //       .attr('cx', tx)
+    //       .attr('cy', ty)
+    //       .attr('r', 7)
+    //       .attr('display', null)
+    //   } else {
+    //     tpath = tpath + ' L ' + tx + ' ' + ty
+    //   }
+
+    //   drawnCoords.push([tx, ty])
+
+    //   // Calculate the current distance from the lasso origin
+    //   const distance = Math.sqrt(
+    //     Math.pow(x - origin[0], 2) + Math.pow(y - origin[1], 2)
+    //   )
+
+    //   // Set the closed path line
+    //   const close_draw_path =
+    //     'M ' + tx + ' ' + ty + ' L ' + torigin[0] + ' ' + torigin[1]
+
+    //   // Draw the lines
+    //   dyn_path.attr('d', tpath)
+
+    //   close_path.attr('d', close_draw_path)
+
+    //   // Check if the path is closed
+    //   isPathClosed = distance <= closePathDistance ? true : false
+
+    //   // If within the closed path distance parameter, show the closed path. otherwise, hide it
+    //   if (isPathClosed && closePathSelect) {
+    //     close_path.attr('display', null)
+    //   } else {
+    //     close_path.attr('display', 'none')
+    //   }
+
+    //   items.forEach(function (n) {
+    //     n.__lasso.loopSelect =
+    //       isPathClosed && closePathSelect
+    //         ? robustPnp(drawnCoords, n.__lasso.lassoPoint) < 1
+    //         : false
+    //     n.__lasso.possible = n.__lasso.hoverSelect || n.__lasso.loopSelect
+    //   })
+
+    //   on.draw(event.sourceEvent)
+    // }
+
     function dragstart(event) {
       // Init coordinates
-      drawnCoords = []
+      drawnCoords = [];
 
       // Initialize paths
-      tpath = ''
-      dyn_path.attr('d', null)
-      close_path.attr('d', null)
+      tpath = "";
+      dyn_path.attr("d", null);
+      close_path.attr("d", null);
 
       // Set every item to have a false selection and reset their center point and counters
       items.forEach(function (e) {
-        e.__lasso.possible = false
-        e.__lasso.selected = false
-        e.__lasso.hoverSelect = false
-        e.__lasso.loopSelect = false
+        e.__lasso.possible = false;
+        e.__lasso.selected = false;
+        e.__lasso.hoverSelect = false;
+        e.__lasso.loopSelect = false;
 
-        const box = e.getBoundingClientRect()
+        const box = e.getBoundingClientRect();
         e.__lasso.lassoPoint = [
-          Math.round(box.left + box.width / 2),
-          Math.round(box.top + box.height / 2),
-        ]
-      })
+          (Math.round(box.left + box.width / 2) - translation.x) / scaleFactor,
+          (Math.round(box.top + box.height / 2) - translation.y) / scaleFactor,
+        ];
+      });
 
-      // if hover is on, add hover function
       if (hoverSelect) {
-        // CUSTOM:  Disabled this, items passed is a direct list, on does not exist.
-        // items.on('mouseover.lasso', function () {
-        //   // if hovered, change lasso selection attribute to true
-        //   this.__lasso.hoverSelect = true
-        // })
+        // CUSTOM: Hover logic, if needed
       }
 
       // Run user defined start function
-      on.start(event.sourceEvent)
+      on.start(event.sourceEvent);
     }
 
     function dragmove(event) {
+
       // Get mouse position within body, used for calculations
-      let x, y
-      if (event.sourceEvent.type === 'touchmove') {
-        x = event.sourceEvent.touches[0].clientX
-        y = event.sourceEvent.touches[0].clientY
-      } else {
-        x = event.sourceEvent.clientX
-        y = event.sourceEvent.clientY
-      }
+        let x, y;
+        if (event.sourceEvent.type === 'touchmove') {
+          x = event.sourceEvent.touches[0].clientX;
+          y = event.sourceEvent.touches[0].clientY;
+        } else {
+          x = event.sourceEvent.clientX;
+          y = event.sourceEvent.clientY;
+        }
+        
+      // Get mouse position within drawing area
+      const [tx, ty] = pointer(event, this);
 
-      // Get mouse position within drawing area, used for rendering
-      const [tx, ty] = pointer(event, this)
+      // console.log("Mouse (canvas):", tx, ty); // Log canvas pointer coordinates
+      // console.log("Mouse (absolute):", x, y); // Log absolute mouse coordinates
 
-      // Initialize the path or add the latest point to it
-      if (tpath === '') {
-        tpath = tpath + 'M ' + tx + ' ' + ty
-        origin = [x, y]
-        torigin = [tx, ty]
-        // Draw origin node
+      if (tpath === "") {
+        tpath = `M ${tx} ${ty}`;
+        origin = [(tx - translation.x) / scaleFactor*4, (ty - translation.y) / scaleFactor*4];
+        torigin = [tx, ty];
         origin_node
-          .attr('cx', tx)
-          .attr('cy', ty)
-          .attr('r', 7)
-          .attr('display', null)
+          .attr("cx", tx)
+          .attr("cy", ty)
+          .attr("r", 7)
+          .attr("display", null);
       } else {
-        tpath = tpath + ' L ' + tx + ' ' + ty
+        tpath += ` L ${tx} ${ty}`;
       }
 
-      drawnCoords.push([tx, ty])
+      // console.log("Lasso Path:", tpath); // Log lasso path being drawn
 
-      // Calculate the current distance from the lasso origin
-      const distance = Math.sqrt(
-        Math.pow(x - origin[0], 2) + Math.pow(y - origin[1], 2)
-      )
+       // Track viewport transformations
+      // console.log("Viewport Transform:", this.viewport?.worldTransform);
 
-      // Set the closed path line
-      const close_draw_path =
-        'M ' + tx + ' ' + ty + ' L ' + torigin[0] + ' ' + torigin[1]
+      drawnCoords.push([
+        (tx - translation.x) / scaleFactor,
+        (ty - translation.y) / scaleFactor,
+      ]);
 
-      // Draw the lines
-      dyn_path.attr('d', tpath)
+      
 
-      close_path.attr('d', close_draw_path)
+      const close_draw_path = `M ${tx} ${ty} L ${torigin[0]} ${torigin[1]}`;
 
-      // Check if the path is closed
-      isPathClosed = distance <= closePathDistance ? true : false
-
-      // If within the closed path distance parameter, show the closed path. otherwise, hide it
-      if (isPathClosed && closePathSelect) {
-        close_path.attr('display', null)
-      } else {
-        close_path.attr('display', 'none')
-      }
+      dyn_path.attr("d", tpath);
+      close_path.attr("d", close_draw_path);
 
       items.forEach(function (n) {
-        n.__lasso.loopSelect =
-          isPathClosed && closePathSelect
-            ? robustPnp(drawnCoords, n.__lasso.lassoPoint) < 1
-            : false
-        n.__lasso.possible = n.__lasso.hoverSelect || n.__lasso.loopSelect
-      })
+        n.__lasso.loopSelect = robustPnp(drawnCoords, n.__lasso.lassoPoint) < 1;
+        n.__lasso.possible = n.__lasso.hoverSelect || n.__lasso.loopSelect;
+        // console.log("Item Loop Select:", n.__lasso.loopSelect);
+      });
 
-      on.draw(event.sourceEvent)
+      on.draw(event.sourceEvent);
     }
+
+
 
     function dragend(event) {
       // Remove mouseover tagging function
@@ -904,23 +996,21 @@ export function lasso() {
         n.__lasso.possible = false
       })
 
-      // Clear lasso
-      // Commenting out the lines that clear the path
-      dyn_path.attr('d', null)
-      close_path.attr('d', null)
-      origin_node.attr('display', 'none')
+      // // Clear lasso
+      // // Commenting out the lines that clear the path
+      // dyn_path.attr('d', null)
+      // close_path.attr('d', null)
+      // origin_node.attr('display', 'none')
 
-      dyn_path.attr('d', null);
-      close_path.attr('d', null);
 
       // Optionally, if you want to clear the path later,
       // you can set a timeout to clear the path after a delay.
       setTimeout(() => {
         dyn_path.attr('d', null) // Clear the lasso path after a delay if needed
         close_path.attr('d', null) // Clear the close path after a delay if needed
-      }, 1000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
+      }, 2000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
 
-      // // Hide the origin node
+      // // // Hide the origin node
       origin_node.attr('display', 'none')
 
       // Run user defined end function
@@ -1013,6 +1103,18 @@ export function lasso() {
     if (!arguments.length) return targetArea
     targetArea = _
     return lasso
+  }
+
+  lasso.scale = function (_) {
+    if (!arguments.length) return scaleFactor;
+    scaleFactor = _;
+    return lasso;
+  };
+
+  lasso.translation = function (_) {
+    if (!arguments.length) return translation;
+    translation = _;
+    return lasso;
   }
 
   return lasso

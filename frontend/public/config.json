@@ -1,8 +1,19 @@
 {
-  "apiUrl": "http://localhost:5001/",
+  "apiUrl": "http://localhost:5001",
   "apps": [
     "geneSet"
   ],
+  "geneSet": {
+      "dataset": "rose_myb114",
+      "datasets": [
+      "yeast",
+      "yeast14",
+      "rose",
+      "rose_myb114",
+      "capsicum",
+      "capsicum_small"
+    ]
+  },
   "homology": {
     "defaultId": "14508105",
     "defaultSequenceMetadataColumns": [

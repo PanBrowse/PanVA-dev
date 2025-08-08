@@ -1,10 +1,3 @@
-<!-- <template>
-  <div class="child-container" ref="view">
-    <canvas ref="pixi"></canvas>
-    <svg ref="lasso"><g class="lasso"></g></svg>
-  </div>
-</template> -->
-
 <template>
   <ACard
     title="Grid Overview"
@@ -33,14 +26,17 @@ import * as d3 from 'd3'
 import { mapActions, mapState } from 'pinia'
 import * as PIXI from 'pixi.js'
 import { DropShadowFilter } from 'pixi-filters'
+import { Viewport } from 'pixi-viewport'
 import { defineComponent, onMounted, ref, watch } from 'vue'
 
 import { lasso } from '@/components/Lasso.js'
 import { useGeneSetStore } from '@/stores/geneSet'
 import { useGenomeStore } from '@/stores/geneSet'
 import type { Gene, Genome, GenomeData } from '@/types'
+import { parseSVG } from 'svg-path-parser';
 
 const globalSelectedSprites = ref<string[]>([])
+// to-do: need to use these again:
 const circleTexture = ref<PIXI.Texture>()
 const lassoInstance = ref<lasso>()
 
@@ -56,7 +52,33 @@ PIXI.Sprite.prototype.getBoundingClientRect = function () {
     width: adjustedWidth,
     height: adjustedHeight,
   }
-}
+} 
+
+// PIXI.Sprite.prototype.getBoundingClientRect = function () {
+//   const devicePixelRatio = window.devicePixelRatio || 1;
+
+//   // Get the viewport's transformation matrix
+//   const viewportTransform = this.parent.worldTransform || { tx: 0, ty: 0, a: 1, d: 1 };
+//   const { tx, ty, a: scaleX, d: scaleY } = viewportTransform;
+
+//   // Adjust sprite's position and size according to translation and scaling
+//   const left = (this.x * scaleX + tx - this.width * scaleX) / 4* devicePixelRatio
+//   const top = (this.y * scaleY + ty - this.height * scaleY) / 4* devicePixelRatio;
+//   const adjustedWidth = this.width * scaleX / devicePixelRatio;
+//   const adjustedHeight = this.height * scaleY / devicePixelRatio;
+
+//   console.log('PIXI.Sprite.prototype.getBoundingClientRect', left, top, adjustedWidth, adjustedHeight)
+
+//   return {
+//     left,
+//     top,
+//     width: adjustedWidth,
+//     height: adjustedHeight,
+//   };
+// };
+
+
+
 export default {
   name: 'PixiCanvas',
   emits: ['loaded'], // Declare the emitted event
@@ -130,14 +152,10 @@ export default {
     this.$nextTick(async () => {
       try {
         const genomeStore = this.genomeStore
-        // const genomeStore = useGenomeStore()
-        // console.log(
-        //   'sequences from genomeStore: ',
-        //   genomeStore.genomeData.genomes
-        // )
-
-        let zoomLevel = 1 // Default zoom level
-        this.zoomLevel = zoomLevel
+        const isShiftPressed = ref(false)
+        this.isShiftPressed = isShiftPressed
+        console.log(isShiftPressed.value)
+        const focusContainer = this.$refs.focusContainer;
 
         // // Create a PIXI.Application instance
         const app = new PIXI.Application()
@@ -153,10 +171,245 @@ export default {
           width: window.innerWidth,
           height: window.innerHeight,
           backgroundColor: 0xffffff,
-          // resolution: window.devicePixelRatio || 1,
+          resolution: 3,
+          autoResize: true,
           antialias: true,
+          autoDensity: true,
           canvas: this.$refs.pixi,
-          resizeTo: this.$refs.view, // or window
+          resizeTo: this.$refs.view,
+        })
+
+        // Create the viewport
+        const viewport = new Viewport({
+          screenWidth: window.innerWidth,
+          screenHeight: window.innerHeight,
+          worldWidth: 2000, // Adjust this value to fit your data
+          worldHeight: 2000,
+          autoResize: true,
+          resolution: 3,
+          canvas: this.$refs.pixi,
+          resizeTo: this.$refs.view,
+          events: app.renderer.events,
+        })
+        this.viewport = viewport
+
+        // Add the viewport to the PIXI stage
+        app.stage.addChild(this.viewport)
+        console.log('Viewport added to stage:', this.viewport)
+
+        this.viewport.interactive = true
+        this.viewport.sortableChildren = true; 
+
+        this.viewport.drag({
+          pressDrag: false, // Enables dragging
+        })
+
+        // Enable viewport plugins
+        this.viewport.wheel().decelerate() // Enable mouse wheel zoom and panning
+
+        // Create a container for connection lines
+        const linesContainer = new PIXI.Container();
+        linesContainer.zIndex = 0; // Lowest layer for connections
+        this.viewport.addChild(linesContainer); // Add the lines container to the viewport
+        this.linesContainer = linesContainer;
+
+        // Create a container for sprites
+        const spritesContainer = new PIXI.Container();
+        spritesContainer.zIndex = 1; // Above lines
+        this.viewport.addChild(spritesContainer); // Add the sprites container to the viewport
+        this.spritesContainer = spritesContainer
+
+        const tooltipContainer = new PIXI.Container();
+        tooltipContainer.zIndex = 2; // Above sprites and lines, below lasso
+        tooltipContainer.interactive = false;
+        tooltipContainer.interactiveChildren = false;
+        this.viewport.addChild(tooltipContainer);
+        this.tooltipContainer = tooltipContainer;
+
+        const onFocusCanvas = () => {
+          console.log('Canvas focused, keyboard events will be captured')
+
+          if (canvas) {
+            canvas.addEventListener('keydown', onKeyDown)
+            canvas.addEventListener('keyup', onKeyUp)
+          }
+        }
+
+        const onKeyDown = (event: KeyboardEvent) => {
+          if (event.key === 'Shift') {
+            this.isShiftPressed.value = true
+            this.viewport.drag({
+              pressDrag: true, // Enables dragging
+            })
+          }
+          if (lassoInstance.value) {
+            console.log('Removing lasso.')
+
+            // Clear lasso paths
+            d3.select(this.$refs.lasso).selectAll('path').remove()
+            d3.select(this.$refs.lasso).selectAll('circle').remove()
+          }
+          console.log(
+            '*** key shift pressed from canvas focus',
+            this.isShiftPressed.value
+          )
+        }
+
+        const onKeyUp = (event: KeyboardEvent) => {
+          if (event.key === 'Shift') {
+            this.isShiftPressed.value = false
+            console.log(
+              '*** key shift NOT pressed from canvas focus',
+              this.isShiftPressed.value
+            )
+
+            this.viewport.drag({
+              pressDrag: false, // Enables dragging
+            })
+
+            this.initializeLasso(canvas)
+          }
+        }
+
+        const onBlurCanvas = () => {
+          if (canvas) {
+            canvas.blur(); // Explicitly remove focus
+            console.log('Canvas blurred, keyboard events ignored');
+          }
+        }
+
+        app.canvas.addEventListener('focus', onFocusCanvas)
+        app.canvas.addEventListener('blur', onBlurCanvas)
+        // Make canvas focusable and auto-focus on click
+        app.canvas.setAttribute('tabindex', '0')
+        app.canvas.addEventListener('mouseover', () => {
+          canvas.focus({ preventScroll: true });
+        })
+        app.canvas.addEventListener('mouseleave', () => {
+          canvas.blur()
+        })
+
+        viewport.on('wheel', (e) => {
+        //   console.log('Wheel event detected on viewport:', e)
+        })
+
+        viewport.on('drag', (e) => {
+          // console.log('Drag event detected on viewport:', e)
+        })
+
+        this.viewport.on('moved', (event) => {
+          const zoomLevel = this.viewport.scale.x
+          const resolution = window.devicePixelRatio * zoomLevel
+
+          console.log('zoomlevel:', zoomLevel)
+
+           // Ensure linesContainer exists
+          if (!this.linesContainer) {
+            this.linesContainer = new PIXI.Container();
+            this.viewport.addChildAt(this.linesContainer,0);
+          }
+
+          this.spritesContainer.children.forEach((sprite) => {
+          // this.viewport.children.forEach((sprite) => {
+            if (sprite.sequence_uid) {
+              const geneCount =
+                genomeStore.sequenceToLociGenesLookup.get(sprite.sequence_uid)
+                  ?.genes.length || 1;
+
+              // Compute border thickness based on zoom level
+              let borderThickness = 0; // No border at low zoom levels
+
+              if (zoomLevel > 1) {
+                // Gradually increase thickness from zoom level 1 to 2
+                const transitionProgress = Math.min(1, (zoomLevel - 1) / 1);
+                borderThickness =
+                  transitionProgress * Math.min(10, Math.log2(geneCount + 1) + 1);
+              } else {
+                // Keep the border invisible for zoom levels <= 1
+                borderThickness = 0;
+              }
+
+              // Update the sprite's texture with the calculated border thickness
+              const circleRadius = 5 * window.devicePixelRatio;
+              const { texture, totalRadius } = this.createCircleTexture(
+                circleRadius,
+                resolution,
+                borderThickness
+              );
+              sprite.texture = texture
+              sprite.totalRadius = totalRadius
+              // sprite.texture = this.createCircleTexture(
+              //   circleRadius,
+              //   resolution,
+              //   borderThickness
+              // );
+
+              // Spread out sprites in the x-direction based on zoom level
+              // The higher the zoom level, the greater the spacing factor
+              const spacingFactor = 1 + Math.max(0, (zoomLevel -1)); // Adjust factor to control spacing sensitivity
+              sprite.x = sprite.originalX * spacingFactor; // `originalX` holds the base position
+            }
+          });
+          this.app.render()
+        
+          // if (zoomLevel>2){
+          //    // Access all sprites in the viewport
+          //   this.viewport.children.forEach((sprite) => {
+          //     if (sprite.sequence_uid) {
+          //       console.log('Sprite moved:', sprite.sequence_uid, sprite.x, sprite.y, genomeStore.sequenceToLociGenesLookup.get(sprite.sequence_uid)?.genes.length);
+          //     }
+          //   });
+            
+          // }
+          // // const { x: mouseWorldX, y: mouseWorldY } = this.viewport.toWorld(event.clientX, event.clientY);
+          // // console.log('mouse x and mouse y during zoom', {mouseWorldX, mouseWorldY})
+
+          // const circleRadius = 5 * devicePixelRatio
+
+          // // Regenerate the circle texture
+          // circleTexture.value = this.createCircleTexture(
+          //   circleRadius,
+          //   resolution,
+          //   0.5
+          // )
+
+          // // Update all sprites
+          // this.viewport.children.forEach((sprite) => {
+          //   sprite.texture = circleTexture.value
+          // })
+          // // this.drawGrid();
+        
+          // Dynamically toggle links based on zoom level
+          if (zoomLevel > 1.5) {
+            // Draw connections if zoom level is high enough
+            this.drawConnections();
+          } else {
+            // Hide connections by clearing the linesContainer
+            this.linesContainer.visible = false; // Hide instead of removing children
+          }
+
+          // Ensure visibility of linesContainer at higher zoom levels
+          if (zoomLevel > 1.5 && !this.linesContainer.visible) {
+            this.linesContainer.visible = true;
+          }
+
+          this.app.render();
+
+        })
+
+        app.canvas.addEventListener('wheel', (e) => {
+          e.preventDefault() // Stop default browser scroll behavior
+          // console.log('Wheel event on canvas:', e);
+          // Manually forward the event to the Viewport
+          viewport.emit('wheel', e)
+        })
+
+        app.canvas.addEventListener('drag', (e) => {
+          e.preventDefault() // Stop default browser scroll behavior
+          console.log('Drag event on canvas:', e)
+
+          // Manually forward the event to the Viewport
+          viewport.emit('drag', e)
         })
 
         // Check and log canvas size
@@ -166,111 +419,19 @@ export default {
         // Set the canvas size dynamically
         this.resizeWindow(app)
 
-        // Create a foreground container for hover texts
-        const foregroundContainer = new PIXI.Container()
-        const circleContainer = new PIXI.Container()
-        this.circleContainer = circleContainer
+        // // Create a foreground container for hover texts
+        // const foregroundContainer = new PIXI.Container()
+        // const circleContainer = new PIXI.Container()
+        // this.circleContainer = circleContainer
 
-        // const devicePixelRatio = window.devicePixelRatio || 1
-        // console.log('devicePixelRatio', devicePixelRatio)
-        // const padding = 10
-        // const circleRadius = 5 * devicePixelRatio
-        // const circleSpacing = (3 * circleRadius) / devicePixelRatio
-        // const chromPadding = 25 // Padding between chromosome grids
-
-        // const containerWidth = this.$refs.pixi.clientWidth * devicePixelRatio
-        // const containerHeight = this.$refs.pixi.clientHeight * devicePixelRatio
-        // console.log('containerWidth', containerWidth)
-        // console.log('containerHeight', containerHeight)
-
-        // // load data
-        // const genomes = genomeStore.genomeData.genomes
-
-        // let numCols = Math.floor(
-        //   (containerWidth - 2 * padding) /
-        //     (2 * circleRadius + 2 * circleSpacing)
-        // )
-        // // numCols = Math.floor(numCols / 5) * 5 // Make numCols a multiple of 5
-        // // console.log('numCols', numCols, this.sequences.length)
-        // console.log('numCols', numCols)
-
-        // // Calculate the number of rows needed to fit all the points
-        // // const numRows = Math.ceil(this.sequences.length / numCols)
-        // const numRows = Math.ceil(genomes.length / numCols)
-        // console.log('numRows', numRows)
-
-        // // Calculate the total grid width and height
-        // const totalGridWidth =
-        //   numCols * (2 * circleSpacing + 2 * circleRadius) + 2 * padding
-        // const totalGridHeight =
-        //   numRows * (2 * circleSpacing + 2 * circleRadius) + 2 * padding
-        // console.log('totalGridWidth', totalGridWidth)
-        // console.log('totalGridHeight', totalGridHeight)
-
-        // debugger
-
-        // // test with old potato data
-        // // console.log('sequences', this.sequences)
-        // // const sequences_sorted = this.sequences.sort(
-        // //   (a, b) => b.sequence_length - a.sequence_length
-        // // )
-        // // console.log('sequences sorted', sequences_sorted)
-
-        // // const sequencesGrouped =
-        // //   this.groupSequencesByChromosome(sequences_sorted)
-        // // console.log('sequencesGrouped', sequencesGrouped)
-
-        // // <---------------------Create circle sprites ---------------->
-        // this.createCircleTexture(circleRadius, app)
-
-        // let currentXOffset = padding
-
-        // // Loop through each genome and create a unit grid for its sequences
-        // Object.entries(genomes).forEach(([_, genomeData]) => {
-        //   const sequences = genomeData.sequences
-
-        //   if (Array.isArray(sequences)) {
-        //     let numCols = Math.ceil(sequences.length / 10) // max 10 rows
-
-        //     sequences.forEach((sequence, index) => {
-        //       const row = index % 10
-        //       const col = Math.floor(index / 10)
-
-        //       const x =
-        //         (currentXOffset + col * circleSpacing + circleRadius) *
-        //         devicePixelRatio
-        //       const y =
-        //         (padding + row * circleSpacing + circleRadius) *
-        //         devicePixelRatio
-
-        //       // console.log('x', x, 'y', y)
-
-        //       this.createSprites(
-        //         x,
-        //         y,
-        //         genomeData.name,
-        //         sequence.sequence_length_nuc,
-        //         sequence.name,
-        //         sequence.id,
-        //         app,
-        //         foregroundContainer,
-        //         circleContainer,
-        //         sequence.uid
-        //       )
-        //     })
-
-        //     // After placing the grid for this chromosome, move the horizontal offset
-        //     currentXOffset += numCols * circleSpacing + chromPadding
-        //   } else {
-        //     console.warn(
-        //       `Expected sequences to be an array for genome ${genomeData.name}, but got:`,
-        //       sequences
-        //     )
-        //   }
-        // })
-        // app.render()
+        // app.stage.addChild(circleContainer)
+        // this.viewport.addChild(circleContainer)
 
         this.drawGrid()
+        this.drawTooltips();
+        // this.drawConnections();
+
+
 
         // Add watcher for selectedSequencesLasso
         this.$watch(
@@ -278,8 +439,8 @@ export default {
           (newSelectedSequences) => {
             console.log('Lasso selection updated:', newSelectedSequences)
 
-            if (circleContainer) {
-              circleContainer.children.forEach((sprite: any) => {
+            if (this.viewport) {
+              this.spritesContainer.children.forEach((sprite: any) => {
                 const isSelected = newSelectedSequences.includes(
                   sprite.sequence_uid
                 )
@@ -289,31 +450,56 @@ export default {
                 // Update sprite styles based on its state
                 if (isSelected) {
                   sprite.tint = 0x007bff // Blue for selected
+                  sprite.alpha = 0.5 // Dimmed
                   // sprite.alpha = 1 // Full opacity
-                // } else if (isTracked) {
-                //   sprite.tint = 0xa9a9a9 // Dark grey for tracked
-                //   sprite.alpha = 0.75 // Slightly dimmer
+                  // } else if (isTracked) {
+                  //   sprite.tint = 0xa9a9a9 // Dark grey for tracked
+                  //   sprite.alpha = 0.75 // Slightly dimmer
                 } else {
                   sprite.tint = 0xd3d3d3 // Default gray for unselected
                   sprite.alpha = 0.5 // Dimmed
                 }
               })
             }
-            this.app.render();
+            this.app.render()
           },
           { immediate: true }
         )
 
-        app.stage.addChild(foregroundContainer)
+        this.$watch(
+          () => this.genomeStore.hoveredSequence,
+          (newHoveredSequence, oldHoveredSequence) => {
+            // Reset the previously hovered sprite
+            if (oldHoveredSequence) {
+              const oldSprite = this.spritesContainer.children.find(
+                (sprite) => sprite.sequence_uid === oldHoveredSequence
+              );
+              if (oldSprite) {
+                if (this.genomeStore.selectedSequencesLasso.includes(oldSprite.sequence_uid)) {
+                  oldSprite.tint = 0x007bff; // Blue for lasso-selected
+                } else {
+                  oldSprite.tint = 0xd3d3d3; // Default color
+                }
+              }
+            }
 
-        // Event listener for mouse wheel zoom
-        app.canvas.addEventListener('wheel', (event) => {
-          const delta = event.deltaY < 0 ? 0.1 : -0.1 // Zoom in/out
-          // zoomGrid(delta)
-          console.log('test zoom from Grid', delta)
-        })
+            // Highlight the new hovered sprite
+            if (newHoveredSequence) {
+              const newSprite = this.spritesContainer.children.find(
+                (sprite) => sprite.sequence_uid === newHoveredSequence
+              );
+              if (newSprite) {
+                newSprite.tint = 0xFF8C00; // Highlight color for hovered
+              }
+            }
 
-        // Watch for embedding changes
+            this.app.render();
+          }
+        );
+
+        // app.stage.addChild(foregroundContainer)
+
+        // Watch for filterEmpty changes
         this.$watch(
           () => this.genomeStore.filterEmpty,
           (value) => {
@@ -322,6 +508,7 @@ export default {
             // genomeStore.selectedSequencesLasso = [];
 
             this.drawGrid()
+            // this.drawConnections();
           },
           { immediate: true, deep: true }
         )
@@ -334,44 +521,664 @@ export default {
 
         // to-do: fix this workaround
         // Emit the loaded event after everything is set up
-
         console.log('PixiScatter loaded event emitted')
         this.$emit('loaded')
+        this.$emit('canvasSize', {
+          width: this.app.renderer.width,
+          height: this.app.renderer.height,
+        });
       } catch (error) {
         console.error('Error initializing Pixi.js:', error)
       }
     })
   },
   methods: {
-    zoomGrid(delta: number) {
-      this.zoomLevel += delta
-      this.zoomLevel = Math.max(1, Math.min(5, this.zoomLevel)) // Clamp zoom level between 1 and 5
-      this.drawGrid()
+    showTooltip(sequence_uid) {
+     
+        // Find the related text and background tooltips in the tooltipContainer
+      const tooltipText = this.tooltipContainer.children.find(
+        (child) => child.sequence_uid === sequence_uid && child instanceof PIXI.Text
+      );
+
+      // const tooltipBackground = this.tooltipContainer.children.find(
+      //   (child) => child.sequence_uid === sequence_uid && child instanceof PIXI.Graphics
+      // );
+
+      // Set both text and background to visible, if they exist
+      if (tooltipText){
+        tooltipText.visible = true;
+        // tooltipBackground.visible = true;
+
+        // Adjust scale dynamically for both
+        tooltipText.scale.set(1 / this.viewport.scale.x);
+        console.log(`Tooltip for sequence_uid ${sequence_uid} is now visible.`);
+      } else {
+        console.warn(`Tooltip for sequence_uid ${sequence_uid} not found.`);
+      }
+   
+    },
+    debugTooltips() {
+      console.log('Tooltips count:', this.tooltipContainer.children.length);
+
+      this.tooltipContainer.children.forEach((tooltip, index) => {
+        console.log(`Tooltip ${index}:`, {
+          x: tooltip.x,
+          y: tooltip.y,
+          visible: tooltip.visible,
+          text: tooltip.text,
+          alpha: tooltip.alpha,
+        });
+      });
+    },
+    hideTooltip(sequence_uid) {
+      // Find the tooltip in the tooltipContainer
+      const tooltip = this.tooltipContainer.children.find(
+        (child) => child.sequence_uid === sequence_uid
+      );
+
+      // If tooltip exists, set it to invisible
+      if (tooltip) {
+        tooltip.visible = false;
+        console.log(`Tooltip for sequence_uid ${sequence_uid} is now hidden.`);
+      } else {
+        console.warn(`Tooltip for sequence_uid ${sequence_uid} not found.`);
+      }
+    },
+    highlightLinks(sequence_uid, isHovered) {
+
+      // console.log('highlight links for:', sequence_uid)
+
+      //   // Ensure tooltips are managed with highlights
+      //   this.spritesContainer.children.forEach((sprite) => {
+      //     if (sprite.sequence_uid === sequence_uid) {
+      //       if (isHovered) {
+      //         console.log('hovered', this.tooltipContainer.children)
+      //         this.showTooltip(sequence_uid);
+
+
+         
+
+      //         if (this.viewport.scale.x > 2) {
+      //           this.linesContainer.children.forEach((line) => {
+      //             if (
+      //                       line.sourceSequenceUid === sequence_uid ||
+      //                       line.targetSequenceUid === sequence_uid
+      //                   ) {
+      //               line.clear();
+      //               line.moveTo(line.startX, line.startY);
+      //               line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+      //               line.stroke({ width: 2, color: 0xb674e8, alpha: 1}); // Highlighted line
+      //             } else {
+      //               line.clear();
+      //               line.moveTo(line.startX, line.startY);
+      //               line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+      //               line.stroke({ width: 1, color: 0xd3d3d3, alpha: 0.7 }); // Default line
+      //             }
+      //           });
+      //         }
+      //       } else {
+
+      //         // Hide the tooltip when not hovered
+      //         this.hideTooltip(sequence_uid);
+
+      //         if (this.viewport.scale.x > 2) {
+      //           this.linesContainer.children.forEach((line) => {
+      //               line.clear();
+      //               line.moveTo(line.startX, line.startY);
+      //               line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+      //               line.stroke({ width: 1, color: 0xd3d3d3, alpha: 0.7 }); // Reset line
+                  
+      //           });
+      //         }
+      //       }
+      //     }
+      //   });
+      // },
+
+    console.log('highlight links for:', sequence_uid)
+
+    // Ensure tooltips are managed with highlights
+    this.spritesContainer.children.forEach((sprite) => {
+        if (sprite.sequence_uid === sequence_uid) {
+            if (isHovered) {
+                console.log('hovered', this.tooltipContainer.children);
+                this.showTooltip(sequence_uid);
+
+
+
+                if (this.viewport.scale.x > 1.5) {
+                    this.linesContainer.children.forEach((line) => {
+                      console.log(this.linesContainer.children)
+                        // Highlight lines connected to the hovered sprite
+                        if (
+                            line.sourceSequenceUid === sequence_uid || line.targetSequenceUid === sequence_uid
+                        ) {
+
+                            // Move the hovered line to the end of the container for rendering on top
+                            this.linesContainer.removeChild(line);
+                            this.linesContainer.addChild(line);
+
+                            line.clear();
+                            line.moveTo(line.startX, line.startY);
+                            line.quadraticCurveTo(
+                                line.controlX,
+                                line.controlY,
+                                line.endX,
+                                line.endY
+                            );
+                            line.stroke({
+                                width: line.linkCount || 1,
+                                color: 0xb674e8, // Highlight color
+                                alpha: 0.7, // Full opacity for highlighted lines
+                            });
+                            
+                        }
+                    });
+                }
+            } else {
+                // Hide the tooltip when not hovered
+                this.hideTooltip(sequence_uid);
+
+                if (this.viewport.scale.x > 1.5) {
+                    this.linesContainer.children.forEach((line) => {
+                        // Reset all lines to their default styles, but do not remove them
+                        line.clear();
+                        line.moveTo(line.startX, line.startY);
+                        line.quadraticCurveTo(
+                            line.controlX,
+                            line.controlY,
+                            line.endX,
+                            line.endY
+                        );
+                        line.stroke({
+                            width: line.linkCount/5|| 1, // Default width
+                            color: 0xd3d3d3, // Default color
+                            alpha: 0.7, // Default opacity
+                        });
+                    });
+                }
+            }
+       
+        }
+    });
+      // //   Clear the container
+      // this.linesContainer.removeChildren();
+
+      // // Re-add non-hovered lines first, then hovered lines (to render them on top)
+      // nonHoveredLines.forEach((line) => this.linesContainer.addChild(line));
+      // hoveredLines.forEach((line) => this.linesContainer.addChild(line));
+
+      // // Re-render to update the visuals
+      this.app.render();
+  },
+
+
+
+    //   if (this.viewport.scale.x > 2) {
+
+    //     const hoveredLines = [];
+    //     const nonHoveredLines = [];
+
+    //     if (isHovered === true){
+    //     console.log('highlight links true', this.linesContainer.children)
+    //     this.linesContainer.children.forEach((line) => {
+    //       // console.log(line.sourceSequenceUid, sequence_uid)
+    //       if (line.sourceSequenceUid === sequence_uid) {
+    //         console.log('source sequence uid', line.startX, line.startY, line.controlX, line.controlY, line.endX, line.endY)
+
+    //         line.clear();
+    //         // Redraw the line
+        
+    //         line.moveTo(line.startX, line.startY);
+    //         line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+    //         line.stroke({width: 2, color: 0xb674e8, alpha: line.identityNorm});
+    //         hoveredLines.push(line);
+       
+    //         }
+    //         else {
+    //           line.clear();
+    //           line.moveTo(line.startX, line.startY);
+    //           line.quadraticCurveTo(line.controlX, line.controlY, line.endX, line.endY);
+    //           line.stroke({width:1, color: 0xd3d3d3, alpha: line.identityNorm});
+    //           nonHoveredLines.push(line);
+    //         }
+    //     });
+
+    //     // Clear the container
+    //     this.linesContainer.removeChildren();
+
+    //     // Re-add non-hovered lines first, then hovered lines (to render them on top)
+    //     nonHoveredLines.forEach((line) => this.linesContainer.addChild(line));
+    //     hoveredLines.forEach((line) => this.linesContainer.addChild(line));
+
+    //     // Re-render to update the visuals
+    //     this.app.render();
+
+    //     }
+    //   }
+    // },
+    drawSequenceSprite(sequence, x, y, radius) {
+      const circleSprite = new PIXI.Sprite(circleTexture.value);
+
+      // Check if this sequence is part of the selectedSequencesLasso
+      const isSelected = this.genomeStore.selectedSequencesLasso.includes(sequence.uid);
+      circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3; // Blue if selected, gray otherwise
+      circleSprite.alpha = 0.5;
+      circleSprite.sequence_uid = sequence.uid;
+      circleSprite.sequence_id = sequence.id
+
+      circleSprite.x = x;
+      circleSprite.originalX = x;
+      circleSprite.y = y;
+
+      circleSprite.interactive = true;
+
+
+   
+       // Add interactivity for tooltip and highlighting
+       circleSprite.on('mouseover', () => {
+          this.genomeStore.setHoveredSequence(circleSprite.sequence_uid); // Update store
+          circleSprite.tint = 0xFF8C00; // Highlight color for selected
+          // Dim all other sprites
+        this.spritesContainer.children.forEach((sprite) => {
+          if (sprite.sequence_uid !== circleSprite.sequence_uid) {
+              sprite.alpha = 0.3; // Dimmed color for non-hovered
+          }
+          })
+          this.highlightLinks(circleSprite.sequence_uid, true); // Highlight links
+          this.app.render()
+        });
+
+        circleSprite.on('mouseout', () => {
+          this.genomeStore.setHoveredSequence(null);
+          circleSprite.tint = 0xd3d3d3;
+          circleSprite.alpha = 0.5; // Dimmed color for non-hovered
+          this.spritesContainer.children.forEach((sprite) => {
+          if (sprite.sequence_uid !== circleSprite.sequence_uid) {
+              sprite.alpha = 0.5; // Dimmed color for non-hovered
+          }
+          })
+
+          this.highlightLinks(circleSprite.sequence_uid, false); // Reset links
+          this.app.render();
+        });
+
+
+          // Add interactivity for command/control key + click
+        circleSprite.on('pointerdown', (event) => {
+          if (event.originalEvent.metaKey || event.originalEvent.ctrlKey) {
+            console.log('control or command pressed')
+            event.stopPropagation();
+            // Check if the sprite is already selected
+            const isAlreadySelected = this.genomeStore.selectedSequencesLasso.includes(circleSprite.sequence_uid);
+
+            if (!isAlreadySelected) {
+              // Add to lasso selection
+              this.genomeStore.selectedSequencesLasso.push(circleSprite.sequence_uid);
+
+              // Update sprite appearance
+              circleSprite.tint = 0x007bff; // Highlight color for selected
+              circleSprite.alpha = 0.8; // Slightly more opaque
+
+              console.log(`Added ${circleSprite.sequence_uid} to lasso selection.`);
+            } else {
+              console.log(`${circleSprite.sequence_uid} is already selected.`);
+            }
+
+            // Trigger Vue reactivity for `selectedSequencesLasso`
+            this.genomeStore.setSelectedSequencesLasso([...this.genomeStore.selectedSequencesLasso]);
+
+            this.initializeLasso(this.app.canvas)
+            // Re-render
+            this.app.render();
+
+          }
+        });
+
+
+      // this.viewport.addChild(circleSprite);
+      // Add the sprite to spritesContainer
+      this.spritesContainer.addChild(circleSprite);
+    },
+    drawConnections(useAggregateLinks = true) {
+
+      console.log('drawing connections')
+      // // Clear existing lines
+      // if (!this.connectionGraphics) {
+      //   this.connectionGraphics = new PIXI.Graphics();
+      //   this.viewport.addChildAt(this.connectionGraphics, 0); // Add to the back
+      // }
+      // this.connectionGraphics.clear();
+
+ 
+      // this.viewport.addChild(this.connectionGraphics)
+
+      // Ensure the connectionGraphics container is created and ordered correctly
+      if (!this.linesContainer) {
+        this.linesContainer = new PIXI.Container();
+        this.viewport.addChildAt(this.linesContainer, 0); // Add to the back
+      }
+
+      // Clear existing lines
+      this.linesContainer.removeChildren(); // Clear previous connections
+
+      // this.connectionGraphics = new PIXI.Graphics();
+
+
+      const spriteLinks = this.genomeStore.sequenceHomologyLinks;
+
+      // Map sequence_uid to sprite for easy lookup
+      const spriteMap = new Map();
+      this.spritesContainer.children.forEach((sprite) => {
+      // this.viewport.children.forEach((sprite) => {
+        if (sprite.sequence_uid) {
+          spriteMap.set(sprite.sequence_uid, sprite);
+        }
+      });
+
+      if (useAggregateLinks) {
+        const sequenceOrder = this.genomeStore.sequenceHomologyMatrixlabels;
+        const homologyMatrix = this.genomeStore.sequenceHomologyMatrix;
+
+        // Iterate over the matrix
+        for (let i = 0; i < sequenceOrder.length; i++) {
+          for (let j = i + 1; j < sequenceOrder.length; j++) { // Upper triangle only
+            const sourceUid = sequenceOrder[i];
+            const targetUid = sequenceOrder[j];
+            const sharedCount = homologyMatrix[i][j];
+
+            if (sharedCount > 0) {
+              const sourceSprite = spriteMap.get(sourceUid);
+              const targetSprite = spriteMap.get(targetUid);
+              if (!sourceSprite || !targetSprite) continue;
+
+              const sourceX = sourceSprite.x + sourceSprite.totalRadius;
+              const sourceY = sourceSprite.y + sourceSprite.totalRadius;
+              const targetX = targetSprite.x + targetSprite.totalRadius;
+              const targetY = targetSprite.y + targetSprite.totalRadius;
+
+              // Calculate control point for curvature
+              const controlX = (sourceX + targetX) / 2 + (targetY - sourceY) * 0.2;
+              const controlY = (sourceY + targetY) / 2 + (sourceX - targetX) * 0.2;
+
+              // Normalize line width directly based on sharedCount
+              const normalizedWidth = Math.max(sharedCount / 5, 1); // Ensure minimum width
+
+              // Draw the line
+              const connectionGraphics = new PIXI.Graphics();
+              connectionGraphics.moveTo(sourceX, sourceY);
+              connectionGraphics.quadraticCurveTo(
+                controlX,
+                controlY,
+                targetX,
+                targetY
+              );
+              connectionGraphics.stroke({
+                width: normalizedWidth,
+                color: 0xd3d3d3,
+                alpha: 0.7,
+              });
+
+              // Add metadata for interaction/debugging
+              connectionGraphics.sourceSequenceUid = sourceUid;
+              connectionGraphics.targetSequenceUid = targetUid;
+              connectionGraphics.linkCount = sharedCount;
+
+              connectionGraphics.startX = sourceX;
+              connectionGraphics.startY = sourceY;
+              connectionGraphics.controlX = controlX;
+              connectionGraphics.controlY = controlY;
+              connectionGraphics.endX = targetX;
+              connectionGraphics.endY = targetY;
+
+              // Add to the lines container
+              this.linesContainer.addChild(connectionGraphics);
+              }
+            }
+          }
+          
+    } else {
+
+      // Draw connections based on homology links
+      this.spritesContainer.children.forEach((sprite) => {
+      // this.viewport.children.forEach((sprite) => {
+        if (!sprite.sequence_uid || !spriteLinks[sprite.sequence_uid]) return;
+
+        const sourceX = sprite.x + sprite.totalRadius;
+        const sourceY = sprite.y + sprite.totalRadius;
+
+        const links = spriteLinks[sprite.sequence_uid];
+        links.forEach((link) => {
+          const targetSprite = spriteMap.get(link.targetUid);
+          if (!targetSprite) return;
+
+          const targetX = targetSprite.x + targetSprite.totalRadius;
+          const targetY = targetSprite.y + targetSprite.totalRadius;
+
+          // Calculate control point for curvature
+          const controlX = (sourceX + targetX) / 2 + (targetY - sourceY) * 0.2; // Offset based on vertical distance
+          const controlY = (sourceY + targetY) / 2 + (sourceX - targetX) * 0.2; // Offset based on horizontal distance
+
+          const normalizedOpacity = Math.pow(link.identity / 100, 3);
+
+          // Draw the line
+          this.connectionGraphics = new PIXI.Graphics();
+          this.connectionGraphics.moveTo(sourceX, sourceY);
+          // this.connectionGraphics.lineTo(targetX, targetY);
+          this.connectionGraphics.quadraticCurveTo(controlX, controlY, targetX, targetY);
+          this.connectionGraphics.stroke({ width: 1, color:  0xd3d3d3, alpha: normalizedOpacity });
+
+          // Add source and target sequence_uid properties
+          this.connectionGraphics.sourceSequenceUid = sprite.sequence_uid;
+          this.connectionGraphics.targetSequenceUid = link.targetUid;
+
+          // Add geometry 
+          this.connectionGraphics.startX = sourceX;
+          this.connectionGraphics.startY = sourceY;
+          this.connectionGraphics.controlX = controlX;
+          this.connectionGraphics.controlY = controlY;
+          this.connectionGraphics.endX = targetX;
+          this.connectionGraphics.endY = targetY;
+          this.connectionGraphics.identityNorm = normalizedOpacity;
+
+          // Add to the lines container
+          this.linesContainer.addChild(this.connectionGraphics);
+        });
+      });
+
+    }
+
+
+
+      // // Collect all circle positions
+      // const circlePositions = [];
+      // this.viewport.children.forEach((sprite) => {
+      //   const spriteLinks = this.genomeStore.sequenceHomologyLinks
+
+      //   console.log('sprite', sprite.sequence_uid, sprite.totalRadius, spriteLinks[sprite.sequence_uid])
+      //   debugger;
+
+      //   if (sprite.sequence_uid) {
+      //     sprite.homologyLinks = spriteLinks[sprite.sequence_uid]
+      //     // const { tx: spriteXw, ty: spriteYw } = sprite._worldTransform
+      //     const spriteXw = sprite.x + sprite.totalRadius
+      //     const spriteYw = sprite.y + sprite.totalRadius
+      
+      //     // const { x: spriteXw, y: spriteYw } = sprite
+
+
+      //     circlePositions.push({ spriteXw, spriteYw });
+          
+      //   }
+    
+      // });
+
+      // // console.log('circlePositions', circlePositions)
+
+      // // Draw lines between all pairs of circles
+      // for (let i = 0; i < circlePositions.length; i++) {
+      //   for (let j = i + 1; j < circlePositions.length; j++) {
+      //     const start = circlePositions[i];
+      //     const end = circlePositions[j];
+
+      //     // Draw a line between each pair of circles
+      //     this.connectionGraphics.moveTo(start.spriteXw, start.spriteYw);
+      //     this.connectionGraphics.lineTo(end.spriteXw, end.spriteYw);
+      //     this.connectionGraphics.stroke({ width: 1, color: 0x00FF00, alpha: 0.2 });
+      //   }
+      // }
+
+      // // Draw lines between all sequences
+      // for (let i = 0; i < circlePositions.length - 1; i++) {
+      //   const start = circlePositions[i];
+      //   const end = circlePositions[i + 1];
+
+      //   // Draw a line between each pair of circles
+      //   this.connectionGraphics.moveTo(start.spriteXw, start.spriteYw);
+      //   this.connectionGraphics.lineTo(end.spriteXw, end.spriteYw);
+      //   this.connectionGraphics.stroke({ width: 1, color: 0x00FF00 });
+      // }
+      
+      // this.viewport.addChild(this.connectionGraphics);
+
+      const canvas = this.app.canvas
+      this.initializeLasso(canvas)
+
+      this.app.render();
+    },
+
+
+    drawTooltips() {
+      console.log('Drawing tooltips');
+
+      // Ensure the tooltipContainer is created and ordered correctly
+      if (!this.tooltipContainer) {
+        this.tooltipContainer = new PIXI.Container();
+        this.tooltipContainer.zIndex = 2; // Ensure it is above sprites and lines
+        this.viewport.addChildAt(this.tooltipContainer,2);
+      }
+
+      // Clear existing tooltips
+      this.tooltipContainer.removeChildren(); // Remove any previous tooltips
+
+      // Iterate over the sprites and create tooltips for each
+      this.spritesContainer.children.forEach((sprite) => {
+        if (!sprite.sequence_uid) return; // Skip if the sprite doesn't have a sequence_uid
+
+        const geneCount = this.genomeStore.sequenceToLociGenesLookup.get(sprite.sequence_uid)
+                  ?.genes.length || 1
+
+        // Create a tooltip for the sprite
+        const tooltipText = new PIXI.Text({text: sprite.sequence_id+' | '+geneCount+' genes', style:{
+          fontFamily: 'Arial',
+          fontSize: 12 * window.devicePixelRatio * this.viewport.scale.x,
+          fill: 0x000000, 
+          align: 'center',
+        }});
+
+        // const tooltipBackground = new PIXI.Graphics();
+        // const padding = 4; // Padding around the text
+
+        // tooltipBackground.rect(
+        //   sprite.x + 15,
+        //   sprite.y,
+        //   tooltipText.width + padding * 2,
+        //   tooltipText.height + padding * 2
+        // );
+        // tooltipBackground.fill({color:0x00FF00, alpha:0.9}); // White with slight transparency
+
+        // // // Position the background behind the text
+        // tooltipBackground.x = sprite.x + 15; // Offset horizontally
+        // tooltipBackground.y = sprite.y
+        // tooltipBackground.visible = false; // Start hidden
+        // tooltipBackground.scale.set(1 / this.viewport.scale.x); // Scale proportionally
+
+        // Set the tooltip's position relative to the sprite
+        // tooltip.anchor.set(0.5, 1); // Center horizontally, position above the sprite
+        tooltipText.x = sprite.x + 15;
+        tooltipText.y = sprite.y
+        tooltipText.visible = false; // Start hidden
+        tooltipText.sequence_uid = sprite.sequence_uid
+        tooltipText.scale.set(1 / this.viewport.scale.x); 
+
+        // Attach the tooltip to the sprite for interactivity
+        tooltipText.relatedSprite = sprite; //
+
+
+
+        // Add tooltip visibility handlers
+        sprite.interactive = true;
+        sprite.on('mouseover', () => {
+          this.highlightLinks(sprite.sequence_uid, true); // Highlight links when hovering
+        });
+        sprite.on('mouseout', () => {
+          this.highlightLinks(sprite.sequence_uid, false); // Reset links when not hovering
+        });
+
+        // Add the tooltip to the tooltipContainer
+        // this.tooltipContainer.addChild(tooltipBackground);
+        this.tooltipContainer.addChild(tooltipText);
+      });
+
+      console.log('Tooltips created and added to the container.');
+
+      const canvas = this.app.canvas
+      this.initializeLasso(canvas)
+
+      this.app.render();
     },
     drawGrid() {
       // Clear previous content
-      if (this.app) {
-        this.app.stage.removeChildren()
+      // if (this.app) {
+      //   this.app.stage.removeChildren()
+      // }
+
+      // // Clear previous content
+      // if (this.circleContainer) {
+      //   this.circleContainer.removeChildren() // Clear all children from the container
+      // }
+
+      // this.app.stage.addChild(this.circleContainer)
+      // // this.app.stage.addChild(this.foregroundContainer)
+
+      // /////// previous with only viewport //////////
+      // if (!this.viewport) {
+      //   console.error('Viewport is not initialized.')
+      //   return
+      // }
+
+      // // Clear the viewport
+      // this.viewport.removeChildren()
+      // ///////////////
+
+      // Ensure spritesContainer is created
+      if (!this.spritesContainer) {
+        this.spritesContainer = new PIXI.Container();
+        this.viewport.addChild(this.spritesContainer); // Add spritesContainer to the viewport
       }
 
-      // Clear previous content
-      if (this.circleContainer) {
-        this.circleContainer.removeChildren() // Clear all children from the container
-      }
+      // Clear the spritesContainer
+      this.spritesContainer.removeChildren();
 
-      this.app.stage.addChild(this.circleContainer)
-      // this.app.stage.addChild(this.foregroundContainer)
+      if (!this.viewport) {
+        console.error("Viewport is not initialized.");
+        return;
+      }
 
       const app = this.app
-      const circleContainer = this.circleContainer
+      // const circleContainer = this.circleContainer
       const devicePixelRatio = window.devicePixelRatio || 1
       const padding = 10
-      const circleRadius = 5 * devicePixelRatio * this.zoomLevel
+      const circleRadius = 5 * devicePixelRatio
       const circleSpacing = (2 * circleRadius) / devicePixelRatio
       const genomeGap = 20 * devicePixelRatio // Extra gap between genomes
+      const zoomLevel = this.viewport.scale.x
+      const resolution = window.devicePixelRatio * zoomLevel
 
       // Create the circle texture
-      this.createCircleTexture(circleRadius, app)
+      const { texture, totalRadius } = this.createCircleTexture(circleRadius, resolution, 0.5)
+      circleTexture.value = texture
+      // circleTexture.value = this.createCircleTexture(circleRadius, resolution, 0.5)
 
       // Check and log canvas size
       const canvas = this.app.canvas
@@ -397,59 +1204,71 @@ export default {
 
       const filterEmpty = this.genomeStore.filterEmpty
 
-      // Iterate over genomes
-      this.genomeStore.genomeData.genomes.forEach((genomeData) => {
-        const sequences = genomeData.sequences
+        // Determine which data structure to use
+      const genomes = filterEmpty
+        ? this.genomeStore.filteredGenomes // Map or Object with key-value pairs
+        : this.genomeStore.genomeData.genomes; // Array of objects
 
-        sequences.forEach((sequence, index) => {
-          // Create sprite for each sequence
+      // Iterate over the selected genome structure
+      if (filterEmpty) {
+        // `filteredGenomes` is a Map or object with keys as genome UIDs
+        Object.entries(genomes).forEach(([genomeUid, sequences]) => {
+          console.log('Drawing genome:', genomeUid);
 
-          const shouldDraw =
-            !filterEmpty || (sequence.loci && sequence.loci.length > 0)
+          sequences.forEach((sequence, index) => {
+            this.drawSequenceSprite(sequence, currentX, currentY, circleRadius);
 
-          if (shouldDraw) {
-            const circleSprite = new PIXI.Sprite(circleTexture.value)
+            // Update grid position
+            currentX += 2 * circleRadius + circleSpacing;
 
-             // Check if this sequence is part of the selectedSequencesLasso
-            const isSelected = this.genomeStore.selectedSequencesLasso.includes(
-              sequence.uid
-            )
-            circleSprite.tint = isSelected ? 0x007bff : 0xd3d3d3 // Blue if selected, gray otherwise
-            // circleSprite.tint = 0xd3d3d3 // Default color
-            circleSprite.alpha = 0.5
-            circleSprite.sequence_uid = sequence.uid
+            // Wrap to the next row if maxCols is reached
+            if ((index + 1) % maxCols === 0) {
+              currentX = padding;
+              currentY += 2 * circleRadius + circleSpacing;
+            }
+          });
 
-            circleSprite.x = currentX
-            circleSprite.y = currentY
+          // Add gap for the next genome
+          currentX = padding;
+          currentY += genomeGap;
+        });
+      } else {
+        // `genomeData.genomes` is an array of objects
+        genomes.forEach((genome) => {
+          console.log('Drawing genome:', genome.uid);
 
-            circleContainer.addChild(circleSprite)
-          }
+          genome.sequences.forEach((sequence, index) => {
+            this.drawSequenceSprite(sequence, currentX, currentY, circleRadius);
 
-          // Move to the next column
-          currentX += 2 * circleRadius + circleSpacing
+            // Update grid position
+            currentX += 2 * circleRadius + circleSpacing;
 
-          // Wrap to the next row if maxCols is reached
-          if ((index + 1) % maxCols === 0) {
-            currentX = padding
-            currentY += 2 * circleRadius + circleSpacing
-          }
-        })
+            // Wrap to the next row if maxCols is reached
+            if ((index + 1) % maxCols === 0) {
+              currentX = padding;
+              currentY += 2 * circleRadius + circleSpacing;
+            }
+          });
 
-        // Add extra gap for the next genome group
-        currentX = padding
-        currentY += 2 * circleRadius + circleSpacing + genomeGap
-      })
+          // Add gap for the next genome
+          currentX = padding;
+          currentY += genomeGap;
+        });
+      }
+      // this.app.stage.addChild(this.viewport)
 
-      this.app.stage.addChild(this.circleContainer)
-
-      app.render()
+      this.app.render()
 
       //  Reinitialize the lasso
-      this.initializeLasso(canvas)
+      if (!this.isDragging) {
+        this.initializeLasso(canvas)
+      }
 
-      console.log(lassoInstance.value.items())
+      // console.log(this.lassoInstance.items())
     },
     initializeLasso(canvas) {
+
+      d3.select(this.$refs.lasso).selectAll('g.lasso *').remove()
       // Ensure lasso SVG and elements are properly set up
       const svg = d3
         .select(this.$refs.lasso)
@@ -459,25 +1278,34 @@ export default {
         .style('top', '0')
         .style('left', '0')
         .style('pointer-events', 'none') // Ensure Pixi.js captures pointer events
+        
 
       // Set up the lasso instance
       lassoInstance.value = lasso()
         .targetArea(d3.select(canvas)) // Bind to the canvas
         .closePathDistance(150)
+        // .scale(this.viewport.scale.x)
+        // .translation({
+        //   x: this.viewport.worldTransform.tx,
+        //   y: this.viewport.worldTransform.ty,
+        // })
         .on('start', this.lassoStart)
-        .on('draw', this.lassoDraw)
+        .on('draw',this.lassoDraw)
         .on('end', this.lassoEnd)
 
       // Link lasso to the sprites in the container
-      lassoInstance.value.items(this.circleContainer.children as PIXI.Sprite[])
+      // lassoInstance.value.items(this.viewport.children as PIXI.Sprite[])
+      lassoInstance.value.items(this.spritesContainer.children as PIXI.Sprite[])
       svg.select('g.lasso').call(lassoInstance.value)
-
-      // // Store lasso instance for further interaction
-      // lassoInstance.value = lassoInstance;
 
       console.log('Lasso initialized and added.')
     },
     lassoStart() {
+      if (this.isShiftPressed.value === true) {
+        console.log('Skipping lasso start due to Shift key being pressed.')
+        return
+      }
+
       const genomeStore = useGenomeStore()
       console.log('Lasso selection started', genomeStore.selectedSequencesLasso)
       const trackerUids = genomeStore.selectedSequencesTracker
@@ -501,166 +1329,219 @@ export default {
         })
       }
     },
-    lassoDraw() {},
+    lassoDraw() {
+      if (this.isShiftPressed.value === true) {
+        console.log('Skipping lasso draw due to Shift key being pressed.')
+        return
+      }
+    },
     lassoEnd() {
+      if (this.isShiftPressed.value === true) {
+        console.log('Skipping lasso end due to Shift key being pressed.')
+        return
+      }
       console.log('lasso end')
 
-      const selectedSprites: string[] = []
+      var selectedSprites = []
 
-      try {
-        console.log('Lasso end')
+      // Get the device pixel ratio
+      const dpr = window.devicePixelRatio || 1;
 
+      const dyn_path = d3
+        .select(this.$refs.lasso)
+        .select('g.lasso')
+        .select('g.lasso')
+        .select('path.drawn')
+
+      const lassoPath = dyn_path.attr('d') // Get the current lasso path
+      console.log('Lasso path data at end:', lassoPath)
+      // Extract original lasso points
+      const parsedData = parseSVG(lassoPath);
+
+        // Extract coordinates
+        const lassoPoints = parsedData
+          .filter((command) => command.code === 'M' || command.code === 'L') // MoveTo or LineTo commands
+          .map((command) => [command.x * dpr , command.y * dpr]);
+
+        console.log('Lasso Points:', lassoPoints);
+
+
+        // checking matrices 
         lassoInstance.value.items().forEach((sprite) => {
-          if (sprite.__lasso.selected) {
-            sprite.tint = 0x007bff
-            selectedSprites.push(sprite.sequence_uid)
-            // genomeStore.setSelectedSequencesTracker(sprite.sequence_uid)
-          } else {
-            sprite.tint = 0xd3d3d3
-          }
-        })
+        // Get the sprite's position in the original data space using groupTransform
+        const { x: itemX, y: itemY } = sprite;
+        const { tx: spriteXl, ty: spriteYl } = sprite.localTransform
+        const { tx: spriteX, ty: spriteY } = sprite.groupTransform
+        const { tx: spriteXr, ty: spriteYr } = sprite.relativeGroupTransform
+        const { tx: spriteXw, ty: spriteYw } = sprite._worldTransform
+  
 
-        this.app?.render()
+      // console.log('Bounding Box:', boundingBox);
+      // console.log('dpr', dpr)
+      // console.log(
+      //     `Sprite at (${itemX}, ${itemY})`
+      //   );
+      //   console.log(
+      //     `Sprite group at (${spriteX}, ${spriteY})`
+      //   );
+      //   console.log(
+      //     `Sprite local at (${spriteXl}, ${spriteYl})`
+      //   );
+      //   console.log(
+      //     `Sprite relative at (${spriteXr}, ${spriteYr})`
+      //   );
+      //   console.log(
+      //     `Sprite world at (${spriteXw}, ${spriteYw})`
+      //   );
 
-        // const boolSprites = lassoInstance.value.items().map(x => x.__lasso.selected);
-        // console.log('boolSprites', boolSprites)
-        // const selectedSprites = lassoInstance.value.items().filter((sprite, index) => boolSprites[index] === true).map(
-        // (sprite) => sprite.sequence_uid
+         
+        // // For bebugging: Compute the bounding box, scaled for devicePixelRatio
+        // const boundingBox = lassoPoints.reduce(
+        //   (box, [x, y]) => ({
+        //     minX: Math.min(box.minX, x * dpr),
+        //     minY: Math.min(box.minY, y * dpr),
+        //     maxX: Math.max(box.maxX, x * dpr),
+        //     maxY: Math.max(box.maxY, y * dpr),
+        //   }),
+        //   { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
         // );
-        console.log('Selected sprites:', selectedSprites)
-        globalSelectedSprites.value = selectedSprites
-        const genomeStore = useGenomeStore()
-        genomeStore.setSelectedSequencesLasso(selectedSprites)
 
-        lassoInstance.value.reset();
+        // // Check if sprite is inside the bounding box
+        // const isInBoundingBox =
+        // spriteXw * dpr >= boundingBox.minX &&
+        // spriteXw * dpr <= boundingBox.maxX &&
+        // spriteYw * dpr >= boundingBox.minY &&
+        // spriteYw * dpr <= boundingBox.maxY;
 
-        // this.$forceUpdate();
-      } catch (error) {
-        console.error('Error in lassoEnd:', error)
-      }
+        // if (isInBoundingBox) {
+        //   console.log(`Sprite at (${spriteXw * dpr}, ${spriteYw * dpr}) is within bounding box`);
+        // } else {
+        //   console.log(`Sprite at (${spriteXw * dpr}, ${spriteYw * dpr}) is outside bounding box`);
+        // }
 
-      // // add the drawn path for the lasso
-      // const dyn_path = d3
-      //   .select(this.$refs.lasso)
-      //   .select('g.lasso')
-      //   .select('g.lasso')
-      //   .select('path.drawn')
+        // Create a point array for the sprite
+        const spritePoint = [spriteXw * dpr, spriteYw * dpr];
+        const lassoPointsDpr = lassoPoints.map(([x, y]) => [x * dpr, y * dpr]);
 
-      // // add a closed path
-      // const close_path = d3
-      //   .select(this.$refs.lasso)
-      //   .select('g.lasso')
-      //   .select('g.lasso')
-      //   .select('path.loop_close')
+        // Check if the point lies within the lasso polygon
+        const selected = this.isPointInPoly(lassoPointsDpr, spritePoint, dpr);
+        if (selected){
+          sprite.tint = 0x007bff
+          selectedSprites.push(sprite.sequence_uid)
+          // selectedItemsGroupTransform.push(sprite)
+        }
+        else{
+          sprite.tint = 0xd3d3d3
+        }
 
-      // // add an origin node
-      // const origin_node = d3
-      //   .select(this.$refs.lasso)
-      //   .select('g.lasso')
-      //   .select('g.lasso')
-      //   .select('circle.origin')
+      //   console.log(
+      //   `Sprite at (${spriteXw * dpr}, ${spriteYw * dpr}) is ${
+      //     selected ? 'inside' : 'outside'
+      //   } the lasso`
+      // );
 
-      // const lassoPath = dyn_path.attr('d') // Get the current lasso path
-      // // console.log('Lasso path data at end:', lassoPath)
+      });
 
-      // if (!lassoPath || lassoPath.length < 3) {
-      //   // console.warn('Lasso selection is empty or too small.')
-      //   return // Exit early
-      // }
+      this.app?.render()
+      // debugger;
 
-      // const polygonPoints = this.getPolygonFromPath(dyn_path.node())
+      // const boolSprites = lassoInstance.value.items().map(x => x.__lasso.selected);
+      // console.log('boolSprites', boolSprites)
+      // const selectedSprites = lassoInstance.value.items().filter((sprite, index) => boolSprites[index] === true).map(
+      // (sprite) => sprite.sequence_uid
+      // );
+      console.log('Selected sprites:', selectedSprites)
+      globalSelectedSprites.value = selectedSprites
+      this.selectedSprites = selectedSprites
+      const genomeStore = useGenomeStore()
+      genomeStore.setSelectedSequencesLasso(selectedSprites)
 
-      // // Log the points to the console
-      // console.log('Polygon Points:', polygonPoints)
-      // const selectedSprites = lassoInstance.value.items().filter((sprite) => {
-      //   const { x, y } = sprite.position
-      //   // console.log('{ x, y } ', { x, y })
-      //   return this.isPointInPolygon(x, y, polygonPoints) // Check if sprite is inside the lasso polygon
-      // })
-
-      // setTimeout(() => {
-      //   dyn_path.attr('d', null) // Clear the lasso path after a delay if needed
-      //   close_path.attr('d', null) // Clear the close path after a delay if needed
-      // }, 1000) // Adjust the delay as needed (e.g., 2000 ms = 2 seconds)
-      // origin_node.attr('display', 'none')
-
-      // console.log('Lasso path cleared in drawEnd.')
-
-      // // Apply effects to selected sprites
-      // selectedSprites.forEach((sprite) => {
-      //   sprite.tint = 0x007bff // Set sprite color to blue
-      //   sprite.alpha = 1
-      // })
-
-      // console.log('Selected sprites:', selectedSprites)
-      // selectedSprites.value = selectedSprites
-      // // Flattening the array and extracting UIDs
-      // const flattenedSequenceUids = selectedSprites
-      //   .flat()
-      //   .map((sprite) => sprite.sequence_uid)
-
-      // console.log(flattenedSequenceUids)
-
-      // const genomeStore = useGenomeStore() // Create an instance of the store
-      // // Save UIDs to the store
-      // genomeStore.setSelectedSequencesLasso(flattenedSequenceUids)
-      // // console.log(
-      // //   'Updated store with current lasso selection:',
-      // //   genomeStore.selectedSequencesLasso
-      // // )
-
-      // genomeStore.setSelectedSequencesTracker(flattenedSequenceUids)
-      // // console.log(
-      // //   'Updated store lasso selection tracker:',
-      // //   genomeStore.selectedSequencesTracker
-      // // )
-
-      // this.$forceUpdate() // might not need this?
     },
-    getPolygonFromPath(pathElement) {
-      const pathLength = pathElement.getTotalLength()
-      const numPoints = 1000
-      const points = []
+    isPointInPoly(polygon, point) {
 
-      for (let i = 0; i <= numPoints; i++) {
-        const point = pathElement.getPointAtLength((i / numPoints) * pathLength)
-        points.push([point.x, point.y])
-      }
+      // Scale the point by the devicePixelRatio
+      const [px, py] = [point[0], point[1]];
+      let isInside = false;
 
-      return points
-    },
-    isPointInPolygon(x, y, polygon) {
-      const dpr = window.devicePixelRatio || 1
-      x /= dpr
-      y /= dpr
-      let inside = false
-
+      // Iterate through the polygon edges
       for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i][0],
-          yi = polygon[i][1]
-        const xj = polygon[j][0],
-          yj = polygon[j][1]
+        // Scale polygon points by the devicePixelRatio
+        const [xi, yi] = [polygon[i][0], polygon[i][1]];
+        const [xj, yj] = [polygon[j][0], polygon[j][1]];
+
+        // Check if the point is between the y-coordinates of the edge
         const intersect =
-          yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
-        if (intersect) inside = !inside
+          yi > py !== yj > py &&
+          px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+
+        if (intersect) isInside = !isInside;
       }
-      return inside
+
+      return isInside;
     },
-    createCircleTexture(circleRadius, app) {
+    createCircleTexture(circleRadius, resolution, borderThickness) {
+      const res =
+        Math.max(1, window.devicePixelRatio) * (this.viewport?.scale.x || 1)
+      // console.log('Generating texture with resolution:', res)
+
+      // Adjust circle radius based on the zoom level to keep it constant
+      const adjustedRadius = circleRadius / (this.viewport?.scale.x || 1);
+      const adjustedBorderThickness = borderThickness * devicePixelRatio / (this.viewport?.scale.x || 1);
+
+      // console.log('Adjusted circle radius:', adjustedRadius);
+      // console.log('Adjusted border thickness:', adjustedBorderThickness);
+
+
       // Use PIXI.Graphics to draw a circle
       const graphics = new PIXI.Graphics()
-      // Draw border
-      const borderRadius = circleRadius + 0.5 * devicePixelRatio
-      const totalRadius =
-        borderRadius > circleRadius ? borderRadius : circleRadius
-      const borderColor = 0x000000
+
+      // Draw border and circle
+      // const borderRadius = adjustedRadius + 0.5 * devicePixelRatio;
+      const borderRadius = adjustedRadius + adjustedBorderThickness;
+      const totalRadius = borderRadius;
+      // const totalRadius = Math.max(borderRadius, adjustedRadius);
+      const borderColor = 0x000000; // Black border
       graphics.circle(totalRadius, totalRadius, borderRadius)
       graphics.fill(borderColor)
-      // Draw the circle
-      graphics.circle(totalRadius, totalRadius, circleRadius)
+      graphics.circle(totalRadius, totalRadius, adjustedRadius)
       graphics.fill(0xffffff)
-      // Generate a texture from the Graphics object
-      circleTexture.value = app.renderer.generateTexture(graphics)
+
+      // Draw border and cicle
+      // const borderRadius = circleRadius + 0.5 * devicePixelRatio
+      // const totalRadius =
+      //   borderRadius > circleRadius ? borderRadius : circleRadius
+      // const borderColor = 0x000000
+      // graphics.circle(totalRadius, totalRadius, borderRadius)
+      // graphics.fill(borderColor)
+      // // Draw the circle
+      // graphics.circle(totalRadius, totalRadius, circleRadius)
+      // graphics.fill(0xffffff)
+
+      // // Generate a texture from the Graphics object
+      // // const resolution = 10 * this.viewport.scale.x
+      // const texture = this.app.renderer.generateTexture(graphics, {
+      //   resolution: window.devicePixelRatio * (this.viewport?.scale.x || 1),
+      // })
+      // // texture.baseTexture.update();
+      // console.log('Base texture resolution:', texture.source.resolution, this.viewport?.scale.x);
+      // return texture
+      // Create a render texture for the circle
+      const renderTexture = PIXI.RenderTexture.create({
+        // width: circleRadius * 2.5,
+        // height: circleRadius * 2.5,
+        width: totalRadius * 2, // Adjust for border and padding
+        height: totalRadius * 2,
+        resolution: Math.max(
+          2,
+          window.devicePixelRatio * this.viewport.scale.x
+        ), // Adjust resolution based on zoom
+      })
+
+      // Render the graphics to the texture
+      this.app.renderer.render(graphics, {renderTexture})
+
+      // Return both the texture and totalRadius
+      return { texture: renderTexture, totalRadius };
     },
     createSprites(
       x,
@@ -680,7 +1561,9 @@ export default {
       }
 
       // Create a sprite using the circle texture
-      const circleSprite = new PIXI.Sprite(circleTexture.value)
+      const circleSprite = new PIXI.Sprite()
+      // Assign the texture
+      circleSprite.texture = circleTexture.value
 
       circleSprite.tint = 0xd3d3d3
       circleSprite.alpha = 0.5 // Set opacity to 50%
@@ -1022,15 +1905,33 @@ div {
   position: relative;
 }
 
+.ant-card-head {
+  pointer-events: none; /* Prevent header from triggering events */
+}
+
 .child-container {
   flex: 1; /* This will make it inherit the available width */
   width: 100%; /* Ensures full width */
+  height: calc(100% - 40px);
+  pointer-events: auto;
+  position: relative;
 }
 
-/* canvas {
-  height: 100%;
-  width: 100%;
-} */
+.focus-container {
+  position: relative; /* Position relative to card body */
+  width: 100%; /* Match the card body */
+  height: calc(100% - 40px); /* Exclude the card header */
+  outline: none; /* Prevent default outline */
+}
+
+canvas {
+  top: 0;
+  left: 0;
+  width: 100%; /* Fill the container */
+  height: 100%; /* Fill the container */
+  pointer-events: auto;
+  z-index: 10;
+}
 
 svg {
   height: 100%;
@@ -1069,5 +1970,9 @@ svg {
 
 .not-selected {
   opacity: 0.3; /* Dim items that are not selected */
+}
+
+canvas {
+  outline: none; /* Removes blue border on focus */
 }
 </style>

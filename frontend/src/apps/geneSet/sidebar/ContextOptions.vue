@@ -34,22 +34,11 @@ export default {
     >
       <ARow type="flex">
         <ACol :span="12">
-          <AFormItem label="All sequences">
-            <ASwitch size="small" v-model:checked="allSequences"
-          /></AFormItem>
           <AFormItem label="Color genomes">
             <ASwitch size="small" v-model:checked="colorGenomes"
           /></AFormItem>
-          <AFormItem label="Gene density"> <ASwitch size="small" /></AFormItem>
         </ACol>
-        <ACol :span="12">
-          <AFormItem label="GC %">
-            <ASwitch size="small" v-model:checked="percentageGC" />
-          </AFormItem>
-          <AFormItem label="ACGT %">
-            <ASwitch size="small" />
-          </AFormItem>
-        </ACol>
+       
       </ARow>
     </AForm>
   </SidebarItem>

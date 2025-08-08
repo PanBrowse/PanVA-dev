@@ -65,8 +65,8 @@ export default defineComponent({
 
     // Trigger loading of genome data
     genomeStore.loadGenomeData()
-    const isInitializedGenome = computed(() => genomeStore.isInitialized)
-
+    const isInitializedGenome = computed(() => genomeStore.isInitialized )
+    const rerun = computed(() => geneSetStore.rerunSimulation)
     // Computed properties for state
     const isInitialized = computed(() => geneSetStore.isInitialized)
     const showTable = computed(() => geneSetStore.showTable)
@@ -93,6 +93,9 @@ export default defineComponent({
       console.log('isInitialized:', geneInit)
       console.log('isInitializedGenome:', genomeInit)
     })
+    watch(rerun, (value) => {
+      console.log('rerun', value)
+    })
 
     // Trigger loading on component mount
     onMounted(() => {
@@ -100,9 +103,9 @@ export default defineComponent({
         if (!isInitialized.value) {
           geneSetStore.initialize()
         }
-        if (!isInitializedGenome.value) {
-          genomeStore.loadGenomeData()
-        }
+        // if (!isInitializedGenome.value) {
+        //   genomeStore.loadGenomeData()
+        // }
       } catch (error) {
         console.error('Error during component initialization:', error)
       }
@@ -120,6 +123,7 @@ export default defineComponent({
       embedding,
       embeddingFiltered,
       selectedEmbedding,
+      rerun
     }
   },
 })
@@ -129,12 +133,12 @@ export default defineComponent({
   <Layout v-if="isInitialized && isInitializedGenome">
     <template #sidebar>
       <OverviewFilters />
-      <Filters />
+      <!-- <Filters /> -->
       <Sorting />
       <SpringTuning />
       <GraphicsOptions />
-      <ContextOptions />
-      <Unphased />
+      <!-- <ContextOptions /> -->
+      <!-- <Unphased /> -->
     </template>
 
     <!-- Row 1: PixiCanvas Visualization -->
@@ -142,7 +146,6 @@ export default defineComponent({
       <ACol :span="12" :gutter="8" class="col full-height">
         <div class="content-overview" ref="parentElementUMAP">
           <PixiUMAP
-            :distanceMatrix="distanceMatrix"
             :embedding="selectedEmbedding"
             @loaded="handlePixiLoaded"
           />

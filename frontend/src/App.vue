@@ -24,7 +24,9 @@ export default {
   head() {
     const baseTitle = this.title || DEFAULT_TITLE
     const title = this.currentApp
-      ? `${baseTitle} - ${this.currentApp.name}`
+      // ? `${baseTitle} - ${this.currentApp.name}`
+      // ? `${this.currentApp.name}`
+      ? 'Multipla'
       : baseTitle
 
     return {

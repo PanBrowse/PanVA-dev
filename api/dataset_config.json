@@ -1,0 +1,44 @@
+{
+  "rose": {
+    "embedding_filtered": "geneSet/rose/filtered_embedding_rose_neighbors4_minDist0.1_seed42.json",
+    "embedding": "geneSet/rose/embedding_rose_neighbors10_minDist0.5_seed42.json",
+    "labels_filtered": "geneSet/rose/filtered_protein_distance_labels.json",
+    "labels": "geneSet/rose/protein_distance_labels.json",
+    "distance_matrix": "geneSet/rose/protein_distance_matrix.npy"
+  },
+  "rose_myb114": {
+    "embedding_filtered": "geneSet/rose_myb114/filtered_embedding_rose_myb114_neighbors2_minDist0.2_seed42.json",
+    "embedding": "geneSet/rose_myb114/embedding_rose_myb114_neighbors200_minDist0.3_seed42.json",
+    "labels_filtered": "geneSet/rose_myb114/filtered_protein_distance_labels.json",
+    "labels": "geneSet/rose_myb114/protein_distance_labels.json",
+    "distance_matrix": "geneSet/rose_myb114/protein_distance_matrix.npy"
+  },
+  "yeast": {
+    "embedding_filtered": "geneSet/yeast/filtered_embedding_yeast_neighbors2_minDist0.1_seed42.json",
+    "embedding": "geneSet/yeast/embedding_neighbors10_minDist0.1_seed42.json",
+    "labels_filtered": "geneSet/yeast/filtered_protein_distance_labels.json",
+    "labels": "geneSet/yeast/protein_distance_labels.json",
+    "distance_matrix": "geneSet/yeast/protein_distance_matrix.npy"
+  },
+  "yeast14": {
+    "embedding_filtered": "geneSet/yeast14/filtered_embedding_yeast14_neighbors2_minDist0.1_seed42.json",
+    "embedding": "geneSet/yeast14/embedding_yeast14_neighbors10_minDist0.1_seed42.json",
+    "labels_filtered": "geneSet/yeast14/filtered_protein_distance_labels.json",
+    "labels": "geneSet/yeast14/protein_distance_labels.json",
+    "distance_matrix": "geneSet/yeast14/protein_distance_matrix.npy"
+  },
+  "capsicum": {
+    "embedding_filtered": "geneSet/capsicum/filtered_embedding_capsicum_neighbors2_minDist0.1_seed42.json",
+    "embedding": "geneSet/capsicum/embedding_capsicum_neighbors360_minDist0.2_seed42.json",
+    "labels_filtered": "geneSet/capsicum/filtered_protein_distance_labels.json",
+    "labels": "geneSet/capsicum/protein_distance_labels.json",
+    "distance_matrix": "geneSet/capsicum/filtered_protein_distance_matrix.npy"
+  },
+  "capsicum_small": {
+    "embedding_filtered": "geneSet/capsicum_small/filtered_embedding_capsicum_small_neighbors2_minDist0.1_seed42.json",
+    "embedding": "geneSet/capsicum_small/embedding_capsicum_small_neighbors10_minDist0.1_seed42.json",
+    "labels_filtered": "geneSet/capsicum_small/filtered_protein_distance_labels.json",
+    "labels": "geneSet/capsicum_small/protein_distance_labels.json",
+    "distance_matrix": "geneSet/capsicum_small/filtered_protein_distance_matrix.npy"
+  }
+}
