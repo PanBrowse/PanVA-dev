@@ -11,7 +11,10 @@ export default ({ mode }: any) => {
   return defineConfig({
     // We want relative paths in our generated index.html.
     base: './',
-    plugins: [vue(), vueJsx()],
+    plugins: [
+      vue(), 
+      vueJsx()
+    ],
     resolve: {
       alias: {
         // Needed for vue3-runtime-template
